@@ -10,9 +10,17 @@ import WelcomeScreen from './components/WelcomeScreen';
 import CanvasView from './components/CanvasView';
 import { useZoomPan } from './hooks/useZoomPan';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
+import LayersPanel from './components/LayersPanel';
 
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 export type RectangleTagType = Exclude<FilterCategory, 'safety'>;
+
+const mockRfis: RfiData[] = [
+    { id: 101, title: 'Clarification on beam specification', type: 'Design Clarification', question: 'The structural drawing S-2.1 specifies a W12x26 beam, but the architectural drawing A-5.0 shows a W14x22. Please clarify which is correct.' },
+    { id: 102, title: 'Permission to use alternative sealant', type: 'Material Substitution', question: 'The specified sealant Dow Corning 795 is unavailable with a 6-week lead time. Can we substitute with Pecora 890, which has equivalent performance characteristics? Datasheet attached.' },
+    { id: 103, title: 'Unexpected conduit in wall cavity', type: 'Field Condition', question: 'During demolition of the partition wall in Room 204, we discovered an undocumented electrical conduit. Please advise on whether it is live and if it needs to be relocated.' },
+    { id: 104, title: 'Location of thermostat in Lobby', type: 'General Inquiry', question: 'The MEP drawings do not specify the exact mounting location for the main lobby thermostat. Please provide a location.' },
+];
 
 const mockSubmittals: SubmittalData[] = [
     { id: 'SUB-001', title: 'Structural Steel Shop Drawings', specSection: '05 12 00', status: 'In Review' },
@@ -54,6 +62,7 @@ const App: React.FC = () => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [rectangles, setRectangles] = useState<Rectangle[]>([]);
   const [pins, setPins] = useState<Pin[]>([]);
+  const [allRfis, setAllRfis] = useState<RfiData[]>(mockRfis);
   const [allPhotos, setAllPhotos] = useState<PhotoData[]>(mockPhotos);
   const [allPunches, setAllPunches] = useState<PunchData[]>(mockPunches);
   const [allSafetyIssues, setAllSafetyIssues] = useState<SafetyIssueData[]>(mockSafetyIssues);
@@ -73,17 +82,16 @@ const App: React.FC = () => {
   const [activePinType, setActivePinType] = useState<'photo' | 'safety' | 'punch'>('safety');
 
   // Panel & Modal State
-  const [isRfiPanelOpen, setIsRfiPanelOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<'rfi' | 'safety' | 'punch' | null>(null);
+
   const [rfiTargetRectId, setRfiTargetRectId] = useState<string | null>(null);
   const [rfiTargetRfiId, setRfiTargetRfiId] = useState<number | null>(null);
   const [rfiFormData, setRfiFormData] = useState({ title: '', type: 'General Inquiry', question: '' });
   const [isRfiEditMode, setIsRfiEditMode] = useState(false);
 
-  const [isSafetyPanelOpen, setIsSafetyPanelOpen] = useState(false);
   const [safetyTargetPinId, setSafetyTargetPinId] = useState<string | null>(null);
   const [safetyFormData, setSafetyFormData] = useState<Omit<SafetyIssueData, 'id'>>({ title: '', description: '', status: 'Open', severity: 'Medium' });
 
-  const [isPunchPanelOpen, setIsPunchPanelOpen] = useState(false);
   const [punchTargetPinId, setPunchTargetPinId] = useState<string | null>(null);
   const [punchFormData, setPunchFormData] = useState<Omit<PunchData, 'id'>>({ title: '', status: 'Open', assignee: '' });
   const [punchPanelMode, setPunchPanelMode] = useState<'create' | 'link'>('create');
@@ -109,6 +117,7 @@ const App: React.FC = () => {
     safety: true,
   });
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const [isLayersPanelOpen, setIsLayersPanelOpen] = useState(true);
 
   // Refs
   const imageContainerRef = useRef<HTMLDivElement>(null);
@@ -137,19 +146,19 @@ const App: React.FC = () => {
   }, [viewTransform]);
   
     const handleRfiCancel = useCallback(() => {
-    setIsRfiPanelOpen(false);
+    setActivePanel(null);
     setRfiTargetRectId(null);
     setRfiTargetRfiId(null);
     setRfiFormData({ title: '', type: 'General Inquiry', question: '' });
     setIsRfiEditMode(false);
-  }, []);
+    if (activeTool === 'pin') {
+        setActiveTool('select');
+    }
+  }, [activeTool]);
   
   const handleOpenRfiPanel = useCallback((rectId: string, rfiId: number | null) => {
-    const targetRect = rectangles.find(r => r.id === rectId);
-    if (!targetRect) return;
-    
     if (rfiId !== null) {
-        const rfiToEdit = targetRect.rfi?.find(r => r.id === rfiId);
+        const rfiToEdit = allRfis.find(r => r.id === rfiId);
         if (rfiToEdit) {
             setRfiFormData({title: rfiToEdit.title, type: rfiToEdit.type, question: rfiToEdit.question});
             setIsRfiEditMode(true);
@@ -163,9 +172,9 @@ const App: React.FC = () => {
     
     setRfiTargetRectId(rectId);
     setRfiTargetRfiId(rfiId);
-    setIsRfiPanelOpen(true);
+    setActivePanel('rfi');
     setLinkMenuRectId(null);
-  }, [rectangles]);
+  }, [allRfis]);
 
   const handleSubmenuLink = useCallback((e: React.MouseEvent, type: string, targetId: string | null) => {
     e.stopPropagation();
@@ -181,13 +190,12 @@ const App: React.FC = () => {
             if (targetId) handleOpenRfiPanel(targetId, null);
             break;
         case 'Link RFI':
-            const allRfis = rectangles.flatMap(r => r.rfi ? r.rfi.map(rfi => ({...rfi, id: rfi.id, title: `RFI-${rfi.id}: ${rfi.title}`})) : []);
             setLinkModalConfig({
                 type: 'rfi',
                 title: 'Link to an Existing RFI',
-                items: allRfis,
-                displayFields: [{ key: 'title' }],
-                searchFields: ['title', 'question'],
+                items: allRfis.map(rfi => ({ ...rfi, titleWithId: `RFI-${rfi.id}: ${rfi.title}` })),
+                displayFields: [{ key: 'titleWithId' }],
+                searchFields: ['title', 'question', 'id'],
             });
             setIsLinkModalOpen(true);
             break;
@@ -235,7 +243,12 @@ const App: React.FC = () => {
             alert(`Linking ${type} for rectangle ${targetId}`);
             break;
     }
-  }, [rectangles, allPhotos, allPunches, handleOpenRfiPanel]);
+  }, [allRfis, allPhotos, allPunches, handleOpenRfiPanel]);
+
+  const handleSetActiveTool = useCallback((tool: 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'distance' | 'drawing' | 'pin') => {
+    setActiveTool(tool);
+    setActivePanel(null);
+  }, []);
 
   const {
     interaction,
@@ -252,14 +265,15 @@ const App: React.FC = () => {
     selectedRectIds, setSelectedRectIds,
     setSelectedPinId,
     viewTransform, setViewTransform,
-    isRfiPanelOpen, handleRfiCancel,
+    isRfiPanelOpen: activePanel === 'rfi', handleRfiCancel,
     setLinkMenuRectId,
     draggingPinId, setDraggingPinId,
     getRelativeCoords,
     handleSubmenuLink,
     setPinTargetCoords,
-    setSafetyTargetPinId, setSafetyFormData, setIsSafetyPanelOpen,
-    setPunchTargetPinId, setPunchFormData, setPunchPanelMode, setIsPunchPanelOpen,
+    setSafetyTargetPinId, setSafetyFormData,
+    setPunchTargetPinId, setPunchFormData, setPunchPanelMode,
+    setActivePanel,
     mouseDownRef,
   });
 
@@ -340,7 +354,7 @@ const App: React.FC = () => {
                     case 'rfi':
                         if (!newRect.rfi) newRect.rfi = [];
                         if (!newRect.rfi.some(r => r.id === item.id)) {
-                            const originalRfi = rectangles.flatMap(r => r.rfi || []).find(rfi => rfi.id === item.id);
+                            const originalRfi = allRfis.find(rfi => rfi.id === item.id);
                             if(originalRfi) newRect.rfi.push(originalRfi);
                         }
                         break;
@@ -366,15 +380,20 @@ const App: React.FC = () => {
             return rect;
         }));
     } else if (pinTargetCoords && linkModalConfig?.type === 'photo') {
+        const newPinName = `Photo ${pins.filter(p => p.type === 'photo').length + 1}`;
         const newPin: Pin = {
             id: `pin-${Date.now()}`,
             type: 'photo',
             x: pinTargetCoords.x,
             y: pinTargetCoords.y,
-            linkedId: item.id
+            linkedId: item.id,
+            name: newPinName,
+            visible: true
         };
         setPins(prev => [...prev, newPin]);
         setPinTargetCoords(null);
+        setActiveTool('select');
+        setActivePanel(null);
     }
 
     setIsLinkModalOpen(false);
@@ -388,34 +407,49 @@ const App: React.FC = () => {
 
   const handleRfiSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rfiTargetRectId) return;
   
-    setRectangles(prevRects =>
-      prevRects.map(rect => {
-        if (rect.id === rfiTargetRectId) {
-          const newRect = { ...rect };
-  
-          if (isRfiEditMode && rfiTargetRfiId !== null) {
-            newRect.rfi = newRect.rfi?.map(rfi =>
-              rfi.id === rfiTargetRfiId ? { ...rfi, ...rfiFormData } : rfi
-            );
-          } else {
-            const newRfiId = (prevRects.flatMap(r => r.rfi || []).reduce((maxId, rfi) => Math.max(maxId, rfi.id), 0)) + 1;
-            const newRfiData: RfiData = { id: newRfiId, ...rfiFormData };
+    if (isRfiEditMode && rfiTargetRfiId !== null) {
+      // Editing an existing RFI
+      const updatedRfiData = { id: rfiTargetRfiId, ...rfiFormData };
+      
+      // Update the master list
+      setAllRfis(prev => prev.map(rfi => rfi.id === rfiTargetRfiId ? updatedRfiData : rfi));
+
+      // Update it in any rectangle that might have it linked
+      setRectangles(prevRects => prevRects.map(rect => ({
+          ...rect,
+          rfi: rect.rfi?.map(r => r.id === rfiTargetRfiId ? updatedRfiData : r)
+      })));
+
+    } else if (rfiTargetRectId) {
+      // Creating a new RFI and linking it
+      const newRfiId = (allRfis.reduce((maxId, rfi) => Math.max(maxId, rfi.id), 0)) + 1;
+      const newRfiData: RfiData = { id: newRfiId, ...rfiFormData };
+      
+      // Add to the master list
+      setAllRfis(prev => [...prev, newRfiData]);
+
+      // Add to the target rectangle
+      setRectangles(prevRects =>
+        prevRects.map(rect => {
+          if (rect.id === rfiTargetRectId) {
+            const newRect = { ...rect };
             if (!newRect.rfi) newRect.rfi = [];
             newRect.rfi.push(newRfiData);
+            return newRect;
           }
-          return newRect;
-        }
-        return rect;
-      })
-    );
+          return rect;
+        })
+      );
+    }
+    
     handleRfiCancel();
   };
   
   const handlePinDetails = (pin: Pin) => {
       setSelectedPinId(null);
       if (pin.type === 'photo') {
+          setActivePanel(null);
           setPhotoViewerConfig({ photoId: pin.linkedId, pinId: pin.id });
           setIsPhotoViewerOpen(true);
       } else if (pin.type === 'safety') {
@@ -423,7 +457,7 @@ const App: React.FC = () => {
           if (issue) {
               setSafetyFormData(issue);
               setSafetyTargetPinId(pin.id);
-              setIsSafetyPanelOpen(true);
+              setActivePanel('safety');
           }
       } else if (pin.type === 'punch') {
           const punchItem = allPunches.find(p => p.id === pin.linkedId);
@@ -431,7 +465,7 @@ const App: React.FC = () => {
               setPunchFormData(punchItem);
               setPunchTargetPinId(pin.id);
               setPunchPanelMode('create');
-              setIsPunchPanelOpen(true);
+              setActivePanel('punch');
           }
       }
   };
@@ -442,16 +476,22 @@ const App: React.FC = () => {
   };
 
   const handleSafetyPanelCancel = () => {
-      setIsSafetyPanelOpen(false);
+      setActivePanel(null);
       setSafetyTargetPinId(null);
       setSafetyFormData({ title: '', description: '', status: 'Open', severity: 'Medium' });
+      if (pinTargetCoords || activeTool === 'pin') {
+          setActiveTool('select');
+      }
       setPinTargetCoords(null);
   };
 
   const handlePunchPanelCancel = () => {
-      setIsPunchPanelOpen(false);
+      setActivePanel(null);
       setPunchTargetPinId(null);
       setPunchFormData({ title: '', status: 'Open', assignee: '' });
+      if (pinTargetCoords || activeTool === 'pin') {
+          setActiveTool('select');
+      }
       setPinTargetCoords(null);
       setPunchSearchTerm('');
   };
@@ -475,8 +515,10 @@ const App: React.FC = () => {
       } else if (pinTargetCoords) { // Creating new
           const newIssue: SafetyIssueData = { id: `SAFE-${Date.now()}`, ...safetyFormData };
           setAllSafetyIssues(prev => [...prev, newIssue]);
-          const newPin: Pin = { id: `pin-${Date.now()}`, type: 'safety', x: pinTargetCoords.x, y: pinTargetCoords.y, linkedId: newIssue.id };
+          const newPinName = `Safety ${pins.filter(p => p.type === 'safety').length + 1}`;
+          const newPin: Pin = { id: `pin-${Date.now()}`, type: 'safety', x: pinTargetCoords.x, y: pinTargetCoords.y, linkedId: newIssue.id, name: newPinName, visible: true };
           setPins(prev => [...prev, newPin]);
+          setActiveTool('select');
       }
       handleSafetyPanelCancel();
   };
@@ -492,16 +534,20 @@ const App: React.FC = () => {
       } else if (pinTargetCoords) { // Creating new
           const newItem: PunchData = { id: `PUNCH-${Date.now()}`, ...punchFormData };
           setAllPunches(prev => [...prev, newItem]);
-          const newPin: Pin = { id: `pin-${Date.now()}`, type: 'punch', x: pinTargetCoords.x, y: pinTargetCoords.y, linkedId: newItem.id };
+          const newPinName = `Punch ${pins.filter(p => p.type === 'punch').length + 1}`;
+          const newPin: Pin = { id: `pin-${Date.now()}`, type: 'punch', x: pinTargetCoords.x, y: pinTargetCoords.y, linkedId: newItem.id, name: newPinName, visible: true };
           setPins(prev => [...prev, newPin]);
+          setActiveTool('select');
       }
       handlePunchPanelCancel();
   };
 
   const handleLinkExistingPunch = (punch: PunchData) => {
     if (pinTargetCoords) {
-      const newPin: Pin = { id: `pin-${Date.now()}`, type: 'punch', x: pinTargetCoords.x, y: pinTargetCoords.y, linkedId: punch.id };
+      const newPinName = `Punch ${pins.filter(p => p.type === 'punch').length + 1}`;
+      const newPin: Pin = { id: `pin-${Date.now()}`, type: 'punch', x: pinTargetCoords.x, y: pinTargetCoords.y, linkedId: punch.id, name: newPinName, visible: true };
       setPins((prev) => [...prev, newPin]);
+      setActiveTool('select');
     }
     handlePunchPanelCancel();
   };
@@ -524,8 +570,11 @@ const App: React.FC = () => {
                 return rect;
              }));
           } else if (pinTargetCoords) {
-             const newPin: Pin = { id: `pin-${Date.now()}`, type: 'photo', x: pinTargetCoords.x, y: pinTargetCoords.y, linkedId: newPhoto.id };
+             const newPinName = `Photo ${pins.filter(p => p.type === 'photo').length + 1}`;
+             const newPin: Pin = { id: `pin-${Date.now()}`, type: 'photo', x: pinTargetCoords.x, y: pinTargetCoords.y, linkedId: newPhoto.id, name: newPinName, visible: true };
              setPins(prev => [...prev, newPin]);
+             setActiveTool('select');
+             setActivePanel(null);
           }
           setIsLinkModalOpen(false);
           setLinkModalConfig(null);
@@ -560,88 +609,151 @@ const App: React.FC = () => {
 
   const currentPhotoForViewer = photoViewerConfig ? allPhotos.find(p => p.id === photoViewerConfig.photoId) : null;
 
+  // Handlers for Layers Panel
+  const handleRenameRect = useCallback((id: string, newName: string) => {
+    setRectangles(prev => prev.map(r => r.id === id ? { ...r, name: newName } : r));
+  }, []);
+
+  const handleToggleRectVisibility = useCallback((id: string) => {
+    setRectangles(prev => prev.map(r => r.id === id ? { ...r, visible: !r.visible } : r));
+  }, []);
+
+  const handleDeleteRect = useCallback((id: string) => {
+    setRectangles(prev => prev.filter(r => r.id !== id));
+    setSelectedRectIds(prev => prev.filter(selectedId => selectedId !== id));
+  }, []);
+
+  const handleSelectRect = useCallback((id: string, e: React.MouseEvent) => {
+    setSelectedPinId(null);
+    if (e.shiftKey) {
+        setSelectedRectIds(prev => prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]);
+    } else {
+        setSelectedRectIds([id]);
+    }
+  }, []);
+  
+  const handleRenamePin = useCallback((id: string, newName: string) => {
+    setPins(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p));
+  }, []);
+
+  const handleTogglePinVisibility = useCallback((id: string) => {
+    setPins(prev => prev.map(p => p.id === id ? { ...p, visible: !p.visible } : p));
+  }, []);
+  
+  const handleSelectPin = useCallback((id: string, e: React.MouseEvent) => {
+    setSelectedRectIds([]);
+    setSelectedPinId(prev => (prev === id ? null : id));
+  }, []);
+
+  const handleOpenPhotoViewerFromLayer = useCallback((photoId: string) => {
+    setPhotoViewerConfig({ photoId });
+    setIsPhotoViewerOpen(true);
+  }, []);
+
   return (
     <div className="h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white flex flex-col items-stretch p-4 overflow-hidden">
       <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
       <input type="file" accept="image/*" onChange={handlePhotoFileChange} className="hidden" ref={photoFileInputRef} />
-      <main className="w-full flex-grow flex flex-col items-center bg-white dark:bg-gray-800 rounded-2xl shadow-2xl shadow-cyan-500/10 p-2">
+      <main className="w-full flex-grow flex flex-row items-stretch bg-white dark:bg-gray-800 rounded-2xl shadow-2xl shadow-cyan-500/10 p-2 overflow-hidden">
         {!imageSrc ? (
           <WelcomeScreen onUploadClick={triggerFileUpload} />
         ) : (
-          <CanvasView
-            imageSrc={imageSrc}
-            rectangles={rectangles}
-            pins={pins}
-            filters={filters}
-            viewTransform={viewTransform}
-            interaction={interaction}
-            activeTool={activeTool}
-            hoveredRectId={hoveredRectId}
-            draggingPinId={draggingPinId}
-            selectedRectIds={selectedRectIds}
-            selectedPinId={selectedPinId}
-            currentRect={currentRect}
-            marqueeRect={marqueeRect}
-            isMenuVisible={isMenuVisible}
-            linkMenuRectId={linkMenuRectId}
-            openLinkSubmenu={openLinkSubmenu}
-            isFilterMenuOpen={isFilterMenuOpen}
-            theme={theme}
-            imageContainerRef={imageContainerRef}
-            filterMenuRef={filterMenuRef}
-            handleMouseDown={handleMouseDown}
-            handleMouseMove={handleMouseMove}
-            handleMouseUp={handleMouseUp}
-            handleMouseLeave={handleMouseLeave}
-            handleWheel={handleWheel}
-            handleZoom={handleZoom}
-            handleThemeToggle={handleThemeToggle}
-            onUploadClick={triggerFileUpload}
-            onClearAll={handleClearAll}
-            setHoveredRectId={setHoveredRectId}
-            getRelativeCoords={getRelativeCoords}
-            setActiveTool={setActiveTool}
-            activeShape={activeShape}
-            setActiveShape={setActiveShape}
-            activePinType={activePinType}
-            setActivePinType={setActivePinType}
-            setDraggingPinId={setDraggingPinId}
-            setSelectedPinId={setSelectedPinId}
-            handlePinDetails={handlePinDetails}
-            handleDeletePin={handleDeletePin}
-            setHoveredItem={setHoveredItem}
-            hidePopupTimer={hidePopupTimer}
-            handleResizeStart={(e, rectId, handle) => {
-              e.stopPropagation();
-              const startPoint = getRelativeCoords(e);
-              const rectToResize = rectangles.find(r => r.id === rectId);
-              if (!startPoint || !rectToResize) return;
-              setLinkMenuRectId(null);
-              useCanvasInteraction.setState({ type: 'resizing', startPoint, initialRects: [rectToResize], handle });
-            }}
-            handlePublishRect={(e, id) => {
-              e.stopPropagation();
-              alert(`Publishing rectangle ${id}`);
-              setLinkMenuRectId(null);
-            }}
-            handleLinkRect={(e, id) => {
-              e.stopPropagation();
-              setLinkMenuRectId(prevId => (prevId === id ? null : id));
-            }}
-            handleDeleteSelected={handleDeleteSelected}
-            setOpenLinkSubmenu={setOpenLinkSubmenu}
-            handleSubmenuLink={handleSubmenuLink}
-            setIsFilterMenuOpen={setIsFilterMenuOpen}
-            handleFilterChange={handleFilterChange}
-            handleToggleAllFilters={handleToggleAllFilters}
-            onOpenRfiPanel={handleOpenRfiPanel}
-            onOpenPhotoViewer={(config) => {
-              setPhotoViewerConfig(config);
-              setIsPhotoViewerOpen(true);
-            }}
-            mouseDownRef={mouseDownRef}
-            setSelectedRectIds={setSelectedRectIds}
-          />
+          <>
+            <LayersPanel
+              isOpen={isLayersPanelOpen}
+              onToggle={() => setIsLayersPanelOpen(p => !p)}
+              rectangles={rectangles}
+              pins={pins}
+              selectedRectIds={selectedRectIds}
+              selectedPinId={selectedPinId}
+              onSelectRect={handleSelectRect}
+              onSelectPin={handleSelectPin}
+              onRenameRect={handleRenameRect}
+              onRenamePin={handleRenamePin}
+              onDeleteRect={handleDeleteRect}
+              onDeletePin={handleDeletePin}
+              onToggleRectVisibility={handleToggleRectVisibility}
+              onTogglePinVisibility={handleTogglePinVisibility}
+              onOpenRfiPanel={handleOpenRfiPanel}
+              onOpenPhotoViewer={handleOpenPhotoViewerFromLayer}
+            />
+            <div className="flex-grow h-full relative">
+              <CanvasView
+                imageSrc={imageSrc}
+                rectangles={rectangles}
+                pins={pins}
+                filters={filters}
+                viewTransform={viewTransform}
+                interaction={interaction}
+                activeTool={activeTool}
+                hoveredRectId={hoveredRectId}
+                draggingPinId={draggingPinId}
+                selectedRectIds={selectedRectIds}
+                selectedPinId={selectedPinId}
+                currentRect={currentRect}
+                marqueeRect={marqueeRect}
+                isMenuVisible={isMenuVisible}
+                linkMenuRectId={linkMenuRectId}
+                openLinkSubmenu={openLinkSubmenu}
+                isFilterMenuOpen={isFilterMenuOpen}
+                theme={theme}
+                imageContainerRef={imageContainerRef}
+                filterMenuRef={filterMenuRef}
+                handleMouseDown={handleMouseDown}
+                handleMouseMove={handleMouseMove}
+                handleMouseUp={handleMouseUp}
+                handleMouseLeave={handleMouseLeave}
+                handleWheel={handleWheel}
+                handleZoom={handleZoom}
+                handleThemeToggle={handleThemeToggle}
+                onUploadClick={triggerFileUpload}
+                onClearAll={handleClearAll}
+                setHoveredRectId={setHoveredRectId}
+                getRelativeCoords={getRelativeCoords}
+                setActiveTool={handleSetActiveTool}
+                activeShape={activeShape}
+                setActiveShape={setActiveShape}
+                activePinType={activePinType}
+                setActivePinType={setActivePinType}
+                setDraggingPinId={setDraggingPinId}
+                setSelectedPinId={setSelectedPinId}
+                handlePinDetails={handlePinDetails}
+                handleDeletePin={handleDeletePin}
+                setHoveredItem={setHoveredItem}
+                hidePopupTimer={hidePopupTimer}
+                handleResizeStart={(e, rectId, handle) => {
+                  e.stopPropagation();
+                  const startPoint = getRelativeCoords(e);
+                  const rectToResize = rectangles.find(r => r.id === rectId);
+                  if (!startPoint || !rectToResize) return;
+                  setLinkMenuRectId(null);
+                  useCanvasInteraction.setState({ type: 'resizing', startPoint, initialRects: [rectToResize], handle });
+                }}
+                handlePublishRect={(e, id) => {
+                  e.stopPropagation();
+                  alert(`Publishing rectangle ${id}`);
+                  setLinkMenuRectId(null);
+                }}
+                handleLinkRect={(e, id) => {
+                  e.stopPropagation();
+                  setLinkMenuRectId(prevId => (prevId === id ? null : id));
+                }}
+                handleDeleteSelected={handleDeleteSelected}
+                setOpenLinkSubmenu={setOpenLinkSubmenu}
+                handleSubmenuLink={handleSubmenuLink}
+                setIsFilterMenuOpen={setIsFilterMenuOpen}
+                handleFilterChange={handleFilterChange}
+                handleToggleAllFilters={handleToggleAllFilters}
+                onOpenRfiPanel={handleOpenRfiPanel}
+                onOpenPhotoViewer={(config) => {
+                  setPhotoViewerConfig(config);
+                  setIsPhotoViewerOpen(true);
+                }}
+                mouseDownRef={mouseDownRef}
+                setSelectedRectIds={setSelectedRectIds}
+              />
+            </div>
+          </>
         )}
       </main>
 
@@ -667,6 +779,9 @@ const App: React.FC = () => {
         config={linkModalConfig}
         onClose={() => {
             setIsLinkModalOpen(false);
+            if (pinTargetCoords || activeTool === 'pin') {
+                setActiveTool('select');
+            }
             setPinTargetCoords(null);
         }}
         onSelect={handleSelectLinkItem}
@@ -681,7 +796,7 @@ const App: React.FC = () => {
       />
 
       <RfiPanel
-        isOpen={isRfiPanelOpen}
+        isOpen={activePanel === 'rfi'}
         isEditMode={isRfiEditMode}
         formData={rfiFormData}
         onFormChange={handleRfiFormChange}
@@ -690,7 +805,7 @@ const App: React.FC = () => {
       />
       
       <SafetyPanel
-        isOpen={isSafetyPanelOpen}
+        isOpen={activePanel === 'safety'}
         isEditMode={!!safetyTargetPinId}
         formData={safetyFormData}
         onFormChange={handleSafetyFormChange}
@@ -699,7 +814,7 @@ const App: React.FC = () => {
       />
       
       <PunchPanel
-        isOpen={isPunchPanelOpen}
+        isOpen={activePanel === 'punch'}
         isEditMode={!!punchTargetPinId}
         mode={punchPanelMode}
         onModeChange={setPunchPanelMode}

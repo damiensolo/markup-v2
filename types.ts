@@ -73,6 +73,8 @@ export interface Rectangle {
   y: number;
   width: number;
   height: number;
+  name: string;
+  visible: boolean;
   rfi?: RfiData[];
   submittals?: SubmittalData[];
   punches?: PunchData[];
@@ -100,6 +102,8 @@ export interface Pin {
   x: number; // percentage
   y: number; // percentage
   linkedId: string; // id of PhotoData, SafetyIssueData, or PunchData
+  name: string;
+  visible: boolean;
 }
 
 /**

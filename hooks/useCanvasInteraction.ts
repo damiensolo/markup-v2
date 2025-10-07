@@ -5,8 +5,8 @@ type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'distance' | '
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
 type ActivePinType = 'photo' | 'safety' | 'punch';
 
-const normalizeRect = (rect: Omit<Rectangle, 'id'> | Rectangle, activeShape: ActiveShape): Rectangle => {
-  const newRect = { ...rect, id: 'id' in rect ? rect.id : '', shape: 'shape' in rect && rect.shape ? rect.shape : activeShape };
+const normalizeRect = (rect: Omit<Rectangle, 'id' | 'name' | 'visible'> | Rectangle, activeShape: ActiveShape): Rectangle => {
+  const newRect = { ...rect, id: 'id' in rect ? rect.id : '', shape: 'shape' in rect && rect.shape ? rect.shape : activeShape, name: 'name' in rect ? rect.name : '', visible: 'visible' in rect ? rect.visible : true };
   if (newRect.width < 0) {
     newRect.x = newRect.x + newRect.width;
     newRect.width = Math.abs(newRect.width);
@@ -31,13 +31,14 @@ export const useCanvasInteraction = ({
   getRelativeCoords,
   handleSubmenuLink,
   setPinTargetCoords,
-  setSafetyTargetPinId, setSafetyFormData, setIsSafetyPanelOpen,
-  setPunchTargetPinId, setPunchFormData, setPunchPanelMode, setIsPunchPanelOpen,
+  setSafetyTargetPinId, setSafetyFormData,
+  setPunchTargetPinId, setPunchFormData, setPunchPanelMode,
+  setActivePanel,
   mouseDownRef,
 }: any) => {
   const [interaction, setInteraction] = useState<InteractionState>({ type: 'none' });
-  const [currentRect, setCurrentRect] = useState<Omit<Rectangle, 'id'> | null>(null);
-  const [marqueeRect, setMarqueeRect] = useState<Omit<Rectangle, 'id'> | null>(null);
+  const [currentRect, setCurrentRect] = useState<Omit<Rectangle, 'id' | 'name' | 'visible'> | null>(null);
+  const [marqueeRect, setMarqueeRect] = useState<Omit<Rectangle, 'id' | 'name' | 'visible'> | null>(null);
 
   const handleMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest('[data-interactive-ui="true"]')) return;
@@ -161,18 +162,19 @@ export const useCanvasInteraction = ({
       setPinTargetCoords(coords);
       switch (activePinType) {
         case 'photo':
+          setActivePanel(null);
           handleSubmenuLink(event, 'Link Photo', 'pin');
           break;
         case 'safety':
           setSafetyTargetPinId(null);
           setSafetyFormData({ title: '', description: '', status: 'Open', severity: 'Medium' });
-          setIsSafetyPanelOpen(true);
+          setActivePanel('safety');
           break;
         case 'punch':
           setPunchTargetPinId(null);
           setPunchFormData({ title: '', status: 'Open', assignee: '' });
           setPunchPanelMode('create');
-          setIsPunchPanelOpen(true);
+          setActivePanel('punch');
           break;
       }
       setInteraction({ type: 'none' });
@@ -184,7 +186,9 @@ export const useCanvasInteraction = ({
     if (interaction.type === 'drawing' && currentRect) {
       const normalized = normalizeRect(currentRect, activeShape);
       if (Math.abs(normalized.width) > 1 && Math.abs(normalized.height) > 1) {
-        const newRect = { ...normalized, id: Date.now().toString() };
+        const shapeName = normalized.shape.charAt(0).toUpperCase() + normalized.shape.slice(1);
+        const count = rectangles.filter((r: Rectangle) => r.shape === normalized.shape).length + 1;
+        const newRect = { ...normalized, id: Date.now().toString(), name: `${shapeName} ${count}`, visible: true };
         setRectangles((prev: Rectangle[]) => [...prev, newRect]);
         setSelectedRectIds([newRect.id]);
       }

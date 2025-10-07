@@ -110,7 +110,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
 
   return (
     <div className="relative">
-      <div className="flex flex-row items-center gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg">
+      <div className="flex flex-row items-center gap-1 bg-gray-900/95 backdrop-blur-sm p-1.5 rounded-lg shadow-xl">
         <ToolButton
             label="Select"
             icon={<MousePointerIcon />}

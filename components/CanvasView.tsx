@@ -23,8 +23,8 @@ interface CanvasViewProps {
     draggingPinId: string | null;
     selectedRectIds: string[];
     selectedPinId: string | null;
-    currentRect: Omit<Rectangle, 'id'> | null;
-    marqueeRect: Omit<Rectangle, 'id'> | null;
+    currentRect: Omit<Rectangle, 'id' | 'name' | 'visible'> | null;
+    marqueeRect: Omit<Rectangle, 'id' | 'name' | 'visible'> | null;
     isMenuVisible: boolean;
     linkMenuRectId: string | null;
     openLinkSubmenu: string | null;
@@ -106,8 +106,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         return 'cursor-default';
     };
 
-    const normalizeRect = (rect: Omit<Rectangle, 'id'> | Rectangle): Rectangle => {
-      const newRect = { ...rect, id: 'id' in rect ? rect.id : '', shape: 'shape' in rect && rect.shape ? rect.shape : activeShape };
+    const normalizeRect = (rect: Omit<Rectangle, 'id' | 'name' | 'visible'> | Rectangle): Rectangle => {
+      const newRect = { ...rect, id: 'id' in rect ? rect.id : '', shape: 'shape' in rect && rect.shape ? rect.shape : activeShape, name: 'name' in rect ? rect.name : '', visible: 'visible' in rect ? rect.visible : true };
       if (newRect.width < 0) {
         newRect.x = newRect.x + newRect.width;
         newRect.width = Math.abs(newRect.width);
@@ -132,7 +132,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         };
       }, [viewTransform, imageContainerRef]);
 
-    const getScreenRect = useCallback((rect: Omit<Rectangle, 'id'> | Rectangle): { left: number; top: number; width: number; height: number; } => {
+    const getScreenRect = useCallback((rect: Omit<Rectangle, 'id' | 'name' | 'visible'> | Rectangle): { left: number; top: number; width: number; height: number; } => {
         if (!imageContainerRef.current) return { left: 0, top: 0, width: 0, height: 0 };
         const containerRect = imageContainerRef.current.getBoundingClientRect();
 
@@ -258,7 +258,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                 >
                     <div className="absolute top-0 left-0 w-full h-full" style={{ transform: `translate(${viewTransform.translateX}px, ${viewTransform.translateY}px) scale(${viewTransform.scale})`, transformOrigin: '0 0' }}>
                         <img src={imageSrc} alt="Blueprint" className="w-full h-full object-contain pointer-events-none" />
-                        {rectangles.map((rect) => {
+                        {rectangles.filter(r => r.visible).map((rect) => {
                             const normalized = normalizeRect(rect);
                             const isSelected = selectedRectIds.includes(rect.id);
                             const strokeColor = isSelected ? '#f87171' : '#ef4444';
@@ -286,7 +286,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     </div>
 
                     {/* Screen-space Overlays */}
-                    {pins.filter(pin => filters[pin.type as FilterCategory]).map(pin => {
+                    {pins.filter(pin => pin.visible && filters[pin.type as FilterCategory]).map(pin => {
                       const screenPos = getScreenPoint(pin.x, pin.y);
                       if (!screenPos) return null;
                       const PinIcon = { photo: PhotoPinIcon, safety: SafetyPinIcon, punch: PunchPinIcon }[pin.type];
@@ -396,13 +396,13 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     {marqueeScreenRect && (<div className="absolute border-2 border-dashed border-blue-400 bg-blue-400/20 pointer-events-none" style={marqueeScreenRect} />)}
 
                     {/* Item Tags */}
-                    {rectangles.map(rect => {
+                    {rectangles.filter(r => r.visible).map(rect => {
                         const screenRect = getScreenRect(rect);
                         if (!screenRect) return null;
                         let tagCount = 0;
                         const renderTag = (type: RectangleTagType, item: any, text: string) => {
                             if (!filters[type]) return null;
-                            const tagColorClasses = { rfi: 'bg-blue-600/85 hover:bg-blue-500/85', submittal: 'bg-green-600/85 hover:bg-green-500/85', punch: 'bg-orange-600/85 hover:bg-orange-500/85', drawing: 'bg-indigo-600/85 hover:bg-indigo-500/85', photo: 'bg-yellow-600/85 hover:bg-yellow-500/85' };
+                            const tagColorClasses = { rfi: 'bg-cyan-600/85 hover:bg-cyan-500/85', submittal: 'bg-green-600/85 hover:bg-green-500/85', punch: 'bg-orange-600/85 hover:bg-orange-500/85', drawing: 'bg-indigo-600/85 hover:bg-indigo-500/85', photo: 'bg-blue-600/85 hover:bg-blue-500/85' };
                             const positionIndex = tagCount++;
                             return (
                                 <div

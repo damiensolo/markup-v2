@@ -28,7 +28,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                     const photo = allPhotos.find(p => p.id === pin.linkedId);
                      if (photo) content = (
                         <>
-                            <h4 className="font-bold text-yellow-400 mb-2 truncate">{photo.id}: {photo.title}</h4>
+                            <h4 className="font-bold text-blue-400 mb-2 truncate">{photo.id}: {photo.title}</h4>
                              <button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -119,7 +119,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                         const photo = rect.photos?.find(p => p.id === hoveredItem.itemId);
                         if (photo) content = (
                             <>
-                                <h4 className="font-bold text-yellow-400 mb-2 truncate">{photo.id}: {photo.title}</h4>
+                                <h4 className="font-bold text-blue-400 mb-2 truncate">{photo.id}: {photo.title}</h4>
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
