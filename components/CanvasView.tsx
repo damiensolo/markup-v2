@@ -5,9 +5,10 @@ import { RectangleTagType } from '../App';
 import { UploadIcon, TrashIcon, LinkIcon, ArrowUpTrayIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowsPointingOutIcon, SunIcon, MoonIcon, SafetyPinIcon, PunchPinIcon, PhotoPinIcon, InformationCircleIcon, FilterIcon } from './Icons';
 import Toolbar from './Toolbar';
 
-type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'distance' | 'drawing' | 'pin';
+type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
 type ActivePinType = 'photo' | 'safety' | 'punch';
+type ActiveColor = 'fill' | 'stroke';
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 
 
@@ -49,6 +50,8 @@ interface CanvasViewProps {
     setActiveShape: (shape: ActiveShape) => void;
     activePinType: ActivePinType;
     setActivePinType: (pinType: ActivePinType) => void;
+    activeColor: ActiveColor;
+    setActiveColor: (color: ActiveColor) => void;
     setDraggingPinId: (id: string | null) => void;
     setSelectedPinId: (id: string | null) => void;
     handlePinDetails: (pin: Pin) => void;
@@ -76,7 +79,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         selectedRectIds, selectedPinId, currentRect, marqueeRect, isMenuVisible, linkMenuRectId, openLinkSubmenu,
         isFilterMenuOpen, theme, isSpacebarDown, imageContainerRef, filterMenuRef, handleMouseDown, handleMouseMove, handleMouseUp,
         handleMouseLeave, handleWheel, handleZoom, handleThemeToggle, onUploadClick, onClearAll, setHoveredRectId,
-        getRelativeCoords, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType,
+        getRelativeCoords, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor, setActiveColor,
         setDraggingPinId, setSelectedPinId, handlePinDetails, handleDeletePin, setHoveredItem, hidePopupTimer,
         handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
         handleSubmenuLink, setIsFilterMenuOpen, handleFilterChange, handleToggleAllFilters, onOpenRfiPanel,
@@ -264,7 +267,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                             const normalized = normalizeRect(rect);
                             const isSelected = selectedRectIds.includes(rect.id);
                             const strokeColor = isSelected ? '#f87171' : '#ef4444';
-                            const shapeProps = { stroke: strokeColor, strokeWidth: 4 / viewTransform.scale, fill: "rgba(0,0,0,0.05)", vectorEffect: "non-scaling-stroke" };
+                            const shapeProps = { stroke: strokeColor, strokeWidth: 2 / viewTransform.scale, fill: "rgba(0,0,0,0.05)", vectorEffect: "non-scaling-stroke" };
                             const cloudFillColor = isSelected ? 'rgba(248, 113, 113, 0.1)' : 'rgba(239, 68, 68, 0.1)';
 
                             // Get the unscaled pixel dimensions for a stable viewBox
@@ -275,7 +278,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
 
                             return (
                                 <div key={rect.id} className="absolute" style={{ left: `${normalized.x}%`, top: `${normalized.y}%`, width: `${normalized.width}%`, height: `${normalized.height}%`, pointerEvents: 'none' }}>
-                                    {rect.shape === 'box' && (<div className={`w-full h-full ${isSelected ? 'border-4 border-red-400' : 'border-4 border-red-500'} bg-black/5 dark:bg-white/5`} />)}
+                                    {rect.shape === 'box' && (<div className={`w-full h-full ${isSelected ? 'border-2 border-red-400' : 'border-2 border-red-500'} bg-black/5 dark:bg-white/5`} />)}
                                     {(rect.shape === 'ellipse' || rect.shape === 'cloud') && (
                                         <svg width="100%" height="100%" viewBox={`0 0 ${pixelWidth} ${pixelHeight}`} preserveAspectRatio="none" className="overflow-visible">
                                             {rect.shape === 'ellipse' && (<ellipse cx={pixelWidth / 2} cy={pixelHeight / 2} rx={pixelWidth / 2} ry={pixelHeight / 2} {...shapeProps} />)}
@@ -442,7 +445,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     </div>
 
                     <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
-                         <Toolbar activeTool={activeTool} setActiveTool={setActiveTool} activeShape={activeShape} setActiveShape={setActiveShape} activePinType={activePinType} setActivePinType={setActivePinType} />
+                         <Toolbar activeTool={activeTool} setActiveTool={setActiveTool} activeShape={activeShape} setActiveShape={setActiveShape} activePinType={activePinType} setActivePinType={setActivePinType} activeColor={activeColor} setActiveColor={setActiveColor} />
                     </div>
                 </div>
             </div>

@@ -14,7 +14,7 @@ import LayersPanel from './components/LayersPanel';
 
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 export type RectangleTagType = Exclude<FilterCategory, 'safety'>;
-type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'distance' | 'drawing' | 'pin';
+type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 
 const mockRfis: RfiData[] = [
     { id: 101, title: 'Clarification on beam specification', type: 'Design Clarification', question: 'The structural drawing S-2.1 specifies a W12x26 beam, but the architectural drawing A-5.0 shows a W14x22. Please clarify which is correct.' },
@@ -82,6 +82,7 @@ const App: React.FC = () => {
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
   const [activeShape, setActiveShape] = useState<'cloud' | 'box' | 'ellipse'>('box');
   const [activePinType, setActivePinType] = useState<'photo' | 'safety' | 'punch'>('safety');
+  const [activeColor, setActiveColor] = useState<'fill' | 'stroke'>('fill');
 
   // Panel & Modal State
   const [activePanel, setActivePanel] = useState<'rfi' | 'safety' | 'punch' | null>(null);
@@ -791,6 +792,8 @@ const App: React.FC = () => {
                 setActiveShape={setActiveShape}
                 activePinType={activePinType}
                 setActivePinType={setActivePinType}
+                activeColor={activeColor}
+                setActiveColor={setActiveColor}
                 setDraggingPinId={setDraggingPinId}
                 setSelectedPinId={setSelectedPinId}
                 handlePinDetails={handlePinDetails}

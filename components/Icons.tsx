@@ -77,17 +77,8 @@ export const ArrowIcon: React.FC<IconProps> = ({ className }) => (
 );
 
 export const TextIcon: React.FC<IconProps> = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 3v18M16.5 3v18M3 8.25h18M3 15.75h18" />
-  </svg>
-);
-
-export const DistanceIcon: React.FC<IconProps> = ({ className }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 8.25l15 7.5m-15-7.5v7.5m15-7.5v7.5m-7.5-3.75h.008v.008H12v-.008zm0 0h.008v.008H12v-.008z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5V18a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18V7.5" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 3.75a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5a.75.75 0 01.75-.75z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 3.75a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 019 3.75z" />
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 5h14M12 5v14M9 19h6" />
   </svg>
 );
 
@@ -231,5 +222,68 @@ export const ClipboardListIcon: React.FC<IconProps> = ({ className }) => (
 export const PhotoIcon: React.FC<IconProps> = ({ className }) => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+    </svg>
+);
+
+export const ImageIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+    </svg>
+);
+
+export const LocationIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
+
+export const MeasurementIcon: React.FC<IconProps> = ({ className }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className={className}>
+    <g transform="rotate(-45 12 12) translate(-2, -2)">
+        <path d="M5 7h14a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1z" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M8 13v-3m4 3v-4m4 4v-3" strokeLinecap="round" strokeLinejoin="round" />
+    </g>
+  </svg>
+);
+
+export const PolygonIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" fill="none" className={className}>
+        <circle cx="6" cy="6" r="1.5" stroke="currentColor" fill="none" strokeWidth="1.5" />
+        <circle cx="18" cy="6" r="1.5" stroke="currentColor" fill="none" strokeWidth="1.5" />
+        <circle cx="6" cy="18" r="1.5" stroke="currentColor" fill="none" strokeWidth="1.5" />
+        <circle cx="18" cy="18" r="1.5" stroke="currentColor" fill="none" strokeWidth="1.5" />
+        <path d="M7.5 6 H 16.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M6 7.5 V 16.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M18 7.5 V 16.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M7.5 18 H 16.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+);
+
+export const HighlighterIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.25 5.25L18.75 8.75" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M5.75 14.75L13.25 7.25L16.75 10.75L9.25 18.25L5 19L5.75 14.75Z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9.25 18.25L12.75 14.75" />
+    </svg>
+);
+
+export const CustomPinIcon: React.FC<IconProps> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21V10m0 0a2 2 0 100-4 2 2 0 000 4zm0 0a2 2 0 110 4 2 2 0 010-4z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21h-2.25A4.5 4.5 0 015.25 16.5v0A4.5 4.5 0 019.75 12H12m0 9h2.25A4.5 4.5 0 0018.75 16.5v0A4.5 4.5 0 0014.25 12H12" />
+    </svg>
+);
+
+export const FillIcon: React.FC<IconProps> = ({ className }) => (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+        <circle cx="12" cy="12" r="8" />
+    </svg>
+);
+
+export const StrokeIcon: React.FC<IconProps> = ({ className }) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={className}>
+        <circle cx="12" cy="12" r="8" />
     </svg>
 );
