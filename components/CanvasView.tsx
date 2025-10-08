@@ -29,13 +29,11 @@ interface CanvasViewProps {
     isMenuVisible: boolean;
     linkMenuRectId: string | null;
     openLinkSubmenu: string | null;
-    isFilterMenuOpen: boolean;
     theme: 'light' | 'dark';
     toolbarPosition: ToolbarPosition;
     setToolbarPosition: (position: ToolbarPosition) => void;
     isSpacebarDown: boolean;
     imageContainerRef: React.RefObject<HTMLDivElement>;
-    filterMenuRef: React.RefObject<HTMLDivElement>;
     handleMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
     handleMouseMove: (event: React.MouseEvent<HTMLDivElement>) => void;
     handleMouseUp: (event: React.MouseEvent<HTMLDivElement>) => void;
@@ -43,8 +41,6 @@ interface CanvasViewProps {
     handleWheel: (e: React.WheelEvent<HTMLDivElement>) => void;
     handleZoom: (direction: 'in' | 'out' | 'reset') => void;
     handleThemeToggle: () => void;
-    onUploadClick: () => void;
-    onClearAll: () => void;
     setHoveredRectId: (id: string | null) => void;
     getRelativeCoords: (event: React.MouseEvent | MouseEvent) => { x: number, y: number } | null;
     setActiveTool: (tool: ActiveTool) => void;
@@ -66,9 +62,6 @@ interface CanvasViewProps {
     onDeleteSelection: () => void;
     setOpenLinkSubmenu: (submenu: string | null) => void;
     handleSubmenuLink: (e: React.MouseEvent, type: string, targetId: string | null) => void;
-    setIsFilterMenuOpen: (isOpen: boolean) => void;
-    handleFilterChange: (filter: FilterCategory) => void;
-    handleToggleAllFilters: () => void;
     onOpenRfiPanel: (rectId: string, rfiId: number | null) => void;
     onOpenPhotoViewer: (config: { rectId?: string; photoId: string, pinId?: string }) => void;
     mouseDownRef: React.RefObject<{ x: number, y: number } | null>;
@@ -79,12 +72,12 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const {
         imageSrc, rectangles, pins, filters, viewTransform, interaction, activeTool, hoveredRectId, draggingPinId,
         selectedRectIds, selectedPinId, currentRect, marqueeRect, isMenuVisible, linkMenuRectId, openLinkSubmenu,
-        isFilterMenuOpen, theme, toolbarPosition, setToolbarPosition, isSpacebarDown, imageContainerRef, filterMenuRef, handleMouseDown, handleMouseMove, handleMouseUp,
-        handleMouseLeave, handleWheel, handleZoom, handleThemeToggle, onUploadClick, onClearAll, setHoveredRectId,
+        theme, toolbarPosition, setToolbarPosition, isSpacebarDown, imageContainerRef, handleMouseDown, handleMouseMove, handleMouseUp,
+        handleMouseLeave, handleWheel, handleZoom, handleThemeToggle, setHoveredRectId,
         getRelativeCoords, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor, setActiveColor,
         setDraggingPinId, setSelectedPinId, handlePinDetails, handleDeletePin, setHoveredItem, hidePopupTimer,
         handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
-        handleSubmenuLink, setIsFilterMenuOpen, handleFilterChange, handleToggleAllFilters, onOpenRfiPanel,
+        handleSubmenuLink, onOpenRfiPanel,
         onOpenPhotoViewer, mouseDownRef, setSelectedRectIds
     } = props;
 
@@ -230,8 +223,6 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     let multiSelectionScreenRect = lastSelectedRectangle ? getScreenRect(lastSelectedRectangle) : null;
     let marqueeScreenRect = marqueeRect ? getScreenRect(normalizeRect(marqueeRect)) : null;
 
-    const areFiltersActive = Object.values(filters).some(v => !v);
-
     const getToolbarPositionClasses = () => {
         switch (toolbarPosition) {
             case 'top': return 'top-4 left-1/2 -translate-x-1/2';
@@ -252,38 +243,6 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
 
     return (
         <div className="w-full h-full flex flex-col">
-            <div className="flex justify-end items-center mb-2 flex-wrap gap-2">
-                <div ref={filterMenuRef} className="relative">
-                    <button onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)} className={`relative bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2`}>
-                        <FilterIcon className="w-5 h-5" /> Filter
-                        {areFiltersActive && <span className="absolute -top-1 -right-1 block h-3 w-3 rounded-full bg-cyan-500 border-2 border-white dark:border-gray-800" />}
-                    </button>
-                    {isFilterMenuOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-4">
-                           <div className="flex justify-between items-center pb-2 border-b border-gray-200 dark:border-gray-700 mb-2">
-                                <h4 className="font-semibold">Filter Items</h4>
-                                <button onClick={handleToggleAllFilters} className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:underline">
-                                    {Object.values(filters).every(v => v) ? 'Hide All' : 'Show All'}
-                                </button>
-                           </div>
-                           <div className="space-y-2">
-                                {(Object.keys(filters) as FilterCategory[]).map(key => (
-                                    <label key={key} className="flex items-center justify-between cursor-pointer">
-                                        <span className="capitalize text-sm text-gray-700 dark:text-gray-300">{key.replace('punch', 'Punch Item').replace('safety', 'Safety Issue')}</span>
-                                        <div className="relative">
-                                            <input type="checkbox" className="sr-only" checked={filters[key]} onChange={() => handleFilterChange(key)} />
-                                            <div className={`block w-10 h-6 rounded-full transition-colors ${filters[key] ? 'bg-cyan-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-                                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${filters[key] ? 'transform translate-x-4' : ''}`}></div>
-                                        </div>
-                                    </label>
-                                ))}
-                           </div>
-                        </div>
-                    )}
-                </div>
-                <button onClick={onUploadClick} className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 text-sm">Change Image</button>
-                <button onClick={onClearAll} className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 text-sm">Clear All</button>
-            </div>
             <div className="relative w-full flex-grow">
                 <div
                     ref={imageContainerRef}

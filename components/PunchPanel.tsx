@@ -21,8 +21,8 @@ const PunchPanel: React.FC<PunchPanelProps> = ({
     isOpen, isEditMode, mode, onModeChange, formData, onFormChange, onSubmit, onCancel, searchTerm, onSearchTermChange, allPunches, onLinkExisting
 }) => {
     return (
-        <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-gray-800 z-50 transform transition-transform transition-shadow duration-300 ease-in-out ${isOpen ? 'translate-x-0 shadow-2xl' : 'translate-x-full'}`}>
-            <div className="p-6 flex flex-col h-full">
+        <div className={`h-full flex-shrink-0 bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'w-full max-w-md border-l border-gray-200 dark:border-gray-700' : 'w-0'}`}>
+            <div className="p-6 flex flex-col h-full w-full max-w-md">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{isEditMode ? 'Edit' : 'Create'} Punch List Item</h2>
                     <button onClick={onCancel} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><XMarkIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" /></button>
