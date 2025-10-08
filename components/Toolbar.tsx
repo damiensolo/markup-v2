@@ -7,6 +7,7 @@ import {
   ImageIcon, LocationIcon, MeasurementIcon, PolygonIcon, HighlighterIcon,
   CustomPinIcon, FillIcon, StrokeIcon
 } from './Icons';
+import { ToolbarPosition } from '../App';
 
 type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
@@ -22,9 +23,9 @@ interface ToolbarProps {
   setActivePinType: (pinType: ActivePinType) => void;
   activeColor: ActiveColor;
   setActiveColor: (color: ActiveColor) => void;
+  toolbarPosition: ToolbarPosition;
 }
 
-// Fix: Changed ToolButton to use a standard interface and React.FC for better type inference with special props like 'key'.
 interface ToolButtonProps {
   label: string;
   icon: React.ReactNode;
@@ -49,7 +50,7 @@ const ToolButton: React.FC<ToolButtonProps> = ({
   </button>
 );
 
-const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor, setActiveColor }) => {
+const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor, setActiveColor, toolbarPosition }) => {
   const [isShapeMenuOpen, setShapeMenuOpen] = useState(false);
   const [isPinMenuOpen, setPinMenuOpen] = useState(false);
   const [isColorMenuOpen, setColorMenuOpen] = useState(false);
@@ -100,20 +101,13 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (shapeMenuRef.current && !shapeMenuRef.current.contains(event.target as Node)) {
-        setShapeMenuOpen(false);
-      }
-      if (pinMenuRef.current && !pinMenuRef.current.contains(event.target as Node)) {
-        setPinMenuOpen(false);
-      }
-      if (colorMenuRef.current && !colorMenuRef.current.contains(event.target as Node)) {
-        setColorMenuOpen(false);
-      }
+      const target = event.target as Node;
+      if (shapeMenuRef.current && !shapeMenuRef.current.contains(target)) setShapeMenuOpen(false);
+      if (pinMenuRef.current && !pinMenuRef.current.contains(target)) setPinMenuOpen(false);
+      if (colorMenuRef.current && !colorMenuRef.current.contains(target)) setColorMenuOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const mainTools = [
@@ -152,9 +146,20 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
   const currentPinTool = pinTools.find(p => p.id === activePinType) || pinTools[1];
   const currentColorTool = colorTools.find(c => c.id === activeColor) || colorTools[0];
 
+  const getFlyoutPositionClasses = () => {
+    switch (toolbarPosition) {
+        case 'top': return 'top-full left-1/2 -translate-x-1/2 mt-2';
+        case 'left': return 'left-full top-0 ml-2';
+        case 'right': return 'right-full top-0 mr-2';
+        default: return 'bottom-full left-1/2 -translate-x-1/2 mb-2'; // bottom
+    }
+  };
+
+  const isVertical = toolbarPosition === 'left' || toolbarPosition === 'right';
+
   return (
     <div className="relative">
-      <div className="flex flex-row items-center gap-1 bg-gray-900/95 backdrop-blur-sm p-1.5 rounded-lg shadow-xl">
+      <div className={`flex items-center gap-1 bg-gray-900/95 backdrop-blur-sm p-1.5 rounded-lg shadow-xl ${isVertical ? 'flex-col' : 'flex-row'}`}>
         <ToolButton
             label="Select"
             icon={<MousePointerIcon />}
@@ -179,7 +184,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                 </div>
             </button>
             {isShapeMenuOpen && (
-                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white">
+                 <div className={`absolute flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white ${getFlyoutPositionClasses()} ${isVertical ? 'flex-col' : 'flex-row'}`}>
                     {shapeTools.map(shape => (
                         <button
                             key={shape.id}
@@ -214,7 +219,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                 </div>
             </button>
             {isPinMenuOpen && (
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white">
+                <div className={`absolute flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white ${getFlyoutPositionClasses()} ${isVertical ? 'flex-col' : 'flex-row'}`}>
                     {pinTools.map(pin => (
                         <button
                             key={pin.id}
@@ -242,7 +247,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
             />
         ))}
 
-        <div className="h-6 w-px bg-gray-600 mx-1" />
+        <div className={`bg-gray-600 ${isVertical ? 'w-6 h-px my-1' : 'h-6 w-px mx-1'}`} />
 
         {customPinTools.map((tool) => (
              <ToolButton
@@ -271,7 +276,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                 </div>
             </button>
             {isColorMenuOpen && (
-                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white">
+                <div className={`absolute flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white ${getFlyoutPositionClasses()} ${isVertical ? 'flex-col' : 'flex-row'}`}>
                     {colorTools.map(color => (
                         <button
                             key={color.id}

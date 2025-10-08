@@ -1,8 +1,8 @@
 // Fix: Import 'useCallback' from 'react' to resolve 'Cannot find name' errors.
-import React, { useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle } from '../types';
-import { RectangleTagType } from '../App';
-import { UploadIcon, TrashIcon, LinkIcon, ArrowUpTrayIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowsPointingOutIcon, SunIcon, MoonIcon, SafetyPinIcon, PunchPinIcon, PhotoPinIcon, InformationCircleIcon, FilterIcon } from './Icons';
+import { RectangleTagType, ToolbarPosition } from '../App';
+import { UploadIcon, TrashIcon, LinkIcon, ArrowUpTrayIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowsPointingOutIcon, SunIcon, MoonIcon, SafetyPinIcon, PunchPinIcon, PhotoPinIcon, InformationCircleIcon, FilterIcon, CogIcon } from './Icons';
 import Toolbar from './Toolbar';
 
 type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
@@ -31,6 +31,8 @@ interface CanvasViewProps {
     openLinkSubmenu: string | null;
     isFilterMenuOpen: boolean;
     theme: 'light' | 'dark';
+    toolbarPosition: ToolbarPosition;
+    setToolbarPosition: (position: ToolbarPosition) => void;
     isSpacebarDown: boolean;
     imageContainerRef: React.RefObject<HTMLDivElement>;
     filterMenuRef: React.RefObject<HTMLDivElement>;
@@ -77,7 +79,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const {
         imageSrc, rectangles, pins, filters, viewTransform, interaction, activeTool, hoveredRectId, draggingPinId,
         selectedRectIds, selectedPinId, currentRect, marqueeRect, isMenuVisible, linkMenuRectId, openLinkSubmenu,
-        isFilterMenuOpen, theme, isSpacebarDown, imageContainerRef, filterMenuRef, handleMouseDown, handleMouseMove, handleMouseUp,
+        isFilterMenuOpen, theme, toolbarPosition, setToolbarPosition, isSpacebarDown, imageContainerRef, filterMenuRef, handleMouseDown, handleMouseMove, handleMouseUp,
         handleMouseLeave, handleWheel, handleZoom, handleThemeToggle, onUploadClick, onClearAll, setHoveredRectId,
         getRelativeCoords, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor, setActiveColor,
         setDraggingPinId, setSelectedPinId, handlePinDetails, handleDeletePin, setHoveredItem, hidePopupTimer,
@@ -85,6 +87,19 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         handleSubmenuLink, setIsFilterMenuOpen, handleFilterChange, handleToggleAllFilters, onOpenRfiPanel,
         onOpenPhotoViewer, mouseDownRef, setSelectedRectIds
     } = props;
+
+    const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+    const settingsMenuRef = useRef<HTMLDivElement>(null);
+    
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+          if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) {
+            setIsSettingsMenuOpen(false);
+          }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const getCursorClass = () => {
         if (interaction.type === 'panning' || draggingPinId) return 'cursor-grabbing';
@@ -216,6 +231,24 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     let marqueeScreenRect = marqueeRect ? getScreenRect(normalizeRect(marqueeRect)) : null;
 
     const areFiltersActive = Object.values(filters).some(v => !v);
+
+    const getToolbarPositionClasses = () => {
+        switch (toolbarPosition) {
+            case 'top': return 'top-4 left-1/2 -translate-x-1/2';
+            case 'left': return 'left-4 top-1/2 -translate-y-1/2';
+            case 'right': return 'right-4 top-1/2 -translate-y-1/2';
+            default: return 'bottom-4 left-1/2 -translate-x-1/2'; // bottom
+        }
+    };
+    
+    const ToolbarPositionButton: React.FC<{position: ToolbarPosition, label: string}> = ({position, label}) => (
+      <button 
+        onClick={() => setToolbarPosition(position)}
+        className={`w-full text-left px-3 py-1.5 text-sm rounded-md transition-colors ${toolbarPosition === position ? 'bg-cyan-600 text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
+      >
+        {label}
+      </button>
+    );
 
     return (
         <div className="w-full h-full flex flex-col">
@@ -438,14 +471,41 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         <button onClick={() => handleZoom('out')} title="Zoom Out" className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><MagnifyingGlassMinusIcon className="w-5 h-5"/></button>
                         <button onClick={() => handleZoom('reset')} title="Reset View" className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><ArrowsPointingOutIcon className="w-5 h-5"/></button>
                     </div>
-                    <div className="absolute bottom-4 left-4 flex flex-col gap-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg">
-                        <button onClick={handleThemeToggle} className="p-2 rounded-md transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-white" title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
-                            {theme === 'dark' ? (<SunIcon className="w-5 h-5" />) : (<MoonIcon className="w-5 h-5" />)}
-                        </button>
+                    
+                    <div data-interactive-ui="true" ref={settingsMenuRef} className="absolute bottom-4 left-4 flex flex-col items-start gap-2">
+                        {isSettingsMenuOpen && (
+                            <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-2 rounded-lg shadow-lg mb-1 w-40">
+                               <h4 className="font-semibold text-sm px-2 pb-1.5 mb-1 border-b border-gray-300 dark:border-gray-600">Toolbar Position</h4>
+                               <div className="flex flex-col gap-1">
+                                   <ToolbarPositionButton position="bottom" label="Footer" />
+                                   <ToolbarPositionButton position="top" label="Top" />
+                                   <ToolbarPositionButton position="left" label="Left" />
+                                   <ToolbarPositionButton position="right" label="Right" />
+                               </div>
+                            </div>
+                        )}
+                        <div className="flex gap-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg">
+                            <button onClick={handleThemeToggle} className="p-2 rounded-md transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-white" title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
+                                {theme === 'dark' ? (<SunIcon className="w-5 h-5" />) : (<MoonIcon className="w-5 h-5" />)}
+                            </button>
+                            <button onClick={() => setIsSettingsMenuOpen(p => !p)} className="p-2 rounded-md transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-white" title="Settings">
+                                <CogIcon className="w-5 h-5" />
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
-                         <Toolbar activeTool={activeTool} setActiveTool={setActiveTool} activeShape={activeShape} setActiveShape={setActiveShape} activePinType={activePinType} setActivePinType={setActivePinType} activeColor={activeColor} setActiveColor={setActiveColor} />
+                    <div className={`absolute z-20 ${getToolbarPositionClasses()}`}>
+                         <Toolbar 
+                             activeTool={activeTool} 
+                             setActiveTool={setActiveTool} 
+                             activeShape={activeShape} 
+                             setActiveShape={setActiveShape} 
+                             activePinType={activePinType} 
+                             setActivePinType={setActivePinType} 
+                             activeColor={activeColor} 
+                             setActiveColor={setActiveColor}
+                             toolbarPosition={toolbarPosition}
+                         />
                     </div>
                 </div>
             </div>

@@ -15,6 +15,7 @@ import LayersPanel from './components/LayersPanel';
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 export type RectangleTagType = Exclude<FilterCategory, 'safety'>;
 type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
+export type ToolbarPosition = 'bottom' | 'top' | 'left' | 'right';
 
 const mockRfis: RfiData[] = [
     { id: 101, title: 'Clarification on beam specification', type: 'Design Clarification', question: 'The structural drawing S-2.1 specifies a W12x26 beam, but the architectural drawing A-5.0 shows a W14x22. Please clarify which is correct.' },
@@ -109,6 +110,7 @@ const App: React.FC = () => {
   
   // UI State
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [toolbarPosition, setToolbarPosition] = useState<ToolbarPosition>('bottom');
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [openLinkSubmenu, setOpenLinkSubmenu] = useState<string | null>(null);
   const [filters, setFilters] = useState<Record<FilterCategory, boolean>>({
@@ -773,6 +775,8 @@ const App: React.FC = () => {
                 openLinkSubmenu={openLinkSubmenu}
                 isFilterMenuOpen={isFilterMenuOpen}
                 theme={theme}
+                toolbarPosition={toolbarPosition}
+                setToolbarPosition={setToolbarPosition}
                 isSpacebarDown={isSpacebarDown}
                 imageContainerRef={imageContainerRef}
                 filterMenuRef={filterMenuRef}
