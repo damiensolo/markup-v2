@@ -19,16 +19,19 @@ interface ToolbarProps {
   setActivePinType: (pinType: ActivePinType) => void;
 }
 
-const ToolButton = ({
-  label,
-  icon,
-  isActive,
-  onClick,
-}: {
+// Fix: Changed ToolButton to use a standard interface and React.FC for better type inference with special props like 'key'.
+interface ToolButtonProps {
   label: string;
   icon: React.ReactNode;
   isActive: boolean;
   onClick: () => void;
+}
+
+const ToolButton: React.FC<ToolButtonProps> = ({
+  label,
+  icon,
+  isActive,
+  onClick,
 }) => (
   <button
     onClick={onClick}

@@ -1,4 +1,5 @@
-import { useState, useCallback, RefObject } from 'react';
+// Fix: Added `React` to the import to make types like `React.WheelEvent` available.
+import React, { useState, useCallback, RefObject } from 'react';
 import type { ViewTransform } from '../types';
 
 const MIN_ZOOM = 0.2;

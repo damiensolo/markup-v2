@@ -35,12 +35,19 @@ export const useCanvasInteraction = ({
   setPunchTargetPinId, setPunchFormData, setPunchPanelMode,
   setActivePanel,
   mouseDownRef,
+  isSpacebarDown,
 }: any) => {
   const [interaction, setInteraction] = useState<InteractionState>({ type: 'none' });
   const [currentRect, setCurrentRect] = useState<Omit<Rectangle, 'id' | 'name' | 'visible'> | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<Omit<Rectangle, 'id' | 'name' | 'visible'> | null>(null);
 
   const handleMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (isSpacebarDown && event.button === 0) {
+        event.preventDefault();
+        setInteraction({ type: 'panning', startPoint: { x: event.clientX, y: event.clientY }, initialTransform: viewTransform });
+        return;
+    }
+
     if ((event.target as HTMLElement).closest('[data-interactive-ui="true"]')) return;
     
     mouseDownRef.current = { x: event.clientX, y: event.clientY };
@@ -95,7 +102,7 @@ export const useCanvasInteraction = ({
         setCurrentRect({ x: coords.x, y: coords.y, width: 0, height: 0, shape: activeShape });
       }
     }
-  }, [getRelativeCoords, interaction.type, rectangles, activeTool, activeShape, selectedRectIds, viewTransform, isRfiPanelOpen, handleRfiCancel, draggingPinId, setInteraction, setCurrentRect, setMarqueeRect, setSelectedRectIds, setSelectedPinId, setLinkMenuRectId, mouseDownRef]);
+  }, [getRelativeCoords, interaction.type, rectangles, activeTool, activeShape, selectedRectIds, viewTransform, isRfiPanelOpen, handleRfiCancel, draggingPinId, setInteraction, setCurrentRect, setMarqueeRect, setSelectedRectIds, setSelectedPinId, setLinkMenuRectId, mouseDownRef, isSpacebarDown]);
   
   const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (draggingPinId) {

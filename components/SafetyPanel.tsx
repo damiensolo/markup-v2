@@ -13,7 +13,7 @@ interface SafetyPanelProps {
 
 const SafetyPanel: React.FC<SafetyPanelProps> = ({ isOpen, isEditMode, formData, onFormChange, onSubmit, onCancel }) => {
     return (
-        <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-gray-800 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-white dark:bg-gray-800 z-50 transform transition-transform transition-shadow duration-300 ease-in-out ${isOpen ? 'translate-x-0 shadow-2xl' : 'translate-x-full'}`}>
             <div className="p-6 flex flex-col h-full">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{isEditMode ? 'Edit' : 'Create'} Safety Issue</h2>

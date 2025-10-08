@@ -14,6 +14,7 @@ import LayersPanel from './components/LayersPanel';
 
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 export type RectangleTagType = Exclude<FilterCategory, 'safety'>;
+type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'distance' | 'drawing' | 'pin';
 
 const mockRfis: RfiData[] = [
     { id: 101, title: 'Clarification on beam specification', type: 'Design Clarification', question: 'The structural drawing S-2.1 specifies a W12x26 beam, but the architectural drawing A-5.0 shows a W14x22. Please clarify which is correct.' },
@@ -75,9 +76,10 @@ const App: React.FC = () => {
   const [draggingPinId, setDraggingPinId] = useState<string | null>(null);
   const [hoveredItem, setHoveredItem] = useState<HoveredItemInfo | null>(null);
   const [pinTargetCoords, setPinTargetCoords] = useState<{x: number, y: number} | null>(null);
+  const [isSpacebarDown, setIsSpacebarDown] = useState(false);
 
   // Tool State
-  const [activeTool, setActiveTool] = useState<'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'distance' | 'drawing' | 'pin'>('select');
+  const [activeTool, setActiveTool] = useState<ActiveTool>('select');
   const [activeShape, setActiveShape] = useState<'cloud' | 'box' | 'ellipse'>('box');
   const [activePinType, setActivePinType] = useState<'photo' | 'safety' | 'punch'>('safety');
 
@@ -245,7 +247,7 @@ const App: React.FC = () => {
     }
   }, [allRfis, allPhotos, allPunches, handleOpenRfiPanel]);
 
-  const handleSetActiveTool = useCallback((tool: 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'distance' | 'drawing' | 'pin') => {
+  const handleSetActiveTool = useCallback((tool: ActiveTool) => {
     setActiveTool(tool);
     setActivePanel(null);
   }, []);
@@ -275,7 +277,87 @@ const App: React.FC = () => {
     setPunchTargetPinId, setPunchFormData, setPunchPanelMode,
     setActivePanel,
     mouseDownRef,
+    isSpacebarDown,
   });
+
+  const deleteSelection = useCallback(() => {
+    if (selectedRectIds.length > 0) {
+        setRectangles(rects => rects.filter(r => !selectedRectIds.includes(r.id)));
+        setSelectedRectIds([]);
+        setLinkMenuRectId(null);
+    }
+    if (selectedPinId) {
+        setPins(pins => pins.filter(p => p.id !== selectedPinId));
+        setSelectedPinId(null);
+    }
+  }, [selectedRectIds, selectedPinId]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        const target = e.target as HTMLElement;
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || isLinkModalOpen || isPhotoViewerOpen) {
+            return;
+        }
+
+        switch (e.key.toLowerCase()) {
+            case 'v':
+                e.preventDefault();
+                handleSetActiveTool('select');
+                break;
+            case 'r':
+                e.preventDefault();
+                setActiveShape('box');
+                handleSetActiveTool('shape');
+                break;
+            case 'o':
+                e.preventDefault();
+                setActiveShape('ellipse');
+                handleSetActiveTool('shape');
+                break;
+            case 'p':
+                e.preventDefault();
+                handleSetActiveTool('pin');
+                break;
+            case 'delete':
+            case 'backspace':
+                e.preventDefault();
+                deleteSelection();
+                break;
+        }
+        
+        if (e.code === 'Space' && !isSpacebarDown) {
+            e.preventDefault();
+            setIsSpacebarDown(true);
+        }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+        if (e.code === 'Space') {
+            e.preventDefault();
+            setIsSpacebarDown(false);
+            if (interaction.type === 'panning') {
+                handleMouseUp({} as React.MouseEvent<HTMLDivElement>);
+            }
+        }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [
+      handleSetActiveTool,
+      setActiveShape,
+      deleteSelection,
+      isSpacebarDown,
+      isLinkModalOpen,
+      isPhotoViewerOpen,
+      interaction,
+      handleMouseUp
+  ]);
 
 
   useEffect(() => {
@@ -334,13 +416,6 @@ const App: React.FC = () => {
   const handleClearAll = () => {
     setRectangles([]);
     setPins([]);
-    setSelectedRectIds([]);
-    setLinkMenuRectId(null);
-  };
-  
-  const handleDeleteSelected = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setRectangles(rects => rects.filter(r => !selectedRectIds.includes(r.id)));
     setSelectedRectIds([]);
     setLinkMenuRectId(null);
   };
@@ -697,6 +772,7 @@ const App: React.FC = () => {
                 openLinkSubmenu={openLinkSubmenu}
                 isFilterMenuOpen={isFilterMenuOpen}
                 theme={theme}
+                isSpacebarDown={isSpacebarDown}
                 imageContainerRef={imageContainerRef}
                 filterMenuRef={filterMenuRef}
                 handleMouseDown={handleMouseDown}
@@ -738,7 +814,7 @@ const App: React.FC = () => {
                   e.stopPropagation();
                   setLinkMenuRectId(prevId => (prevId === id ? null : id));
                 }}
-                handleDeleteSelected={handleDeleteSelected}
+                onDeleteSelection={deleteSelection}
                 setOpenLinkSubmenu={setOpenLinkSubmenu}
                 handleSubmenuLink={handleSubmenuLink}
                 setIsFilterMenuOpen={setIsFilterMenuOpen}

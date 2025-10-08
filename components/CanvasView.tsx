@@ -30,6 +30,7 @@ interface CanvasViewProps {
     openLinkSubmenu: string | null;
     isFilterMenuOpen: boolean;
     theme: 'light' | 'dark';
+    isSpacebarDown: boolean;
     imageContainerRef: React.RefObject<HTMLDivElement>;
     filterMenuRef: React.RefObject<HTMLDivElement>;
     handleMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
@@ -57,7 +58,7 @@ interface CanvasViewProps {
     handleResizeStart: (event: React.MouseEvent<HTMLDivElement>, rectId: string, handle: ResizeHandle) => void;
     handlePublishRect: (event: React.MouseEvent, id: string) => void;
     handleLinkRect: (event: React.MouseEvent, id: string) => void;
-    handleDeleteSelected: (event: React.MouseEvent) => void;
+    onDeleteSelection: () => void;
     setOpenLinkSubmenu: (submenu: string | null) => void;
     handleSubmenuLink: (e: React.MouseEvent, type: string, targetId: string | null) => void;
     setIsFilterMenuOpen: (isOpen: boolean) => void;
@@ -73,17 +74,18 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const {
         imageSrc, rectangles, pins, filters, viewTransform, interaction, activeTool, hoveredRectId, draggingPinId,
         selectedRectIds, selectedPinId, currentRect, marqueeRect, isMenuVisible, linkMenuRectId, openLinkSubmenu,
-        isFilterMenuOpen, theme, imageContainerRef, filterMenuRef, handleMouseDown, handleMouseMove, handleMouseUp,
+        isFilterMenuOpen, theme, isSpacebarDown, imageContainerRef, filterMenuRef, handleMouseDown, handleMouseMove, handleMouseUp,
         handleMouseLeave, handleWheel, handleZoom, handleThemeToggle, onUploadClick, onClearAll, setHoveredRectId,
         getRelativeCoords, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType,
         setDraggingPinId, setSelectedPinId, handlePinDetails, handleDeletePin, setHoveredItem, hidePopupTimer,
-        handleResizeStart, handlePublishRect, handleLinkRect, handleDeleteSelected, setOpenLinkSubmenu,
+        handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
         handleSubmenuLink, setIsFilterMenuOpen, handleFilterChange, handleToggleAllFilters, onOpenRfiPanel,
         onOpenPhotoViewer, mouseDownRef, setSelectedRectIds
     } = props;
 
     const getCursorClass = () => {
         if (interaction.type === 'panning' || draggingPinId) return 'cursor-grabbing';
+        if (isSpacebarDown) return 'cursor-grab';
         switch (interaction.type) {
             case 'moving': return 'cursor-grabbing';
             case 'resizing':
@@ -364,7 +366,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     </div>
                                     )}
                                 </div>
-                                <button onClick={handleDeleteSelected} title="Delete" className="p-2 rounded-md hover:bg-red-500 hover:text-white transition-colors"><TrashIcon className="w-5 h-5" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); onDeleteSelection(); }} title="Delete" className="p-2 rounded-md hover:bg-red-500 hover:text-white transition-colors"><TrashIcon className="w-5 h-5" /></button>
                             </div>
                         </div>
                       </>
@@ -373,7 +375,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     {isMultiSelection && multiSelectionScreenRect && (
                         <div data-interactive-ui="true" className="absolute flex items-center" style={{ left: `${multiSelectionScreenRect.left + multiSelectionScreenRect.width / 2}px`, top: `${multiSelectionScreenRect.top}px`, transform: 'translate(-50%, -100%) translateY(-10px)', pointerEvents: 'auto', zIndex: 30 }}>
                             <div className="flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white">
-                                <button onClick={handleDeleteSelected} title="Delete Selected" className="p-2 rounded-md hover:bg-red-500 hover:text-white transition-colors"><TrashIcon className="w-5 h-5" /></button>
+                                <button onClick={(e) => { e.stopPropagation(); onDeleteSelection(); }} title="Delete Selected" className="p-2 rounded-md hover:bg-red-500 hover:text-white transition-colors"><TrashIcon className="w-5 h-5" /></button>
                             </div>
                         </div>
                     )}
