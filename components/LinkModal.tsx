@@ -46,7 +46,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, config, onClose, onSelect
                         placeholder="Search..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 mt-4 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-500" 
+                        className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 mt-4 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" 
                     />
                 </div>
                 <ul className="overflow-y-auto p-4">
@@ -69,7 +69,7 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, config, onClose, onSelect
                     <div className="p-4 border-t border-gray-200 dark:border-gray-700 text-center">
                         <button 
                             onClick={onUploadRequest}
-                            className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 mx-auto"
+                            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 mx-auto"
                         >
                             <UploadIcon className="w-5 h-5" />
                             Upload from Computer

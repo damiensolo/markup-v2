@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, PhotoData } from '../types';
 import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, PhotoIcon } from './Icons';
@@ -150,7 +151,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
     return (
         <div 
             ref={panelRef}
-            className={`relative h-full bg-gray-50 dark:bg-gray-800/50 border-r border-gray-200 dark:border-gray-700/50 transition-all duration-300 ease-in-out flex-shrink-0`}
+            className={`relative h-full bg-gray-50 dark:bg-gray-800/50 border-r border-gray-200 dark:border-gray-700/50 transition-all duration-300 ease-in-out flex-shrink-0 ${isOpen ? 'shadow-lg' : ''}`}
             style={{ width: isOpen ? `${panelWidth}px` : '0px' }}
         >
             <div className={`h-full w-full flex flex-col transition-opacity duration-200 overflow-hidden ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
@@ -180,7 +181,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                                                     else onSelectPin(item.id, e);
                                                 }
                                             }}
-                                            className={`flex items-center px-3 py-2 cursor-pointer group transition-colors ${isSelected ? 'bg-cyan-100 dark:bg-cyan-900/50' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
+                                            className={`flex items-center px-3 py-2 cursor-pointer group transition-colors ${isSelected ? 'bg-blue-100 dark:bg-blue-900/50' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
                                         >
                                             <div className="w-5 flex items-center justify-center mr-2 flex-shrink-0">
                                             {hasChildren ? (
@@ -198,7 +199,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                                                     onChange={(e) => setEditingName(e.target.value)}
                                                     onBlur={handleSaveEdit}
                                                     onKeyDown={handleKeyDown}
-                                                    className="flex-grow bg-transparent border-b border-cyan-500 focus:outline-none text-gray-800 dark:text-gray-200"
+                                                    className="flex-grow bg-transparent border-b border-blue-500 focus:outline-none text-gray-800 dark:text-gray-200"
                                                 />
                                             ) : (
                                                 <span 
@@ -268,7 +269,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
             {isOpen && (
                 <div 
                     onMouseDown={handleResizeMouseDown}
-                    className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-cyan-400/50 dark:hover:bg-cyan-500/50 transition-colors duration-200 z-20"
+                    className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-blue-400/50 dark:hover:bg-blue-500/50 transition-colors duration-200 z-20"
                 />
             )}
 

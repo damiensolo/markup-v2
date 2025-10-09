@@ -29,12 +29,22 @@ export interface PunchData {
 }
 
 /**
+ * Represents a specific version of a drawing.
+ */
+export interface DrawingVersion {
+  id: string;
+  name: string;
+  timestamp: string;
+  thumbnailUrl: string;
+}
+
+/**
  * Represents Drawing data linked to a rectangle.
  */
 export interface DrawingData {
   id: string;
   title: string;
-  thumbnailUrl: string;
+  versions: DrawingVersion[];
 }
 
 /**

@@ -13,7 +13,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onUploadClick }) => {
       <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md">Select an image file to start highlighting.</p>
       <button
         onClick={onUploadClick}
-        className="bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center gap-2"
+        className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center gap-2"
       >
         <UploadIcon className="w-5 h-5" /> Choose Image
       </button>

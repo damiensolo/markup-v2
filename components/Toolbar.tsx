@@ -42,7 +42,7 @@ const ToolButton: React.FC<ToolButtonProps> = ({
   <button
     onClick={onClick}
     className={`p-2.5 rounded-lg transition-colors duration-200 text-white ${
-      isActive ? 'bg-cyan-600' : 'hover:bg-gray-700'
+      isActive ? 'bg-blue-500' : 'hover:bg-gray-700'
     }`}
     title={label}
   >
@@ -172,7 +172,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
             <button
                 onClick={() => handleToolClick('shape')}
                 className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
-                    activeTool === 'shape' ? 'bg-cyan-600' : 'hover:bg-gray-700'
+                    activeTool === 'shape' ? 'bg-blue-500' : 'hover:bg-gray-700'
                 }`}
                 title={currentShapeTool.label}
             >
@@ -190,7 +190,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                             key={shape.id}
                             onClick={() => handleShapeClick(shape.id)}
                             className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
-                                activeShape === shape.id && activeTool === 'shape' ? 'bg-cyan-600 text-white' : 'hover:bg-gray-700'
+                                activeShape === shape.id && activeTool === 'shape' ? 'bg-blue-500 text-white' : 'hover:bg-gray-700'
                             }`}
                             title={shape.label}
                         >
@@ -207,7 +207,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
              <button
                 onClick={() => handleToolClick('pin')}
                 className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
-                    activeTool === 'pin' ? 'bg-cyan-600' : 'hover:bg-gray-700'
+                    activeTool === 'pin' ? 'bg-blue-500' : 'hover:bg-gray-700'
                 }`}
                 title={currentPinTool.label}
             >
@@ -225,7 +225,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                             key={pin.id}
                             onClick={() => handlePinClick(pin.id)}
                             className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
-                                activePinType === pin.id && activeTool === 'pin' ? 'bg-cyan-600' : 'hover:bg-gray-700'
+                                activePinType === pin.id && activeTool === 'pin' ? 'bg-blue-500' : 'hover:bg-gray-700'
                             }`}
                             title={pin.label}
                         >
@@ -264,7 +264,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
             <button
                 onClick={handleColorButtonClick}
                 className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
-                    activeTool === 'fill' || activeTool === 'stroke' ? 'bg-cyan-600' : 'hover:bg-gray-700'
+                    activeTool === 'fill' || activeTool === 'stroke' ? 'bg-blue-500' : 'hover:bg-gray-700'
                 }`}
                 title={currentColorTool.label}
             >
@@ -282,7 +282,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                             key={color.id}
                             onClick={() => handleColorClick(color.id)}
                             className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
-                                activeColor === color.id && (activeTool === 'fill' || activeTool === 'stroke') ? 'bg-cyan-600 text-white' : 'hover:bg-gray-700'
+                                activeColor === color.id && (activeTool === 'fill' || activeTool === 'stroke') ? 'bg-blue-500 text-white' : 'hover:bg-gray-700'
                             }`}
                             title={color.label}
                         >

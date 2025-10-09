@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { XMarkIcon } from './Icons';
 
@@ -13,7 +14,7 @@ interface RfiPanelProps {
 const RfiPanel: React.FC<RfiPanelProps> = ({ isOpen, isEditMode, formData, onFormChange, onSubmit, onCancel }) => {
     return (
         <div
-            className={`h-full flex-shrink-0 bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'border-l border-gray-200 dark:border-gray-700' : ''}`}
+            className={`h-full flex-shrink-0 bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'border-l border-gray-200 dark:border-gray-700 shadow-lg' : ''}`}
             style={{ width: isOpen ? '28rem' : '0px' }}
         >
             <div className={`h-full w-full flex flex-col transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
@@ -27,11 +28,11 @@ const RfiPanel: React.FC<RfiPanelProps> = ({ isOpen, isEditMode, formData, onFor
                     <form onSubmit={onSubmit} className="flex flex-col flex-grow">
                         <div className="mb-4">
                             <label htmlFor="rfi-title" className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">RFI Title</label>
-                            <input type="text" name="title" id="rfi-title" value={formData.title} onChange={onFormChange} required className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-500" />
+                            <input type="text" name="title" id="rfi-title" value={formData.title} onChange={onFormChange} required className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" />
                         </div>
                         <div className="mb-4">
                             <label htmlFor="rfi-type" className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">RFI Type</label>
-                            <select name="type" id="rfi-type" value={formData.type} onChange={onFormChange} className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-500">
+                            <select name="type" id="rfi-type" value={formData.type} onChange={onFormChange} className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500">
                                 <option>General Inquiry</option>
                                 <option>Design Clarification</option>
                                 <option>Material Substitution</option>
@@ -40,7 +41,7 @@ const RfiPanel: React.FC<RfiPanelProps> = ({ isOpen, isEditMode, formData, onFor
                         </div>
                         <div className="mb-4 flex-grow flex flex-col">
                             <label htmlFor="rfi-question" className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Question</label>
-                            <textarea name="question" id="rfi-question" value={formData.question} onChange={onFormChange} required rows={6} className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white flex-grow resize-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-cyan-500"></textarea>
+                            <textarea name="question" id="rfi-question" value={formData.question} onChange={onFormChange} required rows={6} className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white flex-grow resize-none focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"></textarea>
                         </div>
                         <div className="mb-4">
                             <p className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Attachments / Linked Items</p>
@@ -50,7 +51,7 @@ const RfiPanel: React.FC<RfiPanelProps> = ({ isOpen, isEditMode, formData, onFor
                         </div>
                         <div className="mt-auto flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                             <button type="button" onClick={onCancel} className="bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-white font-bold py-2 px-4 rounded-lg transition-colors">Cancel</button>
-                            <button type="submit" className="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded-lg transition-colors">{isEditMode ? 'Save Changes' : 'Create Draft'}</button>
+                            <button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">{isEditMode ? 'Save Changes' : 'Create Draft'}</button>
                         </div>
                     </form>
                 </div>

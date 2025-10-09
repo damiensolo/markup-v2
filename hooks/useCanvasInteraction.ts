@@ -36,6 +36,7 @@ export const useCanvasInteraction = ({
   setActivePanel,
   mouseDownRef,
   isSpacebarDown,
+  setHasUnsavedChanges,
 }: any) => {
   const [interaction, setInteraction] = useState<InteractionState>({ type: 'none' });
   const [currentRect, setCurrentRect] = useState<Omit<Rectangle, 'id' | 'name' | 'visible'> | null>(null);
@@ -161,7 +162,10 @@ export const useCanvasInteraction = ({
     const isClick = mouseDownRef.current && Math.abs(event.clientX - mouseDownRef.current.x) < 5 && Math.abs(event.clientY - mouseDownRef.current.y) < 5;
     mouseDownRef.current = null;
 
-    if (draggingPinId) setDraggingPinId(null);
+    if (draggingPinId) {
+      setDraggingPinId(null);
+      setHasUnsavedChanges(true);
+    }
 
     if (activeTool === 'pin' && isClick && interaction.type === 'none') {
       const coords = getRelativeCoords(event);
@@ -198,6 +202,8 @@ export const useCanvasInteraction = ({
         const newRect = { ...normalized, id: Date.now().toString(), name: `${shapeName} ${count}`, visible: true };
         setRectangles((prev: Rectangle[]) => [...prev, newRect]);
         setSelectedRectIds([newRect.id]);
+        // FIX: Ensure unsaved changes are flagged after drawing a new rectangle.
+        setHasUnsavedChanges(true);
       }
     } else if (interaction.type === 'marquee' && marqueeRect) {
       const normalizedMarquee = normalizeRect(marqueeRect, 'box');
@@ -209,18 +215,30 @@ export const useCanvasInteraction = ({
                normalizedRect.y + normalizedRect.height > normalizedMarquee.y;
       });
       setSelectedRectIds(selected.map((r: Rectangle) => r.id));
-    } else if (interaction.type === 'resizing' && interaction.initialRects) {
-      const rectToNormalize = rectangles.find((r: Rectangle) => r.id === interaction.initialRects?.[0].id);
-      if (rectToNormalize) {
-        const normalized = normalizeRect(rectToNormalize, rectToNormalize.shape);
-        setRectangles((rects: Rectangle[]) => rects.map(r => (r.id === normalized.id ? normalized : r)));
-      }
+    } else if (interaction.type === 'moving' || interaction.type === 'resizing') {
+        if (interaction.startPoint) {
+            const finalCoords = getRelativeCoords(event);
+            if (finalCoords) {
+                const dx = finalCoords.x - interaction.startPoint.x;
+                const dy = finalCoords.y - interaction.startPoint.y;
+                if (Math.hypot(dx, dy) > 0.5) { // Check for meaningful change
+                    setHasUnsavedChanges(true);
+                }
+            }
+        }
+        if (interaction.type === 'resizing' && interaction.initialRects) {
+            const rectToNormalize = rectangles.find((r: Rectangle) => r.id === interaction.initialRects?.[0].id);
+            if (rectToNormalize) {
+              const normalized = normalizeRect(rectToNormalize, rectToNormalize.shape);
+              setRectangles((rects: Rectangle[]) => rects.map(r => (r.id === normalized.id ? normalized : r)));
+            }
+        }
     }
   
     setInteraction({ type: 'none' });
     setCurrentRect(null);
     setMarqueeRect(null);
-  }, [interaction, currentRect, marqueeRect, rectangles, activeTool, activePinType, getRelativeCoords, handleSubmenuLink, draggingPinId, mouseDownRef, activeShape]);
+  }, [interaction, currentRect, marqueeRect, rectangles, activeTool, activePinType, getRelativeCoords, handleSubmenuLink, draggingPinId, mouseDownRef, activeShape, setHasUnsavedChanges, setRectangles, setSelectedRectIds]);
   
   const handleMouseLeave = useCallback(() => {
     if (interaction.type !== 'none' || draggingPinId) {

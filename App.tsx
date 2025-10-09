@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import type { Rectangle, RfiData, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState } from './types';
+import type { Rectangle, RfiData, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion } from './types';
 import LinkModal from './components/LinkModal';
 import PhotoViewerModal from './components/PhotoViewerModal';
 import RfiPanel from './components/RfiPanel';
@@ -11,7 +11,7 @@ import CanvasView from './components/CanvasView';
 import { useZoomPan } from './hooks/useZoomPan';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import LayersPanel from './components/LayersPanel';
-import { FilterIcon } from './components/Icons';
+import { FilterIcon, ChevronLeftIcon, ShareIcon, DocumentDuplicateIcon } from './components/Icons';
 
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 export type RectangleTagType = Exclude<FilterCategory, 'safety'>;
@@ -42,9 +42,37 @@ const mockPunches: PunchData[] = [
 ];
 
 const mockDrawings: DrawingData[] = [
-    { id: 'A-2.1', title: 'Architectural Floor Plan - Level 2', thumbnailUrl: 'https://i.imgur.com/gZ3J4f3.png' },
-    { id: 'S-5.0', title: 'Structural Details - Column Connections', thumbnailUrl: 'https://i.imgur.com/K81f2i2.png' },
-    { id: 'A-5.1', title: 'Building Section A-A', thumbnailUrl: 'https://i.imgur.com/I7eA7kR.png' },
+    { 
+        id: 'A-1.0', 
+        title: 'BUILDING DATA', 
+        versions: [
+            { id: 'v3', name: 'Revision 3', timestamp: '2024-07-20', thumbnailUrl: 'https://i.imgur.com/gZ3J4f3.png' },
+            { id: 'v2', name: 'Revision 2', timestamp: '2024-07-15', thumbnailUrl: 'https://i.imgur.com/K81f2i2.png' },
+            { id: 'v1', name: 'Initial Release', timestamp: '2024-07-10', thumbnailUrl: 'https://i.imgur.com/I7eA7kR.png' },
+        ]
+    },
+    { 
+        id: 'A-2.1', 
+        title: 'Architectural Floor Plan - Level 2', 
+        versions: [
+            { id: 'v1', name: 'Initial Release', timestamp: '2024-06-01', thumbnailUrl: 'https://i.imgur.com/gZ3J4f3.png' },
+        ] 
+    },
+    { 
+        id: 'S-5.0', 
+        title: 'Structural Details - Column Connections', 
+        versions: [
+            { id: 'v2', name: 'As-Built', timestamp: '2024-08-01', thumbnailUrl: 'https://i.imgur.com/K81f2i2.png' },
+            { id: 'v1', name: 'For Construction', timestamp: '2024-05-20', thumbnailUrl: 'https://i.imgur.com/gZ3J4f3.png' },
+        ]
+    },
+    { 
+        id: 'A-5.1', 
+        title: 'Building Section A-A', 
+        versions: [
+            { id: 'v1', name: 'Initial Release', timestamp: '2024-06-15', thumbnailUrl: 'https://i.imgur.com/I7eA7kR.png' },
+        ]
+    },
 ];
 
 const mockPhotos: PhotoData[] = [
@@ -59,6 +87,217 @@ const mockSafetyIssues: SafetyIssueData[] = [
     { id: 'SAFE-002', title: 'Missing guardrail on 2nd floor', description: 'The entire southern balcony on the second floor is missing its guardrail.', status: 'In Progress', severity: 'High' },
     { id: 'SAFE-003', title: 'Improperly stored flammable materials', description: 'Gasoline cans and other flammable materials stored next to an active welding station.', status: 'Closed', severity: 'Medium' },
 ];
+
+// Sub-components defined inside App.tsx to avoid creating new files
+interface DrawingSelectorProps {
+    drawings: DrawingData[];
+    value: DrawingData | null;
+    onChange: (drawing: DrawingData) => void;
+}
+const DrawingSelector: React.FC<DrawingSelectorProps> = ({ drawings, value, onChange }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const selectorRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (selectorRef.current && !selectorRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const filteredDrawings = drawings.filter(d =>
+        d.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        d.title.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    return (
+        <div className="relative w-72" ref={selectorRef}>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-left text-sm"
+            >
+                <span className="truncate text-gray-800 dark:text-gray-200">{value ? `${value.id} - ${value.title}` : 'Select a drawing'}</span>
+                <svg className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+            {isOpen && (
+                <div className="absolute top-full mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-2">
+                    <input
+                        type="text"
+                        placeholder="Search drawings..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 mb-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <ul className="max-h-60 overflow-y-auto">
+                        {filteredDrawings.map(d => (
+                            <li key={d.id}>
+                                <button
+                                    onClick={() => {
+                                        onChange(d);
+                                        setIsOpen(false);
+                                        setSearchTerm('');
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 truncate"
+                                >
+                                    {d.id} - {d.title}
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+};
+
+interface DrawingVersionSelectorProps {
+    versions: DrawingVersion[];
+    value: DrawingVersion | null;
+    onChange: (version: DrawingVersion) => void;
+    disabled: boolean;
+}
+const DrawingVersionSelector: React.FC<DrawingVersionSelectorProps> = ({ versions, value, onChange, disabled }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const selectorRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (selectorRef.current && !selectorRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+        <div className="relative w-56" ref={selectorRef}>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                disabled={disabled}
+                className="w-full flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-left text-sm disabled:bg-gray-100 disabled:dark:bg-gray-700/50 disabled:cursor-not-allowed"
+            >
+                <span className="truncate text-gray-800 dark:text-gray-200">{value ? `${value.name} (${value.timestamp})` : 'Select version'}</span>
+                <svg className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+            {isOpen && (
+                <div className="absolute top-full mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-2">
+                    <ul className="max-h-60 overflow-y-auto">
+                        {versions.map(v => (
+                            <li key={v.id}>
+                                <button
+                                    onClick={() => {
+                                        onChange(v);
+                                        setIsOpen(false);
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700"
+                                >
+                                    <p className="font-semibold">{v.name}</p>
+                                    <p className="text-xs text-gray-500">{v.timestamp}</p>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </div>
+    );
+};
+
+interface HeaderProps {
+    onBack: () => void;
+    currentDrawing: DrawingData | null;
+    allDrawings: DrawingData[];
+    onDrawingChange: (drawing: DrawingData) => void;
+    currentVersion: DrawingVersion | null;
+    onVersionChange: (version: DrawingVersion) => void;
+    hasUnsavedChanges: boolean;
+    onSave: () => void;
+    filters: Record<FilterCategory, boolean>;
+    areFiltersActive: boolean;
+    isFilterMenuOpen: boolean;
+    setIsFilterMenuOpen: (isOpen: boolean) => void;
+    handleFilterChange: (filter: FilterCategory) => void;
+    handleToggleAllFilters: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, onDrawingChange, currentVersion, onVersionChange, hasUnsavedChanges, onSave, filters, areFiltersActive, isFilterMenuOpen, setIsFilterMenuOpen, handleFilterChange, handleToggleAllFilters }) => {
+    const filterMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
+                setIsFilterMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [setIsFilterMenuOpen]);
+
+    return (
+        <div className="flex justify-between items-center p-2 border-b border-gray-200 dark:border-gray-700 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+                <button onClick={onBack} className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700" title="Back to drawings">
+                    <ChevronLeftIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                </button>
+                <DrawingSelector drawings={allDrawings} value={currentDrawing} onChange={onDrawingChange} />
+                <DrawingVersionSelector versions={currentDrawing?.versions || []} value={currentVersion} onChange={onVersionChange} disabled={!currentDrawing} />
+            </div>
+            <div className="flex items-center gap-2">
+                 <div ref={filterMenuRef} className="relative">
+                    <button onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)} className={`relative bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600`}>
+                        <FilterIcon className="w-5 h-5" /> Filter
+                        {areFiltersActive && <span className="absolute -top-1 -right-1 block h-3 w-3 rounded-full bg-blue-500 border-2 border-white dark:border-gray-800" />}
+                    </button>
+                    {isFilterMenuOpen && (
+                        <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-4">
+                           <div className="flex justify-between items-center pb-2 border-b border-gray-200 dark:border-gray-700 mb-2">
+                                <h4 className="font-semibold">Filter Items</h4>
+                                <button onClick={handleToggleAllFilters} className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                                    {Object.values(filters).every(v => v) ? 'Hide All' : 'Show All'}
+                                </button>
+                           </div>
+                           <div className="space-y-2">
+                                {(Object.keys(filters) as FilterCategory[]).map(key => (
+                                    <label key={key} className="flex items-center justify-between cursor-pointer">
+                                        <span className="capitalize text-sm text-gray-700 dark:text-gray-300">{key.replace('punch', 'Punch Item').replace('safety', 'Safety Issue')}</span>
+                                        <div className="relative">
+                                            <input type="checkbox" className="sr-only" checked={filters[key]} onChange={() => handleFilterChange(key)} />
+                                            <div className={`block w-10 h-6 rounded-full transition-colors ${filters[key] ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${filters[key] ? 'transform translate-x-4' : ''}`}></div>
+                                        </div>
+                                    </label>
+                                ))}
+                           </div>
+                        </div>
+                    )}
+                </div>
+                <button onClick={() => alert('Share functionality not implemented')} className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600">
+                    <ShareIcon className="w-5 h-5" /> Share
+                </button>
+                <button onClick={() => alert('Compare functionality not implemented')} className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600">
+                    <DocumentDuplicateIcon className="w-5 h-5" /> Compare
+                </button>
+                <button
+                    onClick={onSave}
+                    disabled={!hasUnsavedChanges}
+                    className="font-bold py-2 px-4 rounded-lg transition-colors duration-200 disabled:bg-gray-300 disabled:dark:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
+                >
+                    Save Markup
+                </button>
+            </div>
+        </div>
+    );
+}
+
 
 const App: React.FC = () => {
   // Core Data State
@@ -125,16 +364,39 @@ const App: React.FC = () => {
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
   const [isLayersPanelOpen, setIsLayersPanelOpen] = useState(true);
 
+  // Drawing and Save State
+  const [allDrawings, setAllDrawings] = useState<DrawingData[]>(mockDrawings);
+  const [currentDrawing, setCurrentDrawing] = useState<DrawingData | null>(null);
+  const [currentVersion, setCurrentVersion] = useState<DrawingVersion | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+
   // Refs
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoFileInputRef = useRef<HTMLInputElement>(null);
   const hidePopupTimer = useRef<number | null>(null);
-  const filterMenuRef = useRef<HTMLDivElement>(null);
   const mouseDownRef = useRef<{x: number, y: number} | null>(null);
 
   // Custom Hooks for complex logic
   const { viewTransform, setViewTransform, handleWheel, handleZoom } = useZoomPan(imageContainerRef);
+
+  useEffect(() => {
+    if (currentDrawing) {
+        const latestVersion = currentDrawing.versions[0];
+        setCurrentVersion(latestVersion);
+        setImageSrc(latestVersion.thumbnailUrl);
+        setRectangles([]);
+        setPins([]);
+        setSelectedRectIds([]);
+        setHoveredRectId(null);
+        setLinkMenuRectId(null);
+        setViewTransform({ scale: 1, translateX: 0, translateY: 0 });
+        setHasUnsavedChanges(false);
+    } else {
+        setCurrentVersion(null);
+    }
+  }, [currentDrawing, setViewTransform]);
 
   const getRelativeCoords = useCallback((event: React.MouseEvent | WheelEvent | MouseEvent): { x: number; y: number } | null => {
     if (!imageContainerRef.current) return null;
@@ -229,7 +491,7 @@ const App: React.FC = () => {
             setLinkModalConfig({
                 type: 'drawing',
                 title: 'Link to a Drawing',
-                items: mockDrawings,
+                items: allDrawings.map(d => ({id: d.id, title: d.title})),
                 displayFields: [{ key: 'id' }, { key: 'title' }],
                 searchFields: ['id', 'title'],
             });
@@ -249,7 +511,7 @@ const App: React.FC = () => {
             alert(`Linking ${type} for rectangle ${targetId}`);
             break;
     }
-  }, [allRfis, allPhotos, allPunches, handleOpenRfiPanel]);
+  }, [allRfis, allPhotos, allPunches, allDrawings, handleOpenRfiPanel]);
 
   const handleSetActiveTool = useCallback((tool: ActiveTool) => {
     setActiveTool(tool);
@@ -282,18 +544,23 @@ const App: React.FC = () => {
     setActivePanel,
     mouseDownRef,
     isSpacebarDown,
+    setHasUnsavedChanges,
   });
 
   const deleteSelection = useCallback(() => {
+    let changed = false;
     if (selectedRectIds.length > 0) {
         setRectangles(rects => rects.filter(r => !selectedRectIds.includes(r.id)));
         setSelectedRectIds([]);
         setLinkMenuRectId(null);
+        changed = true;
     }
     if (selectedPinId) {
         setPins(pins => pins.filter(p => p.id !== selectedPinId));
         setSelectedPinId(null);
+        changed = true;
     }
+    if (changed) setHasUnsavedChanges(true);
   }, [selectedRectIds, selectedPinId]);
 
   useEffect(() => {
@@ -373,16 +640,16 @@ const App: React.FC = () => {
   }, [theme]);
   
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
-        setIsFilterMenuOpen(false);
-      }
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        if (hasUnsavedChanges) {
+            e.preventDefault();
+            e.returnValue = ''; // Required for Chrome
+        }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
   
   useEffect(() => {
     setIsMenuVisible(false);
@@ -408,6 +675,9 @@ const App: React.FC = () => {
         setLinkMenuRectId(null);
         setViewTransform({ scale: 1, translateX: 0, translateY: 0 });
         setImageSrc(e.target?.result as string);
+        setCurrentDrawing(null); // Clear selected drawing if a local file is uploaded
+        setCurrentVersion(null);
+        setHasUnsavedChanges(false);
       };
       reader.readAsDataURL(file);
       event.target.value = '';
@@ -417,13 +687,6 @@ const App: React.FC = () => {
   const triggerFileUpload = () => fileInputRef.current?.click();
   const triggerPhotoUpload = () => photoFileInputRef.current?.click();
 
-  const handleClearAll = () => {
-    setRectangles([]);
-    setPins([]);
-    setSelectedRectIds([]);
-    setLinkMenuRectId(null);
-  };
-  
   const handleSelectLinkItem = (item: any) => {
     if (linkTargetRectId) {
         setRectangles(prevRects => prevRects.map(rect => {
@@ -447,7 +710,8 @@ const App: React.FC = () => {
                         break;
                     case 'drawing':
                         if (!newRect.drawings) newRect.drawings = [];
-                        if (!newRect.drawings.some(d => d.id === item.id)) newRect.drawings.push(item);
+                        const fullDrawing = allDrawings.find(d => d.id === item.id);
+                        if (fullDrawing && !newRect.drawings.some(d => d.id === item.id)) newRect.drawings.push(fullDrawing);
                         break;
                     case 'photo':
                         if (!newRect.photos) newRect.photos = [];
@@ -458,6 +722,7 @@ const App: React.FC = () => {
             }
             return rect;
         }));
+        setHasUnsavedChanges(true);
     } else if (pinTargetCoords && linkModalConfig?.type === 'photo') {
         const newPinName = `Photo ${pins.filter(p => p.type === 'photo').length + 1}`;
         const newPin: Pin = {
@@ -470,6 +735,7 @@ const App: React.FC = () => {
             visible: true
         };
         setPins(prev => [...prev, newPin]);
+        setHasUnsavedChanges(true);
         setPinTargetCoords(null);
         setActiveTool('select');
         setActivePanel(null);
@@ -499,7 +765,7 @@ const App: React.FC = () => {
           ...rect,
           rfi: rect.rfi?.map(r => r.id === rfiTargetRfiId ? updatedRfiData : r)
       })));
-
+      setHasUnsavedChanges(true);
     } else if (rfiTargetRectId) {
       // Creating a new RFI and linking it
       const newRfiId = (allRfis.reduce((maxId, rfi) => Math.max(maxId, rfi.id), 0)) + 1;
@@ -520,6 +786,7 @@ const App: React.FC = () => {
           return rect;
         })
       );
+      setHasUnsavedChanges(true);
     }
     
     handleRfiCancel();
@@ -552,6 +819,7 @@ const App: React.FC = () => {
   const handleDeletePin = (pinId: string) => {
       setPins(prev => prev.filter(p => p.id !== pinId));
       setSelectedPinId(null);
+      setHasUnsavedChanges(true);
   };
 
   const handleSafetyPanelCancel = () => {
@@ -599,6 +867,7 @@ const App: React.FC = () => {
           setPins(prev => [...prev, newPin]);
           setActiveTool('select');
       }
+      setHasUnsavedChanges(true);
       handleSafetyPanelCancel();
   };
 
@@ -618,6 +887,7 @@ const App: React.FC = () => {
           setPins(prev => [...prev, newPin]);
           setActiveTool('select');
       }
+      setHasUnsavedChanges(true);
       handlePunchPanelCancel();
   };
 
@@ -626,6 +896,7 @@ const App: React.FC = () => {
       const newPinName = `Punch ${pins.filter(p => p.type === 'punch').length + 1}`;
       const newPin: Pin = { id: `pin-${Date.now()}`, type: 'punch', x: pinTargetCoords.x, y: pinTargetCoords.y, linkedId: punch.id, name: newPinName, visible: true };
       setPins((prev) => [...prev, newPin]);
+      setHasUnsavedChanges(true);
       setActiveTool('select');
     }
     handlePunchPanelCancel();
@@ -648,10 +919,12 @@ const App: React.FC = () => {
                 }
                 return rect;
              }));
+             setHasUnsavedChanges(true);
           } else if (pinTargetCoords) {
              const newPinName = `Photo ${pins.filter(p => p.type === 'photo').length + 1}`;
              const newPin: Pin = { id: `pin-${Date.now()}`, type: 'photo', x: pinTargetCoords.x, y: pinTargetCoords.y, linkedId: newPhoto.id, name: newPinName, visible: true };
              setPins(prev => [...prev, newPin]);
+             setHasUnsavedChanges(true);
              setActiveTool('select');
              setActivePanel(null);
           }
@@ -671,6 +944,7 @@ const App: React.FC = () => {
     setAllPhotos(prevPhotos => prevPhotos.map(photo => 
         photo.id === photoId ? { ...photo, markups: newMarkups } : photo
     ));
+    setHasUnsavedChanges(true);
   };
   
   const handleFilterChange = (filter: FilterCategory) => {
@@ -686,21 +960,70 @@ const App: React.FC = () => {
     setFilters(newFilters);
   };
 
+  const handleSaveMarkup = () => {
+    if (!hasUnsavedChanges) return;
+    console.log("Saving markup...", { rectangles, pins });
+    // In a real app, this would be an API call.
+    alert("Markup saved successfully!");
+    setHasUnsavedChanges(false);
+  };
+
+  const handleDrawingChange = (drawing: DrawingData) => {
+    if (hasUnsavedChanges) {
+        if (!window.confirm("You have unsaved changes that will be lost. Are you sure you want to switch drawings?")) {
+            return;
+        }
+    }
+    setCurrentDrawing(drawing);
+  };
+
+  const handleVersionChange = (version: DrawingVersion) => {
+      if (hasUnsavedChanges) {
+          if (!window.confirm("You have unsaved changes that will be lost. Are you sure you want to switch versions?")) {
+              return;
+          }
+      }
+      setCurrentVersion(version);
+      setImageSrc(version.thumbnailUrl);
+      setRectangles([]);
+      setPins([]);
+      setSelectedRectIds([]);
+      setViewTransform({ scale: 1, translateX: 0, translateY: 0 });
+      setHasUnsavedChanges(false);
+  };
+  
+  const handleGoBack = () => {
+      if (hasUnsavedChanges) {
+          if (!window.confirm("You have unsaved changes that will be lost. Are you sure you want to go back?")) {
+              return;
+          }
+      }
+      setImageSrc(null);
+      setCurrentDrawing(null);
+      setRectangles([]);
+      setPins([]);
+      setSelectedRectIds([]);
+      setHasUnsavedChanges(false);
+  };
+
   const currentPhotoForViewer = photoViewerConfig ? allPhotos.find(p => p.id === photoViewerConfig.photoId) : null;
   const areFiltersActive = Object.values(filters).some(v => !v);
 
   // Handlers for Layers Panel
   const handleRenameRect = useCallback((id: string, newName: string) => {
     setRectangles(prev => prev.map(r => r.id === id ? { ...r, name: newName } : r));
+    setHasUnsavedChanges(true);
   }, []);
 
   const handleToggleRectVisibility = useCallback((id: string) => {
     setRectangles(prev => prev.map(r => r.id === id ? { ...r, visible: !r.visible } : r));
+    // Not considered a "savable" change
   }, []);
 
   const handleDeleteRect = useCallback((id: string) => {
     setRectangles(prev => prev.filter(r => r.id !== id));
     setSelectedRectIds(prev => prev.filter(selectedId => selectedId !== id));
+    setHasUnsavedChanges(true);
   }, []);
 
   const handleSelectRect = useCallback((id: string, e: React.MouseEvent) => {
@@ -714,10 +1037,12 @@ const App: React.FC = () => {
   
   const handleRenamePin = useCallback((id: string, newName: string) => {
     setPins(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p));
+    setHasUnsavedChanges(true);
   }, []);
 
   const handleTogglePinVisibility = useCallback((id: string) => {
     setPins(prev => prev.map(p => p.id === id ? { ...p, visible: !p.visible } : p));
+    // Not considered a "savable" change
   }, []);
   
   const handleSelectPin = useCallback((id: string, e: React.MouseEvent) => {
@@ -734,43 +1059,27 @@ const App: React.FC = () => {
     <div className="h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white flex flex-col items-stretch p-4 overflow-hidden">
       <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
       <input type="file" accept="image/*" onChange={handlePhotoFileChange} className="hidden" ref={photoFileInputRef} />
-      <main className="w-full flex-grow flex flex-col items-stretch bg-white dark:bg-gray-800 rounded-2xl shadow-2xl shadow-cyan-500/10 p-2 overflow-hidden">
-        {!imageSrc ? (
+      <main className="w-full flex-grow flex flex-col items-stretch bg-white dark:bg-gray-800 rounded-2xl shadow-2xl shadow-blue-500/10 p-2 overflow-hidden">
+        {!imageSrc && !currentDrawing ? (
           <WelcomeScreen onUploadClick={triggerFileUpload} />
         ) : (
           <>
-            <div className="flex justify-end items-center mb-2 flex-wrap gap-2">
-                <div ref={filterMenuRef} className="relative">
-                    <button onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)} className={`relative bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2`}>
-                        <FilterIcon className="w-5 h-5" /> Filter
-                        {areFiltersActive && <span className="absolute -top-1 -right-1 block h-3 w-3 rounded-full bg-cyan-500 border-2 border-white dark:border-gray-800" />}
-                    </button>
-                    {isFilterMenuOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-4">
-                           <div className="flex justify-between items-center pb-2 border-b border-gray-200 dark:border-gray-700 mb-2">
-                                <h4 className="font-semibold">Filter Items</h4>
-                                <button onClick={handleToggleAllFilters} className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:underline">
-                                    {Object.values(filters).every(v => v) ? 'Hide All' : 'Show All'}
-                                </button>
-                           </div>
-                           <div className="space-y-2">
-                                {(Object.keys(filters) as FilterCategory[]).map(key => (
-                                    <label key={key} className="flex items-center justify-between cursor-pointer">
-                                        <span className="capitalize text-sm text-gray-700 dark:text-gray-300">{key.replace('punch', 'Punch Item').replace('safety', 'Safety Issue')}</span>
-                                        <div className="relative">
-                                            <input type="checkbox" className="sr-only" checked={filters[key]} onChange={() => handleFilterChange(key)} />
-                                            <div className={`block w-10 h-6 rounded-full transition-colors ${filters[key] ? 'bg-cyan-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
-                                            <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${filters[key] ? 'transform translate-x-4' : ''}`}></div>
-                                        </div>
-                                    </label>
-                                ))}
-                           </div>
-                        </div>
-                    )}
-                </div>
-                <button onClick={triggerFileUpload} className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 text-sm">Change Image</button>
-                <button onClick={handleClearAll} className="bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 text-sm">Clear All</button>
-            </div>
+            <Header
+                onBack={handleGoBack}
+                currentDrawing={currentDrawing}
+                allDrawings={allDrawings}
+                onDrawingChange={handleDrawingChange}
+                currentVersion={currentVersion}
+                onVersionChange={handleVersionChange}
+                hasUnsavedChanges={hasUnsavedChanges}
+                onSave={handleSaveMarkup}
+                filters={filters}
+                areFiltersActive={areFiltersActive}
+                isFilterMenuOpen={isFilterMenuOpen}
+                setIsFilterMenuOpen={setIsFilterMenuOpen}
+                handleFilterChange={handleFilterChange}
+                handleToggleAllFilters={handleToggleAllFilters}
+            />
             <div className="flex-grow flex flex-row items-stretch overflow-hidden">
                 <LayersPanel
                   isOpen={isLayersPanelOpen}
@@ -792,7 +1101,7 @@ const App: React.FC = () => {
                 />
                 <div className="flex-grow h-full relative">
                   <CanvasView
-                    imageSrc={imageSrc}
+                    imageSrc={imageSrc || ''}
                     rectangles={rectangles}
                     pins={pins}
                     filters={filters}
