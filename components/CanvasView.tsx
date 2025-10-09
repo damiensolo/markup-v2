@@ -235,7 +235,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const ToolbarPositionButton: React.FC<{position: ToolbarPosition, label: string}> = ({position, label}) => (
       <button 
         onClick={() => setToolbarPosition(position)}
-        className={`w-full text-left px-3 py-1.5 text-sm rounded-md transition-colors ${toolbarPosition === position ? 'bg-cyan-600 text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
+        className={`w-full text-left px-3 py-1.5 text-sm rounded-md transition-colors ${toolbarPosition === position ? 'bg-blue-500 text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
       >
         {label}
       </button>
@@ -340,23 +340,23 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                             <div className="flex items-center gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white">
                                 <button onClick={(e) => selectedRectangle && handlePublishRect(e, selectedRectangle.id)} title="Publish" className="p-2 rounded-md hover:bg-gray-700 transition-colors"><ArrowUpTrayIcon className="w-5 h-5" /></button>
                                 <div className="relative">
-                                    <button onClick={(e) => selectedRectangle && handleLinkRect(e, selectedRectangle.id)} title="Link" className={`p-2 rounded-md transition-colors ${linkMenuRectId === selectedRectangle?.id ? 'bg-cyan-600 text-white' : 'hover:bg-gray-700'}`}><LinkIcon className="w-5 h-5" /></button>
+                                    <button onClick={(e) => selectedRectangle && handleLinkRect(e, selectedRectangle.id)} title="Link" className={`p-2 rounded-md transition-colors ${linkMenuRectId === selectedRectangle?.id ? 'bg-blue-500 text-white' : 'hover:bg-gray-700'}`}><LinkIcon className="w-5 h-5" /></button>
                                     {linkMenuRectId === selectedRectangle?.id && (
                                     <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max" onMouseLeave={() => setOpenLinkSubmenu(null)}>
                                         <div className="flex flex-col gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-sm">
                                             <div className="relative" onMouseEnter={() => setOpenLinkSubmenu('rfi')}>
-                                                <div className="flex justify-between items-center px-3 py-1.5 text-white rounded-md hover:bg-cyan-600 transition-colors text-left cursor-default">
+                                                <div className="flex justify-between items-center px-3 py-1.5 text-white rounded-md hover:bg-blue-500 transition-colors text-left cursor-default">
                                                     <span>RFI</span>
                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3 ml-4"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
                                                 </div>
                                                 {openLinkSubmenu === 'rfi' && (
                                                     <div className="absolute left-full top-0 ml-1 flex flex-col gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-sm w-max">
-                                                        <button onClick={(e) => selectedRectangle && handleSubmenuLink(e, 'New RFI', selectedRectangle.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-cyan-600 transition-colors text-left whitespace-nowrap">New RFI</button>
-                                                        <button onClick={(e) => selectedRectangle && handleSubmenuLink(e, 'Link RFI', selectedRectangle.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-cyan-600 transition-colors text-left whitespace-nowrap">Link RFI</button>
+                                                        <button onClick={(e) => selectedRectangle && handleSubmenuLink(e, 'New RFI', selectedRectangle.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-blue-500 transition-colors text-left whitespace-nowrap">New RFI</button>
+                                                        <button onClick={(e) => selectedRectangle && handleSubmenuLink(e, 'Link RFI', selectedRectangle.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-blue-500 transition-colors text-left whitespace-nowrap">Link RFI</button>
                                                     </div>
                                                 )}
                                             </div>
-                                            {['Link Submittal', 'Link Punch', 'Link Drawing', 'Link Photo'].map(type => (<button key={type} onClick={(e) => selectedRectangle && handleSubmenuLink(e, type, selectedRectangle.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-cyan-600 transition-colors text-left">{type.replace('Link ','')}</button>))}
+                                            {['Link Submittal', 'Link Punch', 'Link Drawing', 'Link Photo'].map(type => (<button key={type} onClick={(e) => selectedRectangle && handleSubmenuLink(e, type, selectedRectangle.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-blue-500 transition-colors text-left">{type.replace('Link ','')}</button>))}
                                         </div>
                                     </div>
                                     )}
