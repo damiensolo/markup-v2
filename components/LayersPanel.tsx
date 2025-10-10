@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, PhotoData } from '../types';
 import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, PhotoIcon } from './Icons';
@@ -275,10 +276,10 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 
             <button 
                 onClick={onToggle} 
-                className="absolute top-1/2 right-0 transform -translate-y-1/2 translate-x-1/2 w-8 h-16 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-r-lg flex items-center justify-center text-gray-600 dark:text-gray-300 transition-colors z-10"
+                className="absolute top-1/2 right-0 transform -translate-y-1/2 translate-x-full w-6 h-12 bg-blue-500 hover:bg-blue-600 rounded-r-md flex items-center justify-center text-white transition-colors z-10 shadow-md"
                 title={isOpen ? 'Collapse Panel' : 'Expand Panel'}
             >
-                <ChevronDoubleLeftIcon className={`w-5 h-5 transition-transform duration-300 ${isOpen ? '' : 'rotate-180'}`} />
+                <ChevronDoubleLeftIcon className={`w-4 h-4 transition-transform duration-300 ${isOpen ? '' : 'rotate-180'}`} />
             </button>
         </div>
     );
