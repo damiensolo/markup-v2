@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import type { Rectangle, RfiData, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion } from './types';
 import LinkModal from './components/LinkModal';
 import PhotoViewerModal from './components/PhotoViewerModal';
+import ShareModal from './components/ShareModal';
 import RfiPanel from './components/RfiPanel';
 import SafetyPanel from './components/SafetyPanel';
 import PunchPanel from './components/PunchPanel';
@@ -88,6 +89,30 @@ const mockSafetyIssues: SafetyIssueData[] = [
     { id: 'SAFE-003', title: 'Improperly stored flammable materials', description: 'Gasoline cans and other flammable materials stored next to an active welding station.', status: 'Closed', severity: 'Medium' },
 ];
 
+const mockCompanies = [
+    { id: 'comp-1', name: 'Martinez Developments', role: 'Building Contractor', projectManager: 'Charles Carter' },
+    { id: 'comp-2', name: 'Mora Specialty Contractors', role: 'Concrete', projectManager: 'Roy Cook' },
+    { id: 'comp-3', name: 'Elliott Subcontractors', role: 'Electrical', projectManager: 'Michael Schmidt' },
+    { id: 'comp-4', name: 'Jenkins Subcontractors', role: 'HVAC', projectManager: 'Ana Lewis' },
+    { id: 'comp-5', name: 'Farley Structures', role: 'Plumbing', projectManager: 'Yvonne Shea' },
+    { id: 'comp-6', name: 'Pham Interior Designs', role: 'Construction Architect', projectManager: 'Dustin Jennings' },
+    { id: 'comp-7', name: 'Camacho Contractors', role: 'Doors & Windows', projectManager: 'John James' },
+    { id: 'comp-8', name: 'Mccoy Construction Group', role: 'Owner', projectManager: 'Danielle Taylor' },
+];
+
+const mockEmployees = [
+  { id: 'emp-1', name: 'Charles Carter', role: 'Project Manager', company: 'Martinez Developments' },
+  { id: 'emp-2', name: 'Roy Cook', role: 'Superintendent', company: 'Mora Specialty Contractors' },
+  { id: 'emp-3', name: 'Michael Schmidt', role: 'Foreman', company: 'Elliott Subcontractors' },
+  { id: 'emp-4', name: 'Ana Lewis', role: 'Engineer', company: 'Jenkins Subcontractors' },
+  { id: 'emp-5', name: 'Yvonne Shea', role: 'Plumber', company: 'Farley Structures' },
+  { id: 'emp-6', name: 'Dustin Jennings', role: 'Architect', company: 'Pham Interior Designs' },
+  { id: 'emp-7', name: 'John James', role: 'Installer', company: 'Camacho Contractors' },
+  { id: 'emp-8', name: 'Danielle Taylor', role: 'Owner Rep', company: 'Mccoy Construction Group' },
+  { id: 'emp-9', name: 'Sarah Wilson', role: 'Safety Inspector', company: 'Martinez Developments' },
+  { id: 'emp-10', name: 'Tom Clark', role: 'Electrician', company: 'Elliott Subcontractors' },
+];
+
 // Sub-components defined inside App.tsx to avoid creating new files
 interface DrawingSelectorProps {
     drawings: DrawingData[];
@@ -115,7 +140,7 @@ const DrawingSelector: React.FC<DrawingSelectorProps> = ({ drawings, value, onCh
     );
 
     return (
-        <div className="relative w-72" ref={selectorRef}>
+        <div className="relative w-[19.5rem]" ref={selectorRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-left text-sm"
@@ -221,6 +246,7 @@ interface HeaderProps {
     onVersionChange: (version: DrawingVersion) => void;
     hasUnsavedChanges: boolean;
     onSave: () => void;
+    onShare: () => void;
     filters: Record<FilterCategory, boolean>;
     areFiltersActive: boolean;
     isFilterMenuOpen: boolean;
@@ -229,7 +255,7 @@ interface HeaderProps {
     handleToggleAllFilters: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, onDrawingChange, currentVersion, onVersionChange, hasUnsavedChanges, onSave, filters, areFiltersActive, isFilterMenuOpen, setIsFilterMenuOpen, handleFilterChange, handleToggleAllFilters }) => {
+const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, onDrawingChange, currentVersion, onVersionChange, hasUnsavedChanges, onSave, onShare, filters, areFiltersActive, isFilterMenuOpen, setIsFilterMenuOpen, handleFilterChange, handleToggleAllFilters }) => {
     const filterMenuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -280,7 +306,7 @@ const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, on
                         </div>
                     )}
                 </div>
-                <button onClick={() => alert('Share functionality not implemented')} className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600">
+                <button onClick={onShare} className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600">
                     <ShareIcon className="w-5 h-5" /> Share
                 </button>
                 <button onClick={() => alert('Compare functionality not implemented')} className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600">
@@ -348,6 +374,8 @@ const App: React.FC = () => {
   const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
   const [photoViewerConfig, setPhotoViewerConfig] = useState<{ rectId?: string; photoId: string, pinId?: string } | null>(null);
   
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
   // UI State
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [toolbarPosition, setToolbarPosition] = useState<ToolbarPosition>('bottom');
@@ -566,7 +594,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         const target = e.target as HTMLElement;
-        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || isLinkModalOpen || isPhotoViewerOpen) {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || isLinkModalOpen || isPhotoViewerOpen || isShareModalOpen) {
             return;
         }
 
@@ -626,6 +654,7 @@ const App: React.FC = () => {
       isSpacebarDown,
       isLinkModalOpen,
       isPhotoViewerOpen,
+      isShareModalOpen,
       interaction,
       handleMouseUp
   ]);
@@ -968,6 +997,12 @@ const App: React.FC = () => {
     setHasUnsavedChanges(false);
   };
 
+  const handleShareConfirm = (settings: { visibility: 'public' | 'restricted' | 'private'; ids: string[] }) => {
+    console.log("Sharing with settings:", settings);
+    alert(`Markup shared with visibility: ${settings.visibility}. Selected items: ${settings.ids.length}`);
+    setIsShareModalOpen(false);
+  };
+
   const handleDrawingChange = (drawing: DrawingData) => {
     if (hasUnsavedChanges) {
         if (!window.confirm("You have unsaved changes that will be lost. Are you sure you want to switch drawings?")) {
@@ -1073,6 +1108,7 @@ const App: React.FC = () => {
                 onVersionChange={handleVersionChange}
                 hasUnsavedChanges={hasUnsavedChanges}
                 onSave={handleSaveMarkup}
+                onShare={() => setIsShareModalOpen(true)}
                 filters={filters}
                 areFiltersActive={areFiltersActive}
                 isFilterMenuOpen={isFilterMenuOpen}
@@ -1244,6 +1280,14 @@ const App: React.FC = () => {
         photoData={currentPhotoForViewer || null}
         onClose={() => setIsPhotoViewerOpen(false)}
         onUpdateMarkups={handleUpdatePhotoMarkups}
+      />
+
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        onShare={handleShareConfirm}
+        companies={mockCompanies}
+        employees={mockEmployees}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import React from 'react';
-import type { HoveredItemInfo, Rectangle, PhotoData, SafetyIssueData, PunchData } from '../types';
+import type { HoveredItemInfo, Rectangle, PhotoData, SafetyIssueData, PunchData, DrawingData } from '../types';
 
 interface HoverPopupProps {
     hoveredItem: HoveredItemInfo | null;
@@ -107,10 +107,11 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                         break;
                     case 'drawing':
                         const drawing = rect.drawings?.find(d => d.id === hoveredItem.itemId);
-                        if (drawing) content = (
+                        // Fix: Access thumbnailUrl from the first version of the drawing.
+                        if (drawing && drawing.versions?.[0]) content = (
                             <>
                                 <h4 className="font-bold text-indigo-400 mb-2 truncate">{drawing.id}: {drawing.title}</h4>
-                                <img src={drawing.thumbnailUrl} alt={drawing.title} className="rounded-md mb-3 w-full object-cover" />
+                                <img src={drawing.versions[0].thumbnailUrl} alt={drawing.title} className="rounded-md mb-3 w-full object-cover" />
                                 <a href="https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/document/newPlans/markup/A-3.2/AHV6vNEm20250627115709/latest" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-400 text-sm font-semibold">View Full Drawing &rarr;</a>
                             </>
                         );
