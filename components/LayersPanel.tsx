@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, PhotoData } from '../types';
 import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, PhotoIcon } from './Icons';
@@ -13,6 +11,8 @@ interface LayersPanelProps {
     pins: Pin[];
     selectedRectIds: string[];
     selectedPinId: string | null;
+    expandedIds: string[];
+    onToggleExpand: (id: string) => void;
     onSelectRect: (id: string, e: React.MouseEvent) => void;
     onSelectPin: (id: string, e: React.MouseEvent) => void;
     onRenameRect: (id: string, newName: string) => void;
@@ -51,13 +51,12 @@ const LinkedItemIcon = ({ type }: { type: string }) => {
 };
 
 const LayersPanel: React.FC<LayersPanelProps> = ({ 
-    isOpen, onToggle, rectangles, pins, selectedRectIds, selectedPinId, 
+    isOpen, onToggle, rectangles, pins, selectedRectIds, selectedPinId, expandedIds, onToggleExpand,
     onSelectRect, onSelectPin, onRenameRect, onRenamePin, onDeleteRect, onDeletePin,
     onToggleRectVisibility, onTogglePinVisibility, onOpenRfiPanel, onOpenPhotoViewer
 }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
-    const [expandedIds, setExpandedIds] = useState<string[]>([]);
     const inputRef = useRef<HTMLInputElement>(null);
     
     // Resizing logic
@@ -145,8 +144,8 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
         }
     };
     
-    const toggleExpand = (id: string) => {
-        setExpandedIds(prev => prev.includes(id) ? prev.filter(expandedId => expandedId !== id) : [...prev, id]);
+    const handleLinkClick = (url: string) => {
+        window.open(url, '_blank', 'noopener,noreferrer');
     };
 
     return (
@@ -186,7 +185,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                                         >
                                             <div className="w-5 flex items-center justify-center mr-2 flex-shrink-0">
                                             {hasChildren ? (
-                                                <button onClick={(e) => { e.stopPropagation(); toggleExpand(item.id); }} className="p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600">
+                                                <button onClick={(e) => { e.stopPropagation(); onToggleExpand(item.id); }} className="p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600">
                                                     <ChevronRightIcon className={`w-3 h-3 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                                                 </button>
                                             ) : <div className="w-3 h-3" />}
@@ -230,19 +229,19 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                                                     </li>
                                                 ))}
                                                 {item.submittals?.map((sub: SubmittalData) => (
-                                                    <li key={sub.id} className="flex items-center px-4 py-2 cursor-not-allowed">
+                                                    <li key={sub.id} onClick={() => handleLinkClick('https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/document/submittals/package/FMVmW4xEe9bcHUTp/registries/Xh6FHaQZ9Dyv6V3i/?tab=response')} className="flex items-center px-4 py-2 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60">
                                                         <LinkedItemIcon type="submittal" />
                                                         <span className="text-sm truncate text-gray-700 dark:text-gray-300">{sub.id}: {sub.title}</span>
                                                     </li>
                                                 ))}
                                                 {item.punches?.map((punch: PunchData) => (
-                                                    <li key={punch.id} className="flex items-center px-4 py-2 cursor-not-allowed">
+                                                    <li key={punch.id} onClick={() => handleLinkClick('https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/quality/punchList/H7SakWBed794KRdU/details?tab=details')} className="flex items-center px-4 py-2 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60">
                                                         <LinkedItemIcon type="punch" />
                                                         <span className="text-sm truncate text-gray-700 dark:text-gray-300">{punch.id}: {punch.title}</span>
                                                     </li>
                                                 ))}
                                                 {item.drawings?.map((drawing: DrawingData) => (
-                                                    <li key={drawing.id} className="flex items-center px-4 py-2 cursor-not-allowed">
+                                                    <li key={drawing.id} onClick={() => handleLinkClick('https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/document/newPlans/markup/A-3.2/AHV6vNEm20250627115709/latest')} className="flex items-center px-4 py-2 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60">
                                                         <LinkedItemIcon type="drawing" />
                                                         <span className="text-sm truncate text-gray-700 dark:text-gray-300">{drawing.id}: {drawing.title}</span>
                                                     </li>

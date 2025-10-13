@@ -391,6 +391,7 @@ const App: React.FC = () => {
   });
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
   const [isLayersPanelOpen, setIsLayersPanelOpen] = useState(true);
+  const [expandedLayerIds, setExpandedLayerIds] = useState<string[]>([]);
 
   // Drawing and Save State
   const [allDrawings, setAllDrawings] = useState<DrawingData[]>(mockDrawings);
@@ -751,6 +752,7 @@ const App: React.FC = () => {
             }
             return rect;
         }));
+        setExpandedLayerIds(prev => [...new Set([...prev, linkTargetRectId])]);
         setHasUnsavedChanges(true);
     } else if (pinTargetCoords && linkModalConfig?.type === 'photo') {
         const newPinName = `Photo ${pins.filter(p => p.type === 'photo').length + 1}`;
@@ -815,6 +817,7 @@ const App: React.FC = () => {
           return rect;
         })
       );
+      setExpandedLayerIds(prev => [...new Set([...prev, rfiTargetRectId])]);
       setHasUnsavedChanges(true);
     }
     
@@ -948,6 +951,7 @@ const App: React.FC = () => {
                 }
                 return rect;
              }));
+             setExpandedLayerIds(prev => [...new Set([...prev, linkTargetRectId])]);
              setHasUnsavedChanges(true);
           } else if (pinTargetCoords) {
              const newPinName = `Photo ${pins.filter(p => p.type === 'photo').length + 1}`;
@@ -1090,6 +1094,10 @@ const App: React.FC = () => {
     setIsPhotoViewerOpen(true);
   }, []);
 
+  const toggleLayerExpand = (id: string) => {
+    setExpandedLayerIds(prev => prev.includes(id) ? prev.filter(expandedId => expandedId !== id) : [...prev, id]);
+  };
+
   return (
     <div className="h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white flex flex-col items-stretch p-4 overflow-hidden">
       <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
@@ -1124,6 +1132,8 @@ const App: React.FC = () => {
                   pins={pins}
                   selectedRectIds={selectedRectIds}
                   selectedPinId={selectedPinId}
+                  expandedIds={expandedLayerIds}
+                  onToggleExpand={toggleLayerExpand}
                   onSelectRect={handleSelectRect}
                   onSelectPin={handleSelectPin}
                   onRenameRect={handleRenameRect}
