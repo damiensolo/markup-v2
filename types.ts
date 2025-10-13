@@ -51,13 +51,40 @@ export interface DrawingData {
  * Represents a markup annotation on a linked photo.
  * Values are percentages (0-100) relative to the photo's dimensions.
  */
-export interface PhotoMarkup {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+export type PhotoMarkupShapeType = 'box' | 'ellipse' | 'cloud';
+
+export interface ShapePhotoMarkup {
+    id: string;
+    type: 'shape';
+    shape: PhotoMarkupShapeType;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
 }
+
+export interface PenPhotoMarkup {
+    id:string;
+    type: 'pen';
+    points: { x: number; y: number }[];
+}
+
+export interface ArrowPhotoMarkup {
+    id: string;
+    type: 'arrow';
+    start: { x: number; y: number };
+    end: { x: number; y: number };
+}
+
+export interface TextPhotoMarkup {
+    id: string;
+    type: 'text';
+    x: number;
+    y: number;
+    text: string;
+}
+
+export type PhotoMarkup = ShapePhotoMarkup | PenPhotoMarkup | ArrowPhotoMarkup | TextPhotoMarkup;
 
 
 /**
