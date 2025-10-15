@@ -18,6 +18,12 @@ type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'saf
 export type RectangleTagType = Exclude<FilterCategory, 'safety'>;
 type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 export type ToolbarPosition = 'bottom' | 'top' | 'left' | 'right';
+export interface ImageGeom {
+    width: number;
+    height: number;
+    x: number;
+    y: number;
+}
 
 const mockRfis: RfiData[] = [
     { id: 101, title: 'Clarification on beam specification', type: 'Design Clarification', question: 'The structural drawing S-2.1 specifies a W12x26 beam, but the architectural drawing A-5.0 shows a W14x22. Please clarify which is correct.' },
@@ -344,6 +350,7 @@ const App: React.FC = () => {
   const [hoveredItem, setHoveredItem] = useState<HoveredItemInfo | null>(null);
   const [pinTargetCoords, setPinTargetCoords] = useState<{x: number, y: number} | null>(null);
   const [isSpacebarDown, setIsSpacebarDown] = useState(false);
+  const [imageGeom, setImageGeom] = useState<ImageGeom>({ width: 0, height: 0, x: 0, y: 0 });
 
   // Tool State
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
@@ -427,20 +434,37 @@ const App: React.FC = () => {
     }
   }, [currentDrawing, setViewTransform]);
 
+  const handleImageGeomChange = useCallback((geom: ImageGeom) => {
+    setImageGeom(geom);
+  }, []);
+
   const getRelativeCoords = useCallback((event: React.MouseEvent | WheelEvent | MouseEvent): { x: number; y: number } | null => {
-    if (!imageContainerRef.current) return null;
-    const rect = imageContainerRef.current.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
+    if (!imageContainerRef.current || !imageGeom.width) return null;
 
-    const imageX = (mouseX - viewTransform.translateX) / viewTransform.scale;
-    const imageY = (mouseY - viewTransform.translateY) / viewTransform.scale;
+    const containerRect = imageContainerRef.current.getBoundingClientRect();
 
-    const x = (imageX / rect.width) * 100;
-    const y = (imageY / rect.height) * 100;
+    // Mouse position relative to the container
+    const mouseX = event.clientX - containerRect.left;
+    const mouseY = event.clientY - containerRect.top;
+
+    // Undo the pan/zoom transformation
+    const transformedMouseX = (mouseX - viewTransform.translateX) / viewTransform.scale;
+    const transformedMouseY = (mouseY - viewTransform.translateY) / viewTransform.scale;
+
+    // Mouse position relative to the actual rendered image
+    const imageCoordX = transformedMouseX - imageGeom.x;
+    const imageCoordY = transformedMouseY - imageGeom.y;
+
+    // Calculate percentage relative to the rendered image dimensions
+    let x = (imageCoordX / imageGeom.width) * 100;
+    let y = (imageCoordY / imageGeom.height) * 100;
+
+    // Clamp to image bounds
+    x = Math.max(0, Math.min(100, x));
+    y = Math.max(0, Math.min(100, y));
 
     return { x, y };
-  }, [viewTransform]);
+  }, [viewTransform, imageGeom]);
   
     const handleRfiCancel = useCallback(() => {
     setActivePanel(null);
@@ -1168,6 +1192,8 @@ const App: React.FC = () => {
                     setToolbarPosition={setToolbarPosition}
                     isSpacebarDown={isSpacebarDown}
                     imageContainerRef={imageContainerRef}
+                    imageGeom={imageGeom}
+                    onImageGeomChange={handleImageGeomChange}
                     handleMouseDown={handleMouseDown}
                     handleMouseMove={handleMouseMove}
                     handleMouseUp={handleMouseUp}
@@ -1176,7 +1202,6 @@ const App: React.FC = () => {
                     handleZoom={handleZoom}
                     handleThemeToggle={handleThemeToggle}
                     setHoveredRectId={setHoveredRectId}
-                    getRelativeCoords={getRelativeCoords}
                     setActiveTool={handleSetActiveTool}
                     activeShape={activeShape}
                     setActiveShape={setActiveShape}

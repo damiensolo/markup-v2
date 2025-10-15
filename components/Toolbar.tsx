@@ -188,7 +188,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                     {shapeTools.map(shape => (
                         <button
                             key={shape.id}
-                            onClick={() => handleShapeClick(shape.id)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); handleShapeClick(shape.id); }}
                             className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
                                 activeShape === shape.id && activeTool === 'shape' ? 'bg-blue-500 text-white' : 'hover:bg-gray-700'
                             }`}
@@ -223,7 +224,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                     {pinTools.map(pin => (
                         <button
                             key={pin.id}
-                            onClick={() => handlePinClick(pin.id)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); handlePinClick(pin.id); }}
                             className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
                                 activePinType === pin.id && activeTool === 'pin' ? 'bg-blue-500' : 'hover:bg-gray-700'
                             }`}
@@ -280,7 +282,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                     {colorTools.map(color => (
                         <button
                             key={color.id}
-                            onClick={() => handleColorClick(color.id)}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { e.stopPropagation(); handleColorClick(color.id); }}
                             className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
                                 activeColor === color.id && (activeTool === 'fill' || activeTool === 'stroke') ? 'bg-blue-500 text-white' : 'hover:bg-gray-700'
                             }`}

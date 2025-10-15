@@ -1,7 +1,7 @@
 // Fix: Import 'useCallback' from 'react' to resolve 'Cannot find name' errors.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle } from '../types';
-import { RectangleTagType, ToolbarPosition } from '../App';
+import { RectangleTagType, ToolbarPosition, ImageGeom } from '../App';
 import { UploadIcon, TrashIcon, LinkIcon, ArrowUpTrayIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowsPointingOutIcon, SunIcon, MoonIcon, SafetyPinIcon, PunchPinIcon, PhotoPinIcon, InformationCircleIcon, FilterIcon, CogIcon } from './Icons';
 import Toolbar from './Toolbar';
 
@@ -34,6 +34,8 @@ interface CanvasViewProps {
     setToolbarPosition: (position: ToolbarPosition) => void;
     isSpacebarDown: boolean;
     imageContainerRef: React.RefObject<HTMLDivElement>;
+    imageGeom: ImageGeom;
+    onImageGeomChange: (geom: ImageGeom) => void;
     handleMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
     handleMouseMove: (event: React.MouseEvent<HTMLDivElement>) => void;
     handleMouseUp: (event: React.MouseEvent<HTMLDivElement>) => void;
@@ -42,7 +44,6 @@ interface CanvasViewProps {
     handleZoom: (direction: 'in' | 'out' | 'reset') => void;
     handleThemeToggle: () => void;
     setHoveredRectId: (id: string | null) => void;
-    getRelativeCoords: (event: React.MouseEvent | MouseEvent) => { x: number, y: number } | null;
     setActiveTool: (tool: ActiveTool) => void;
     activeShape: ActiveShape;
     setActiveShape: (shape: ActiveShape) => void;
@@ -72,17 +73,74 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const {
         imageSrc, rectangles, pins, filters, viewTransform, interaction, activeTool, hoveredRectId, draggingPinId,
         selectedRectIds, selectedPinId, currentRect, marqueeRect, isMenuVisible, linkMenuRectId, openLinkSubmenu,
-        theme, toolbarPosition, setToolbarPosition, isSpacebarDown, imageContainerRef, handleMouseDown, handleMouseMove, handleMouseUp,
-        handleMouseLeave, handleWheel, handleZoom, handleThemeToggle, setHoveredRectId,
-        getRelativeCoords, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor, setActiveColor,
-        setDraggingPinId, setSelectedPinId, handlePinDetails, handleDeletePin, setHoveredItem, hidePopupTimer,
-        handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
-        handleSubmenuLink, onOpenRfiPanel,
-        onOpenPhotoViewer, mouseDownRef, setSelectedRectIds
+        theme, toolbarPosition, setToolbarPosition, isSpacebarDown, imageContainerRef, imageGeom, onImageGeomChange,
+        handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handleWheel, handleZoom, handleThemeToggle, 
+        setHoveredRectId, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor, 
+        setActiveColor, setDraggingPinId, setSelectedPinId, handlePinDetails, handleDeletePin, setHoveredItem, 
+        hidePopupTimer, handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
+        handleSubmenuLink, onOpenRfiPanel, onOpenPhotoViewer, mouseDownRef, setSelectedRectIds
     } = props;
 
     const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
     const settingsMenuRef = useRef<HTMLDivElement>(null);
+    const imageRef = useRef<HTMLImageElement>(null);
+    const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
+    const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+    const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        setNaturalSize({
+            width: e.currentTarget.naturalWidth,
+            height: e.currentTarget.naturalHeight
+        });
+    };
+
+    useEffect(() => {
+        const container = imageContainerRef.current;
+        if (!container) return;
+        const resizeObserver = new ResizeObserver(() => {
+            setContainerSize({
+                width: container.offsetWidth,
+                height: container.offsetHeight,
+            });
+        });
+        resizeObserver.observe(container);
+        return () => { if(container) resizeObserver.unobserve(container) };
+    }, [imageContainerRef]);
+
+    useEffect(() => {
+        const container = imageContainerRef.current;
+        if (!container || !naturalSize.width) {
+            onImageGeomChange({ width: 0, height: 0, x: 0, y: 0 });
+            return;
+        }
+
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
+        const { width: imageNaturalWidth, height: imageNaturalHeight } = naturalSize;
+        const imageAspectRatio = imageNaturalWidth / imageNaturalHeight;
+        const containerAspectRatio = containerWidth / containerHeight;
+
+        let renderedImageWidth, renderedImageHeight, offsetX, offsetY;
+
+        if (imageAspectRatio > containerAspectRatio) {
+            renderedImageWidth = containerWidth;
+            renderedImageHeight = containerWidth / imageAspectRatio;
+            offsetX = 0;
+            offsetY = (containerHeight - renderedImageHeight) / 2;
+        } else {
+            renderedImageWidth = containerHeight * imageAspectRatio;
+            renderedImageHeight = containerHeight;
+            offsetX = (containerWidth - renderedImageWidth) / 2;
+            offsetY = 0;
+        }
+        
+        onImageGeomChange({
+            width: renderedImageWidth,
+            height: renderedImageHeight,
+            x: offsetX,
+            y: offsetY,
+        });
+    }, [containerSize, naturalSize, onImageGeomChange, imageContainerRef]);
     
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -133,84 +191,66 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
     
     const getScreenPoint = useCallback((x: number, y: number): { left: number; top: number } | null => {
-        if (!imageContainerRef.current) return null;
-        const containerRect = imageContainerRef.current.getBoundingClientRect();
+        if (!imageGeom.width) return null;
 
-        const pixelX = (x / 100) * containerRect.width;
-        const pixelY = (y / 100) * containerRect.height;
+        const imagePixelX = (x / 100) * imageGeom.width;
+        const imagePixelY = (y / 100) * imageGeom.height;
+        const containerPixelX = imagePixelX + imageGeom.x;
+        const containerPixelY = imagePixelY + imageGeom.y;
         
         return {
-          left: pixelX * viewTransform.scale + viewTransform.translateX,
-          top: pixelY * viewTransform.scale + viewTransform.translateY,
+          left: containerPixelX * viewTransform.scale + viewTransform.translateX,
+          top: containerPixelY * viewTransform.scale + viewTransform.translateY,
         };
-      }, [viewTransform, imageContainerRef]);
+    }, [viewTransform, imageGeom]);
 
     const getScreenRect = useCallback((rect: Omit<Rectangle, 'id' | 'name' | 'visible'> | Rectangle): { left: number; top: number; width: number; height: number; } => {
-        if (!imageContainerRef.current) return { left: 0, top: 0, width: 0, height: 0 };
-        const containerRect = imageContainerRef.current.getBoundingClientRect();
+        if (!imageGeom.width) return { left: 0, top: 0, width: 0, height: 0 };
 
-        const pixelX = (rect.x / 100) * containerRect.width;
-        const pixelY = (rect.y / 100) * containerRect.height;
-        const pixelWidth = (rect.width / 100) * containerRect.width;
-        const pixelHeight = (rect.height / 100) * containerRect.height;
+        const imagePixelX = (rect.x / 100) * imageGeom.width;
+        const imagePixelY = (rect.y / 100) * imageGeom.height;
+        const imagePixelWidth = (rect.width / 100) * imageGeom.width;
+        const imagePixelHeight = (rect.height / 100) * imageGeom.height;
+
+        const containerPixelX = imagePixelX + imageGeom.x;
+        const containerPixelY = imagePixelY + imageGeom.y;
 
         return {
-          left: pixelX * viewTransform.scale + viewTransform.translateX,
-          top: pixelY * viewTransform.scale + viewTransform.translateY,
-          width: pixelWidth * viewTransform.scale,
-          height: pixelHeight * viewTransform.scale,
+          left: containerPixelX * viewTransform.scale + viewTransform.translateX,
+          top: containerPixelY * viewTransform.scale + viewTransform.translateY,
+          width: imagePixelWidth * viewTransform.scale,
+          height: imagePixelHeight * viewTransform.scale,
         };
-    }, [viewTransform, imageContainerRef]);
+    }, [viewTransform, imageGeom]);
 
     const generateCloudPath = (w: number, h: number) => {
         if (w <= 0 || h <= 0) return '';
-
-        // Determine scallop radius based on rectangle size, with min/max constraints
-        // to ensure the scallops look good on various rectangle sizes.
         const r = Math.max(6, Math.min(w / 4, h / 4, 15));
-
-        let path = `M ${r},0`; // Start at top-left, after the corner arc
-
-        // Top edge
+        let path = `M ${r},0`;
         const topScallops = Math.max(1, Math.round((w - 2 * r) / (2 * r)));
         const topStep = (w - 2 * r) / topScallops;
         for (let i = 0; i < topScallops; i++) {
             path += ` a ${topStep / 2},${r} 0 0,1 ${topStep},0`;
         }
-
-        // Top-right corner
         path += ` a ${r},${r} 0 0,1 ${r},${r}`;
-
-        // Right edge
         const rightScallops = Math.max(1, Math.round((h - 2 * r) / (2 * r)));
         const rightStep = (h - 2 * r) / rightScallops;
         for (let i = 0; i < rightScallops; i++) {
             path += ` a ${r},${rightStep / 2} 0 0,1 0,${rightStep}`;
         }
-
-        // Bottom-right corner
         path += ` a ${r},${r} 0 0,1 -${r},${r}`;
-
-        // Bottom edge
         const bottomScallops = Math.max(1, Math.round((w - 2 * r) / (2 * r)));
         const bottomStep = (w - 2 * r) / bottomScallops;
         for (let i = 0; i < bottomScallops; i++) {
             path += ` a ${bottomStep / 2},${r} 0 0,1 -${bottomStep},0`;
         }
-
-        // Bottom-left corner
         path += ` a ${r},${r} 0 0,1 -${r},-${r}`;
-
-        // Left edge
         const leftScallops = Math.max(1, Math.round((h - 2 * r) / (2 * r)));
         const leftStep = (h - 2 * r) / leftScallops;
         for (let i = 0; i < leftScallops; i++) {
             path += ` a ${r},${leftStep / 2} 0 0,1 0,-${leftStep}`;
         }
-
-        // Top-left corner to close
         path += ` a ${r},${r} 0 0,1 ${r},-${r}`;
-
         return path;
     };
 
@@ -253,8 +293,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     onMouseLeave={handleMouseLeave}
                     onWheel={handleWheel}
                 >
-                    <div className="absolute top-0 left-0 w-full h-full" style={{ transform: `translate(${viewTransform.translateX}px, ${viewTransform.translateY}px) scale(${viewTransform.scale})`, transformOrigin: '0 0' }}>
-                        <img src={imageSrc} alt="Blueprint" className="w-full h-full object-contain pointer-events-none" />
+                    <div className="absolute top-0 left-0" style={{ transform: `translate(${viewTransform.translateX}px, ${viewTransform.translateY}px) scale(${viewTransform.scale})`, transformOrigin: '0 0', width: `${containerSize.width}px`, height: `${containerSize.height}px` }}>
+                         <img ref={imageRef} src={imageSrc} alt="Blueprint" className="w-full h-full object-contain pointer-events-none" onLoad={handleImageLoad} style={{ position: 'absolute', top: 0, left: 0 }} />
                         {rectangles.filter(r => r.visible).map((rect) => {
                             const normalized = normalizeRect(rect);
                             const isSelected = selectedRectIds.includes(rect.id);
@@ -262,15 +302,15 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                             const shapeProps = { stroke: strokeColor, strokeWidth: 2 / viewTransform.scale, fill: "rgba(0,0,0,0.05)", vectorEffect: "non-scaling-stroke" };
                             const cloudFillColor = isSelected ? 'rgba(248, 113, 113, 0.1)' : 'rgba(239, 68, 68, 0.1)';
 
-                            // Get the unscaled pixel dimensions for a stable viewBox
-                            const containerWidth = imageContainerRef.current?.clientWidth || 0;
-                            const containerHeight = imageContainerRef.current?.clientHeight || 0;
-                            const pixelWidth = (normalized.width / 100) * containerWidth;
-                            const pixelHeight = (normalized.height / 100) * containerHeight;
+                            const pixelWidth = (normalized.width / 100) * imageGeom.width;
+                            const pixelHeight = (normalized.height / 100) * imageGeom.height;
+                            
+                            const left = (normalized.x / 100) * imageGeom.width + imageGeom.x;
+                            const top = (normalized.y / 100) * imageGeom.height + imageGeom.y;
 
                             return (
-                                <div key={rect.id} className="absolute" style={{ left: `${normalized.x}%`, top: `${normalized.y}%`, width: `${normalized.width}%`, height: `${normalized.height}%`, pointerEvents: 'none' }}>
-                                    {rect.shape === 'box' && (<div className={`w-full h-full ${isSelected ? 'border-2 border-red-400' : 'border-2 border-red-500'} bg-black/5 dark:bg-white/5`} />)}
+                                <div key={rect.id} className="absolute" style={{ left: `${left}px`, top: `${top}px`, width: `${pixelWidth}px`, height: `${pixelHeight}px`, pointerEvents: 'none' }}>
+                                    {rect.shape === 'box' && (<div className={`w-full h-full ${isSelected ? 'border-2 border-red-400' : 'border-2 border-red-500'} bg-black/5 dark:bg-white/5`} style={{borderWidth: `${2 / viewTransform.scale}px`}} />)}
                                     {(rect.shape === 'ellipse' || rect.shape === 'cloud') && (
                                         <svg width="100%" height="100%" viewBox={`0 0 ${pixelWidth} ${pixelHeight}`} preserveAspectRatio="none" className="overflow-visible">
                                             {rect.shape === 'ellipse' && (<ellipse cx={pixelWidth / 2} cy={pixelHeight / 2} rx={pixelWidth / 2} ry={pixelHeight / 2} {...shapeProps} />)}
