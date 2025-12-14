@@ -1,5 +1,5 @@
 import React from 'react';
-import type { HoveredItemInfo, Rectangle, PhotoData, SafetyIssueData, PunchData, DrawingData } from '../types';
+import type { HoveredItemInfo, Rectangle, PhotoData, SafetyIssueData, PunchData, DrawingData, Pin } from '../types';
 
 interface HoverPopupProps {
     hoveredItem: HoveredItemInfo | null;
@@ -11,10 +11,11 @@ interface HoverPopupProps {
     onOpenRfiPanel: (rectId: string, rfiId: number | null) => void;
     onClearHover: () => void;
     hidePopupTimer: React.MutableRefObject<number | null>;
+    onPinClick: (pin: Pin) => void;
 }
 
 const HoverPopup: React.FC<HoverPopupProps> = ({ 
-    hoveredItem, rectangles, allPhotos, allPunches, allSafetyIssues, onOpenPhotoViewer, onOpenRfiPanel, onClearHover, hidePopupTimer
+    hoveredItem, rectangles, allPhotos, allPunches, allSafetyIssues, onOpenPhotoViewer, onOpenRfiPanel, onClearHover, hidePopupTimer, onPinClick
 }) => {
     if (!hoveredItem) return null;
 
@@ -46,20 +47,24 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                     const issue = allSafetyIssues.find(i => i.id === pin.linkedId);
                     if (issue) content = (
                          <>
-                            <h4 className="font-bold text-red-400 mb-2 truncate">{issue.id}: {issue.title}</h4>
+                            <button onClick={(e) => { e.stopPropagation(); onPinClick(pin); onClearHover(); }} className="w-full text-left group">
+                                <h4 className="font-bold text-red-400 mb-2 truncate group-hover:text-red-300 transition-colors underline decoration-dotted">{issue.id}: {issue.title}</h4>
+                            </button>
                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-1"><span className="font-semibold text-gray-500 dark:text-gray-400">Severity:</span> {issue.severity}</p>
                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3"><span className="font-semibold text-gray-500 dark:text-gray-400">Status:</span> {issue.status}</p>
-                            <p className="text-sm text-gray-400">Click pin to view details.</p>
+                            <p className="text-sm text-gray-400">Click title or pin to view details.</p>
                          </>
                     );
                 } else if (pin.type === 'punch') {
                     const punch = allPunches.find(p => p.id === pin.linkedId);
                     if (punch) content = (
                         <>
-                            <h4 className="font-bold text-orange-400 mb-2 truncate">{punch.id}: {punch.title}</h4>
+                            <button onClick={(e) => { e.stopPropagation(); onPinClick(pin); onClearHover(); }} className="w-full text-left group">
+                                <h4 className="font-bold text-orange-400 mb-2 truncate group-hover:text-orange-300 transition-colors underline decoration-dotted">{punch.id}: {punch.title}</h4>
+                            </button>
                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-1"><span className="font-semibold text-gray-500 dark:text-gray-400">Assignee:</span> {punch.assignee}</p>
                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3"><span className="font-semibold text-gray-500 dark:text-gray-400">Status:</span> {punch.status}</p>
-                            <p className="text-sm text-gray-400">Click pin to view details.</p>
+                            <p className="text-sm text-gray-400">Click title or pin to view details.</p>
                         </>
                     );
                 }

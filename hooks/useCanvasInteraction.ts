@@ -39,6 +39,7 @@ export const useCanvasInteraction = ({
   mouseDownRef,
   isSpacebarDown,
   setHasUnsavedChanges,
+  pinDragOffset,
 }: any) => {
   const [interaction, setInteraction] = useState<InteractionState>({ type: 'none' });
   const [currentRect, setCurrentRect] = useState<Omit<Rectangle, 'id' | 'name' | 'visible'> | null>(null);
@@ -119,7 +120,9 @@ export const useCanvasInteraction = ({
     if (draggingPinId) {
       const coords = getRelativeCoords(event);
       if (coords) {
-        setPins((prevPins: Pin[]) => prevPins.map(p => p.id === draggingPinId ? { ...p, x: coords.x, y: coords.y } : p));
+        const offsetX = pinDragOffset ? pinDragOffset.x : 0;
+        const offsetY = pinDragOffset ? pinDragOffset.y : 0;
+        setPins((prevPins: Pin[]) => prevPins.map(p => p.id === draggingPinId ? { ...p, x: coords.x - offsetX, y: coords.y - offsetY } : p));
       }
       return;
     }
@@ -166,7 +169,7 @@ export const useCanvasInteraction = ({
         break;
       }
     }
-  }, [getRelativeCoords, interaction, activeShape, draggingPinId, setPins, setViewTransform, setRectangles, setCurrentRect, setMarqueeRect]);
+  }, [getRelativeCoords, interaction, activeShape, draggingPinId, setPins, setViewTransform, setRectangles, setCurrentRect, setMarqueeRect, pinDragOffset]);
 
   const handleMouseUp = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const isClick = mouseDownRef.current && Math.abs(event.clientX - mouseDownRef.current.x) < 5 && Math.abs(event.clientY - mouseDownRef.current.y) < 5;

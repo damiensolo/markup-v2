@@ -494,6 +494,7 @@ const App: React.FC = () => {
   const [hoveredRectId, setHoveredRectId] = useState<string | null>(null);
   const [linkMenuRectId, setLinkMenuRectId] = useState<string | null>(null);
   const [draggingPinId, setDraggingPinId] = useState<string | null>(null);
+  const [pinDragOffset, setPinDragOffset] = useState<{x: number, y: number} | null>(null);
   const [hoveredItem, setHoveredItem] = useState<HoveredItemInfo | null>(null);
   const [pinTargetCoords, setPinTargetCoords] = useState<{x: number, y: number} | null>(null);
   const [isSpacebarDown, setIsSpacebarDown] = useState(false);
@@ -759,6 +760,7 @@ const App: React.FC = () => {
     mouseDownRef,
     isSpacebarDown,
     setHasUnsavedChanges,
+    pinDragOffset,
   });
 
   const deleteSelection = useCallback(() => {
@@ -1460,6 +1462,8 @@ const App: React.FC = () => {
                     }}
                     mouseDownRef={mouseDownRef}
                     setSelectedRectIds={setSelectedRectIds}
+                    getRelativeCoords={getRelativeCoords}
+                    setPinDragOffset={setPinDragOffset}
                   />
                 </div>
                 <RfiPanel
@@ -1511,6 +1515,7 @@ const App: React.FC = () => {
             onOpenRfiPanel={handleOpenRfiPanel}
             onClearHover={() => setHoveredItem(null)}
             hidePopupTimer={hidePopupTimer}
+            onPinClick={handlePinDetails}
         />
       )}
 

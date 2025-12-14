@@ -69,6 +69,8 @@ interface CanvasViewProps {
     onOpenPhotoViewer: (config: { rectId?: string; photoId: string, pinId?: string }) => void;
     mouseDownRef: React.RefObject<{ x: number, y: number } | null>;
     setSelectedRectIds: (ids: string[]) => void;
+    getRelativeCoords: (event: React.MouseEvent | WheelEvent | MouseEvent) => { x: number; y: number } | null;
+    setPinDragOffset: (offset: {x: number, y: number} | null) => void;
 }
 
 const CanvasView: React.FC<CanvasViewProps> = (props) => {
@@ -80,7 +82,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         setHoveredRectId, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor, 
         setActiveColor, setDraggingPinId, setSelectedPinId, handlePinDetails, handleDeletePin, setHoveredItem, 
         hidePopupTimer, handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
-        handleSubmenuLink, onOpenRfiPanel, onOpenPhotoViewer, mouseDownRef, setSelectedRectIds
+        handleSubmenuLink, onOpenRfiPanel, onOpenPhotoViewer, mouseDownRef, setSelectedRectIds, getRelativeCoords, setPinDragOffset
     } = props;
 
     const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
@@ -337,16 +339,28 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                               className={`absolute transform -translate-x-1/2 -translate-y-full ${pinCursor}`}
                               style={{ left: screenPos.left, top: screenPos.top, pointerEvents: 'auto', zIndex: isSelected ? 21 : 15, width: '2.75rem', height: '2.75rem' }}
                               onMouseDown={(e) => { 
-                                  e.stopPropagation(); 
+                                  e.stopPropagation();
+                                  e.preventDefault();
                                   mouseDownRef.current = { x: e.clientX, y: e.clientY }; 
-                                  if (activeTool === 'select' && !pin.locked) { setDraggingPinId(pin.id); } 
+                                  if (activeTool === 'select') {
+                                       setSelectedRectIds([]);
+                                       setSelectedPinId(pin.id);
+                                       if (!pin.locked) {
+                                           const mouseCoords = getRelativeCoords(e);
+                                           if (mouseCoords) {
+                                               setPinDragOffset({ x: mouseCoords.x - pin.x, y: mouseCoords.y - pin.y });
+                                           }
+                                           setDraggingPinId(pin.id); 
+                                       }
+                                  }
                               }}
                               onClick={(e) => {
                                   e.stopPropagation();
                                   const isClick = mouseDownRef.current && Math.abs(e.clientX - mouseDownRef.current.x) < 5 && Math.abs(e.clientY - mouseDownRef.current.y) < 5;
-                                  if (!isClick && activeTool === 'select') return;
-                                  setSelectedRectIds([]);
-                                  if (activeTool === 'select') { setSelectedPinId(pin.id); } else { handlePinDetails(pin); }
+                                  
+                                  if (activeTool !== 'select' && isClick) {
+                                       handlePinDetails(pin); 
+                                  }
                               }}
                               onMouseEnter={(e) => {
                                   if (draggingPinId || selectedPinId) return;
