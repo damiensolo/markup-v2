@@ -234,14 +234,14 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                     )}
 
                     <div className="flex items-center ml-2">
+                        <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onDeleteRect(item.id) : onDeletePin(item.id); }} className="p-1 rounded-full hover:bg-red-500 hover:text-white text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
+                            <TrashIcon className="w-4 h-4" />
+                        </button>
                         <button onClick={(e) => { e.stopPropagation(); onToggleLock(item.id, item.itemType); }} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
                              {item.locked ? <LockClosedIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : <LockOpenIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
                         </button>
                         <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onToggleRectVisibility(item.id) : onTogglePinVisibility(item.id); }} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
                             {item.visible ? <EyeIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : <EyeSlashIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onDeleteRect(item.id) : onDeletePin(item.id); }} className="p-1 rounded-full hover:bg-red-500 hover:text-white text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
-                            <TrashIcon className="w-4 h-4" />
                         </button>
                     </div>
                 </li>
