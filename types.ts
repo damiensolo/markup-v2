@@ -112,6 +112,7 @@ export interface Rectangle {
   height: number;
   name: string;
   visible: boolean;
+  locked?: boolean;
   rfi?: RfiData[];
   submittals?: SubmittalData[];
   punches?: PunchData[];
@@ -142,6 +143,7 @@ export interface Pin {
   linkedId: string; // id of PhotoData, SafetyIssueData, or PunchData
   name: string;
   visible: boolean;
+  locked?: boolean;
   sourceSetId?: string;
 }
 

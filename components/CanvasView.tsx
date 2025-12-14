@@ -1,3 +1,5 @@
+
+
 // Fix: Import 'useCallback' from 'react' to resolve 'Cannot find name' errors.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle } from '../types';
@@ -334,7 +336,11 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                               key={pin.id}
                               className={`absolute transform -translate-x-1/2 -translate-y-full ${pinCursor}`}
                               style={{ left: screenPos.left, top: screenPos.top, pointerEvents: 'auto', zIndex: isSelected ? 21 : 15, width: '2.75rem', height: '2.75rem' }}
-                              onMouseDown={(e) => { e.stopPropagation(); mouseDownRef.current = { x: e.clientX, y: e.clientY }; if (activeTool === 'select') { setDraggingPinId(pin.id); } }}
+                              onMouseDown={(e) => { 
+                                  e.stopPropagation(); 
+                                  mouseDownRef.current = { x: e.clientX, y: e.clientY }; 
+                                  if (activeTool === 'select' && !pin.locked) { setDraggingPinId(pin.id); } 
+                              }}
                               onClick={(e) => {
                                   e.stopPropagation();
                                   const isClick = mouseDownRef.current && Math.abs(e.clientX - mouseDownRef.current.x) < 5 && Math.abs(e.clientY - mouseDownRef.current.y) < 5;
@@ -351,7 +357,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                               onMouseLeave={() => { hidePopupTimer.current = window.setTimeout(() => setHoveredItem(null), 300); }}
                           >
                               <PinIcon className="w-full h-full drop-shadow-lg" />
-                              {isSelected && (
+                              {isSelected && !pin.locked && (
                                   <div data-interactive-ui="true" className="absolute flex items-center gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white" style={{ left: '50%', top: '-10px', transform: 'translate(-50%, -100%)', zIndex: 30 }}>
                                       <button onClick={(e) => { e.stopPropagation(); handlePinDetails(pin); }} title="Details" className="p-2 rounded-md hover:bg-gray-700 transition-colors"><InformationCircleIcon className="w-5 h-5" /></button>
                                       <button onClick={(e) => { e.stopPropagation(); handleDeletePin(pin.id); }} title="Delete" className="p-2 rounded-md hover:bg-red-500 hover:text-white transition-colors"><TrashIcon className="w-5 h-5" /></button>
@@ -361,7 +367,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                       );
                     })}
 
-                    {singleSelectionScreenRect && (
+                    {singleSelectionScreenRect && !selectedRectangle?.locked && (
                       <>
                         {(['tl', 'tr', 'bl', 'br'] as ResizeHandle[]).map(handle => (
                           <div

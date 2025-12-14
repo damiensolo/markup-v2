@@ -1,3 +1,5 @@
+
+
 import React, { useState, useCallback } from 'react';
 import type { Rectangle, Pin, InteractionState, SafetyIssueData, PunchData } from '../types';
 
@@ -79,8 +81,14 @@ export const useCanvasInteraction = ({
           ? (event.shiftKey ? selectedRectIds.filter(id => id !== clickedRect.id) : selectedRectIds)
           : (event.shiftKey ? [...selectedRectIds, clickedRect.id] : [clickedRect.id]);
         setSelectedRectIds(newSelectedIds);
-        const rectsToMove = rectangles.filter(r => newSelectedIds.includes(r.id));
-        setInteraction({ type: 'moving', startPoint: coords, initialRects: rectsToMove });
+        
+        // Only move if not locked
+        if (!clickedRect.locked) {
+             const rectsToMove = rectangles.filter(r => newSelectedIds.includes(r.id) && !r.locked);
+             if (rectsToMove.length > 0) {
+                 setInteraction({ type: 'moving', startPoint: coords, initialRects: rectsToMove });
+             }
+        }
       } else {
         if (viewTransform.scale > 1) {
             setInteraction({ type: 'panning', startPoint: { x: event.clientX, y: event.clientY }, initialTransform: viewTransform });
@@ -94,7 +102,9 @@ export const useCanvasInteraction = ({
       if (clickedRect) {
         setSelectedRectIds([clickedRect.id]);
         setLinkMenuRectId(null);
-        setInteraction({ type: 'moving', startPoint: coords, initialRects: [clickedRect] });
+        if (!clickedRect.locked) {
+            setInteraction({ type: 'moving', startPoint: coords, initialRects: [clickedRect] });
+        }
       } else {
         if (isRfiPanelOpen) handleRfiCancel();
         setLinkMenuRectId(null);
@@ -202,7 +212,6 @@ export const useCanvasInteraction = ({
         const newRect = { ...normalized, id: Date.now().toString(), name: `${shapeName} ${count}`, visible: true };
         setRectangles((prev: Rectangle[]) => [...prev, newRect]);
         setSelectedRectIds([newRect.id]);
-        // FIX: Ensure unsaved changes are flagged after drawing a new rectangle.
         setHasUnsavedChanges(true);
       }
     } else if (interaction.type === 'marquee' && marqueeRect) {

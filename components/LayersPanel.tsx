@@ -1,7 +1,8 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, PhotoData } from '../types';
-import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, PhotoIcon } from './Icons';
+import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, PhotoIcon, LockClosedIcon, LockOpenIcon } from './Icons';
 
 type LayerItem = (Rectangle & { itemType: 'rect' }) | (Pin & { itemType: 'pin' });
 
@@ -26,6 +27,7 @@ interface LayersPanelProps {
     onOpenPhotoViewer: (photoId: string) => void;
     markupSetNames: Record<string, string>;
     onToggleBatchVisibility: (items: { id: string; type: 'rect' | 'pin' }[], visible: boolean) => void;
+    onToggleLock: (id: string, type: 'rect' | 'pin') => void;
 }
 
 const ItemIcon = ({ item }: { item: LayerItem }) => {
@@ -56,7 +58,7 @@ const LinkedItemIcon = ({ type }: { type: string }) => {
 const LayersPanel: React.FC<LayersPanelProps> = ({ 
     isOpen, onToggle, rectangles, pins, selectedRectIds, selectedPinId, expandedIds, onToggleExpand,
     onSelectRect, onSelectPin, onRenameRect, onRenamePin, onDeleteRect, onDeletePin,
-    onToggleRectVisibility, onTogglePinVisibility, onOpenRfiPanel, onOpenPhotoViewer, markupSetNames, onToggleBatchVisibility
+    onToggleRectVisibility, onTogglePinVisibility, onOpenRfiPanel, onOpenPhotoViewer, markupSetNames, onToggleBatchVisibility, onToggleLock
 }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
@@ -232,6 +234,9 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                     )}
 
                     <div className="flex items-center ml-2">
+                        <button onClick={(e) => { e.stopPropagation(); onToggleLock(item.id, item.itemType); }} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
+                             {item.locked ? <LockClosedIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : <LockOpenIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                        </button>
                         <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onToggleRectVisibility(item.id) : onTogglePinVisibility(item.id); }} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
                             {item.visible ? <EyeIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : <EyeSlashIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
                         </button>

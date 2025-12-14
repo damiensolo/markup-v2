@@ -193,7 +193,7 @@ const DrawingSelector: React.FC<DrawingSelectorProps> = ({ drawings, value, onCh
         <div className="relative w-[19.5rem]" ref={selectorRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-left text-sm"
+                className="w-full h-10 flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-left text-sm"
             >
                 <span className="truncate text-gray-800 dark:text-gray-200">{value ? `${value.id} - ${value.title}` : 'Select a drawing'}</span>
                 <svg className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -256,7 +256,7 @@ const DrawingVersionSelector: React.FC<DrawingVersionSelectorProps> = ({ version
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 disabled={disabled}
-                className="w-full flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-left text-sm disabled:bg-gray-100 disabled:dark:bg-gray-700/50 disabled:cursor-not-allowed"
+                className="w-full h-10 flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-left text-sm disabled:bg-gray-100 disabled:dark:bg-gray-700/50 disabled:cursor-not-allowed"
             >
                 <span className="truncate text-gray-800 dark:text-gray-200">{value ? `${value.name} (${value.timestamp})` : 'Select version'}</span>
                 <svg className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -321,7 +321,7 @@ const MarkupSetSelector: React.FC<MarkupSetSelectorProps> = ({ markupSets, loade
              <button
                 onClick={() => setIsOpen(!isOpen)}
                 disabled={disabled}
-                className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-3 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="h-10 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-3 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Load Markup Sets"
             >
                 <FolderOpenIcon className="w-5 h-5" />
@@ -418,7 +418,7 @@ const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, on
     return (
         <div className="flex justify-between items-center p-2 border-b border-gray-200 dark:border-gray-700 flex-wrap gap-2">
             <div className="flex items-center gap-2">
-                <button onClick={onBack} className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700" title="Back to drawings">
+                <button onClick={onBack} className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-gray-200 dark:hover:bg-gray-700" title="Back to drawings">
                     <ChevronLeftIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                 </button>
                 <DrawingSelector drawings={allDrawings} value={currentDrawing} onChange={onDrawingChange} />
@@ -432,7 +432,7 @@ const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, on
             </div>
             <div className="flex items-center gap-2">
                  <div ref={filterMenuRef} className="relative">
-                    <button onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)} className={`relative bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600`}>
+                    <button onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)} className={`h-10 relative bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600`}>
                         <FilterIcon className="w-5 h-5" /> Filter
                         {areFiltersActive && <span className="absolute -top-1 -right-1 block h-3 w-3 rounded-full bg-blue-500 border-2 border-white dark:border-gray-800" />}
                     </button>
@@ -459,16 +459,16 @@ const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, on
                         </div>
                     )}
                 </div>
-                <button onClick={onShare} className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600">
+                <button onClick={onShare} className="h-10 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600">
                     <ShareIcon className="w-5 h-5" /> Share
                 </button>
-                <button onClick={() => alert('Compare functionality not implemented')} className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600">
+                <button onClick={() => alert('Compare functionality not implemented')} className="h-10 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600">
                     <DocumentDuplicateIcon className="w-5 h-5" /> Compare
                 </button>
                 <button
                     onClick={onSave}
                     disabled={!hasUnsavedChanges}
-                    className="font-bold py-2 px-4 rounded-lg transition-colors duration-200 disabled:bg-gray-300 disabled:dark:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
+                    className="h-10 font-bold py-2 px-4 rounded-lg transition-colors duration-200 disabled:bg-gray-300 disabled:dark:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
                 >
                     Save Markup
                 </button>
@@ -723,6 +723,15 @@ const App: React.FC = () => {
     setActivePanel(null);
   }, []);
 
+  const handleToggleItemLock = useCallback((id: string, type: 'rect' | 'pin') => {
+    if (type === 'rect') {
+        setRectangles(prev => prev.map(r => r.id === id ? { ...r, locked: !r.locked } : r));
+    } else {
+        setPins(prev => prev.map(p => p.id === id ? { ...p, locked: !p.locked } : p));
+    }
+    setHasUnsavedChanges(true);
+  }, []);
+
   const {
     interaction,
     currentRect,
@@ -755,18 +764,28 @@ const App: React.FC = () => {
   const deleteSelection = useCallback(() => {
     let changed = false;
     if (selectedRectIds.length > 0) {
-        setRectangles(rects => rects.filter(r => !selectedRectIds.includes(r.id)));
-        setSelectedRectIds([]);
-        setLinkMenuRectId(null);
-        changed = true;
+        // Filter out locked items
+        const lockedIds = rectangles.filter(r => selectedRectIds.includes(r.id) && r.locked).map(r => r.id);
+        const idsToDelete = selectedRectIds.filter(id => !lockedIds.includes(id));
+        
+        if (idsToDelete.length > 0) {
+             setRectangles(rects => rects.filter(r => !idsToDelete.includes(r.id)));
+             // Keep locked items selected
+             setSelectedRectIds(lockedIds); 
+             setLinkMenuRectId(null);
+             changed = true;
+        }
     }
     if (selectedPinId) {
-        setPins(pins => pins.filter(p => p.id !== selectedPinId));
-        setSelectedPinId(null);
-        changed = true;
+        const pin = pins.find(p => p.id === selectedPinId);
+        if (pin && !pin.locked) {
+            setPins(pins => pins.filter(p => p.id !== selectedPinId));
+            setSelectedPinId(null);
+            changed = true;
+        }
     }
     if (changed) setHasUnsavedChanges(true);
-  }, [selectedRectIds, selectedPinId]);
+  }, [selectedRectIds, selectedPinId, rectangles, pins]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1366,6 +1385,7 @@ const App: React.FC = () => {
                   onOpenPhotoViewer={handleOpenPhotoViewerFromLayer}
                   markupSetNames={markupSetNames}
                   onToggleBatchVisibility={handleToggleBatchVisibility}
+                  onToggleLock={handleToggleItemLock}
                 />
                 <div className="flex-grow h-full relative">
                   <CanvasView
@@ -1417,7 +1437,7 @@ const App: React.FC = () => {
                       e.stopPropagation();
                       const startPoint = getRelativeCoords(e);
                       const rectToResize = rectangles.find(r => r.id === rectId);
-                      if (!startPoint || !rectToResize) return;
+                      if (!startPoint || !rectToResize || rectToResize.locked) return;
                       setLinkMenuRectId(null);
                       useCanvasInteraction.setState({ type: 'resizing', startPoint, initialRects: [rectToResize], handle });
                     }}
