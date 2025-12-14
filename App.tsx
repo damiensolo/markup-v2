@@ -1,5 +1,3 @@
-
-
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import type { Rectangle, RfiData, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet } from './types';
 import LinkModal from './components/LinkModal';
@@ -195,7 +193,7 @@ const DrawingSelector: React.FC<DrawingSelectorProps> = ({ drawings, value, onCh
         <div className="relative w-[19.5rem]" ref={selectorRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-left text-sm"
+                className="w-full flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-left text-sm"
             >
                 <span className="truncate text-gray-800 dark:text-gray-200">{value ? `${value.id} - ${value.title}` : 'Select a drawing'}</span>
                 <svg className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -258,7 +256,7 @@ const DrawingVersionSelector: React.FC<DrawingVersionSelectorProps> = ({ version
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 disabled={disabled}
-                className="w-full flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-left text-sm disabled:bg-gray-100 disabled:dark:bg-gray-700/50 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-left text-sm disabled:bg-gray-100 disabled:dark:bg-gray-700/50 disabled:cursor-not-allowed"
             >
                 <span className="truncate text-gray-800 dark:text-gray-200">{value ? `${value.name} (${value.timestamp})` : 'Select version'}</span>
                 <svg className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -298,6 +296,7 @@ interface MarkupSetSelectorProps {
 
 const MarkupSetSelector: React.FC<MarkupSetSelectorProps> = ({ markupSets, loadedSetIds, onToggle, disabled }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
     const selectorRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -309,6 +308,11 @@ const MarkupSetSelector: React.FC<MarkupSetSelectorProps> = ({ markupSets, loade
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
+
+    const filteredSets = markupSets.filter(set => 
+        set.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        set.author.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     const loadedCount = loadedSetIds.length;
 
@@ -329,36 +333,48 @@ const MarkupSetSelector: React.FC<MarkupSetSelectorProps> = ({ markupSets, loade
                 )}
             </button>
             {isOpen && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-2">
-                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">Available Markups</h4>
-                    {markupSets.length === 0 ? (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 px-2 py-1">No saved markups for this version.</p>
-                    ) : (
-                        <ul className="max-h-60 overflow-y-auto space-y-1">
-                            {markupSets.map(set => {
-                                const isLoaded = loadedSetIds.includes(set.id);
-                                return (
-                                    <li key={set.id}>
-                                        <button
-                                            onClick={() => onToggle(set)}
-                                            className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-start gap-3 ${isLoaded ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
-                                        >
-                                            <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isLoaded ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-400 dark:border-gray-500'}`}>
-                                                {isLoaded && <svg viewBox="0 0 14 14" fill="none" className="w-3 h-3"><path d="M3 7L5.5 9.5L11.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                                            </div>
-                                            <div className="flex-grow">
-                                                <p className={`font-semibold ${isLoaded ? 'text-blue-700 dark:text-blue-300' : 'text-gray-800 dark:text-gray-200'}`}>{set.name}</p>
-                                                <div className="flex justify-between items-center mt-1">
-                                                    <p className="text-xs text-gray-500">{set.author}</p>
-                                                    <p className="text-xs text-gray-400">{set.timestamp}</p>
+                <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                    <div className="p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
+                        <input
+                            type="text"
+                            placeholder="Search markups..."
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-white"
+                            autoFocus
+                        />
+                    </div>
+                    <div className="p-2">
+                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">Available Markups</h4>
+                        {filteredSets.length === 0 ? (
+                            <p className="text-sm text-gray-500 dark:text-gray-400 px-2 py-1">No saved markups found.</p>
+                        ) : (
+                            <ul className="max-h-60 overflow-y-auto space-y-1">
+                                {filteredSets.map(set => {
+                                    const isLoaded = loadedSetIds.includes(set.id);
+                                    return (
+                                        <li key={set.id}>
+                                            <button
+                                                onClick={() => onToggle(set)}
+                                                className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-start gap-3 ${isLoaded ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                            >
+                                                <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isLoaded ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-400 dark:border-gray-500'}`}>
+                                                    {isLoaded && <svg viewBox="0 0 14 14" fill="none" className="w-3 h-3"><path d="M3 7L5.5 9.5L11.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                                                 </div>
-                                            </div>
-                                        </button>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    )}
+                                                <div className="flex-grow">
+                                                    <p className={`font-semibold ${isLoaded ? 'text-blue-700 dark:text-blue-300' : 'text-gray-800 dark:text-gray-200'}`}>{set.name}</p>
+                                                    <div className="flex justify-between items-center mt-1">
+                                                        <p className="text-xs text-gray-500">{set.author}</p>
+                                                        <p className="text-xs text-gray-400">{set.timestamp}</p>
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
