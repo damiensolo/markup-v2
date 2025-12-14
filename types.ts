@@ -117,6 +117,7 @@ export interface Rectangle {
   punches?: PunchData[];
   drawings?: DrawingData[];
   photos?: PhotoData[];
+  sourceSetId?: string;
 }
 
 /**
@@ -141,6 +142,21 @@ export interface Pin {
   linkedId: string; // id of PhotoData, SafetyIssueData, or PunchData
   name: string;
   visible: boolean;
+  sourceSetId?: string;
+}
+
+/**
+ * Represents a saved set of markups for a drawing version.
+ */
+export interface MarkupSet {
+  id: string;
+  name: string;
+  drawingId: string;
+  versionId: string;
+  rectangles: Rectangle[];
+  pins: Pin[];
+  timestamp: string;
+  author: string;
 }
 
 /**

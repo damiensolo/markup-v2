@@ -1,5 +1,7 @@
+
+
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import type { Rectangle, RfiData, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion } from './types';
+import type { Rectangle, RfiData, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet } from './types';
 import LinkModal from './components/LinkModal';
 import PhotoViewerModal from './components/PhotoViewerModal';
 import ShareModal from './components/ShareModal';
@@ -12,7 +14,7 @@ import CanvasView from './components/CanvasView';
 import { useZoomPan } from './hooks/useZoomPan';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import LayersPanel from './components/LayersPanel';
-import { FilterIcon, ChevronLeftIcon, ShareIcon, DocumentDuplicateIcon } from './components/Icons';
+import { FilterIcon, ChevronLeftIcon, ShareIcon, DocumentDuplicateIcon, FolderOpenIcon } from './components/Icons';
 
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 export type RectangleTagType = Exclude<FilterCategory, 'safety'>;
@@ -117,6 +119,50 @@ const mockEmployees = [
   { id: 'emp-8', name: 'Danielle Taylor', role: 'Owner Rep', company: 'Mccoy Construction Group' },
   { id: 'emp-9', name: 'Sarah Wilson', role: 'Safety Inspector', company: 'Martinez Developments' },
   { id: 'emp-10', name: 'Tom Clark', role: 'Electrician', company: 'Elliott Subcontractors' },
+];
+
+const mockMarkupSets: MarkupSet[] = [
+    {
+        id: 'set-1',
+        name: 'Structural Review - John',
+        drawingId: 'A-1.0',
+        versionId: 'v3',
+        timestamp: '2024-07-21 10:00 AM',
+        author: 'John Doe',
+        rectangles: [
+            { id: 'rect-101', shape: 'box', x: 20, y: 20, width: 15, height: 10, name: 'Beam Issue', visible: true, rfi: [mockRfis[0]] },
+            { id: 'rect-102', shape: 'cloud', x: 50, y: 50, width: 20, height: 15, name: 'Revision Cloud', visible: true }
+        ],
+        pins: [
+            { id: 'pin-101', type: 'safety', x: 30, y: 30, linkedId: mockSafetyIssues[1].id, name: 'Safety 1', visible: true }
+        ]
+    },
+    {
+        id: 'set-2',
+        name: 'Architectural Notes - Sarah',
+        drawingId: 'A-1.0',
+        versionId: 'v3',
+        timestamp: '2024-07-22 02:30 PM',
+        author: 'Sarah Wilson',
+        rectangles: [
+            { id: 'rect-201', shape: 'ellipse', x: 60, y: 20, width: 10, height: 10, name: 'Door Swing', visible: true, submittals: [mockSubmittals[0]] }
+        ],
+        pins: [
+            { id: 'pin-201', type: 'punch', x: 70, y: 60, linkedId: mockPunches[0].id, name: 'Punch 1', visible: true }
+        ]
+    },
+    {
+        id: 'set-3',
+        name: 'Initial Review',
+        drawingId: 'A-2.1',
+        versionId: 'v1',
+        timestamp: '2024-06-02 09:00 AM',
+        author: 'Michael Schmidt',
+        rectangles: [
+            { id: 'rect-301', shape: 'cloud', x: 40, y: 40, width: 30, height: 20, name: 'Zone A', visible: true }
+        ],
+        pins: []
+    }
 ];
 
 // Sub-components defined inside App.tsx to avoid creating new files
@@ -243,6 +289,82 @@ const DrawingVersionSelector: React.FC<DrawingVersionSelectorProps> = ({ version
     );
 };
 
+interface MarkupSetSelectorProps {
+    markupSets: MarkupSet[];
+    loadedSetIds: string[];
+    onToggle: (set: MarkupSet) => void;
+    disabled: boolean;
+}
+
+const MarkupSetSelector: React.FC<MarkupSetSelectorProps> = ({ markupSets, loadedSetIds, onToggle, disabled }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const selectorRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (selectorRef.current && !selectorRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const loadedCount = loadedSetIds.length;
+
+    return (
+        <div className="relative" ref={selectorRef}>
+             <button
+                onClick={() => setIsOpen(!isOpen)}
+                disabled={disabled}
+                className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-3 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Load Markup Sets"
+            >
+                <FolderOpenIcon className="w-5 h-5" />
+                <span className="hidden sm:inline">Load Markup</span>
+                {loadedCount > 0 && (
+                    <span className="bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center -ml-1">
+                        {loadedCount}
+                    </span>
+                )}
+            </button>
+            {isOpen && (
+                <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-2">
+                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">Available Markups</h4>
+                    {markupSets.length === 0 ? (
+                        <p className="text-sm text-gray-500 dark:text-gray-400 px-2 py-1">No saved markups for this version.</p>
+                    ) : (
+                        <ul className="max-h-60 overflow-y-auto space-y-1">
+                            {markupSets.map(set => {
+                                const isLoaded = loadedSetIds.includes(set.id);
+                                return (
+                                    <li key={set.id}>
+                                        <button
+                                            onClick={() => onToggle(set)}
+                                            className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-start gap-3 ${isLoaded ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                        >
+                                            <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isLoaded ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-400 dark:border-gray-500'}`}>
+                                                {isLoaded && <svg viewBox="0 0 14 14" fill="none" className="w-3 h-3"><path d="M3 7L5.5 9.5L11.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                                            </div>
+                                            <div className="flex-grow">
+                                                <p className={`font-semibold ${isLoaded ? 'text-blue-700 dark:text-blue-300' : 'text-gray-800 dark:text-gray-200'}`}>{set.name}</p>
+                                                <div className="flex justify-between items-center mt-1">
+                                                    <p className="text-xs text-gray-500">{set.author}</p>
+                                                    <p className="text-xs text-gray-400">{set.timestamp}</p>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </div>
+            )}
+        </div>
+    )
+}
+
 interface HeaderProps {
     onBack: () => void;
     currentDrawing: DrawingData | null;
@@ -259,9 +381,12 @@ interface HeaderProps {
     setIsFilterMenuOpen: (isOpen: boolean) => void;
     handleFilterChange: (filter: FilterCategory) => void;
     handleToggleAllFilters: () => void;
+    markupSets: MarkupSet[];
+    loadedSetIds: string[];
+    onToggleMarkupSet: (set: MarkupSet) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, onDrawingChange, currentVersion, onVersionChange, hasUnsavedChanges, onSave, onShare, filters, areFiltersActive, isFilterMenuOpen, setIsFilterMenuOpen, handleFilterChange, handleToggleAllFilters }) => {
+const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, onDrawingChange, currentVersion, onVersionChange, hasUnsavedChanges, onSave, onShare, filters, areFiltersActive, isFilterMenuOpen, setIsFilterMenuOpen, handleFilterChange, handleToggleAllFilters, markupSets, loadedSetIds, onToggleMarkupSet }) => {
     const filterMenuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -282,6 +407,12 @@ const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, on
                 </button>
                 <DrawingSelector drawings={allDrawings} value={currentDrawing} onChange={onDrawingChange} />
                 <DrawingVersionSelector versions={currentDrawing?.versions || []} value={currentVersion} onChange={onVersionChange} disabled={!currentDrawing} />
+                <MarkupSetSelector
+                    markupSets={currentDrawing ? markupSets.filter(s => s.drawingId === currentDrawing?.id && s.versionId === currentVersion?.id) : markupSets}
+                    loadedSetIds={loadedSetIds}
+                    onToggle={onToggleMarkupSet}
+                    disabled={false}
+                />
             </div>
             <div className="flex items-center gap-2">
                  <div ref={filterMenuRef} className="relative">
@@ -405,6 +536,10 @@ const App: React.FC = () => {
   const [currentDrawing, setCurrentDrawing] = useState<DrawingData | null>(null);
   const [currentVersion, setCurrentVersion] = useState<DrawingVersion | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [allMarkupSets, setAllMarkupSets] = useState<MarkupSet[]>(mockMarkupSets);
+  
+  // New State for Markup Sets
+  const [loadedSetIds, setLoadedSetIds] = useState<string[]>([]);
 
 
   // Refs
@@ -429,6 +564,7 @@ const App: React.FC = () => {
         setLinkMenuRectId(null);
         setViewTransform({ scale: 1, translateX: 0, translateY: 0 });
         setHasUnsavedChanges(false);
+        setLoadedSetIds([]); // Reset loaded sets when switching drawing
     } else {
         setCurrentVersion(null);
     }
@@ -732,6 +868,7 @@ const App: React.FC = () => {
         setCurrentDrawing(null); // Clear selected drawing if a local file is uploaded
         setCurrentVersion(null);
         setHasUnsavedChanges(false);
+        setLoadedSetIds([]);
       };
       reader.readAsDataURL(file);
       event.target.value = '';
@@ -1053,6 +1190,24 @@ const App: React.FC = () => {
       setSelectedRectIds([]);
       setViewTransform({ scale: 1, translateX: 0, translateY: 0 });
       setHasUnsavedChanges(false);
+      setLoadedSetIds([]);
+  };
+
+  const handleToggleMarkupSet = (set: MarkupSet) => {
+    if (loadedSetIds.includes(set.id)) {
+        // Unload
+        setRectangles(prev => prev.filter(r => r.sourceSetId !== set.id));
+        setPins(prev => prev.filter(p => p.sourceSetId !== set.id));
+        setLoadedSetIds(prev => prev.filter(id => id !== set.id));
+    } else {
+        // Load
+        // Add sourceSetId to items to identify them later
+        const newRects = set.rectangles.map(r => ({ ...r, sourceSetId: set.id }));
+        const newPins = set.pins.map(p => ({ ...p, sourceSetId: set.id }));
+        setRectangles(prev => [...prev, ...newRects]);
+        setPins(prev => [...prev, ...newPins]);
+        setLoadedSetIds(prev => [...prev, set.id]);
+    }
   };
   
   const handleGoBack = () => {
@@ -1067,6 +1222,7 @@ const App: React.FC = () => {
       setPins([]);
       setSelectedRectIds([]);
       setHasUnsavedChanges(false);
+      setLoadedSetIds([]);
   };
 
   const currentPhotoForViewer = photoViewerConfig ? allPhotos.find(p => p.id === photoViewerConfig.photoId) : null;
@@ -1121,6 +1277,27 @@ const App: React.FC = () => {
   const toggleLayerExpand = (id: string) => {
     setExpandedLayerIds(prev => prev.includes(id) ? prev.filter(expandedId => expandedId !== id) : [...prev, id]);
   };
+  
+  // Create a map of set IDs to names for LayersPanel
+  const markupSetNames = React.useMemo(() => {
+    const names: Record<string, string> = {};
+    allMarkupSets.forEach(set => {
+        names[set.id] = set.name;
+    });
+    return names;
+  }, [allMarkupSets]);
+
+  const handleToggleBatchVisibility = useCallback((items: { id: string; type: 'rect' | 'pin' }[], visible: boolean) => {
+    const rectIds = new Set(items.filter(i => i.type === 'rect').map(i => i.id));
+    const pinIds = new Set(items.filter(i => i.type === 'pin').map(i => i.id));
+
+    if (rectIds.size > 0) {
+        setRectangles(prev => prev.map(r => rectIds.has(r.id) ? { ...r, visible } : r));
+    }
+    if (pinIds.size > 0) {
+        setPins(prev => prev.map(p => pinIds.has(p.id) ? { ...p, visible } : p));
+    }
+  }, []);
 
   return (
     <div className="h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white flex flex-col items-stretch p-4 overflow-hidden">
@@ -1147,6 +1324,9 @@ const App: React.FC = () => {
                 setIsFilterMenuOpen={setIsFilterMenuOpen}
                 handleFilterChange={handleFilterChange}
                 handleToggleAllFilters={handleToggleAllFilters}
+                markupSets={allMarkupSets}
+                loadedSetIds={loadedSetIds}
+                onToggleMarkupSet={handleToggleMarkupSet}
             />
             <div className="flex-grow flex flex-row items-stretch overflow-hidden">
                 <LayersPanel
@@ -1168,6 +1348,8 @@ const App: React.FC = () => {
                   onTogglePinVisibility={handleTogglePinVisibility}
                   onOpenRfiPanel={handleOpenRfiPanel}
                   onOpenPhotoViewer={handleOpenPhotoViewerFromLayer}
+                  markupSetNames={markupSetNames}
+                  onToggleBatchVisibility={handleToggleBatchVisibility}
                 />
                 <div className="flex-grow h-full relative">
                   <CanvasView
