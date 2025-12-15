@@ -331,7 +331,11 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                       const screenPos = getScreenPoint(pin.x, pin.y);
                       if (!screenPos) return null;
                       const PinIcon = { photo: PhotoPinIcon, safety: SafetyPinIcon, punch: PunchPinIcon }[pin.type];
-                      const pinCursor = activeTool === 'select' ? (draggingPinId === pin.id ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-pointer';
+                      
+                      // Allow selecting/dragging pin even in 'shape' mode to avoid confusion
+                      const isSelectable = activeTool === 'select' || activeTool === 'shape';
+                      
+                      const pinCursor = isSelectable ? (draggingPinId === pin.id ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-pointer';
                       const isSelected = selectedPinId === pin.id;
                       return (
                           <div
@@ -342,7 +346,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                   e.stopPropagation();
                                   e.preventDefault();
                                   mouseDownRef.current = { x: e.clientX, y: e.clientY }; 
-                                  if (activeTool === 'select') {
+                                  if (isSelectable) {
                                        setSelectedRectIds([]);
                                        setSelectedPinId(pin.id);
                                        if (!pin.locked) {
@@ -358,7 +362,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                   e.stopPropagation();
                                   const isClick = mouseDownRef.current && Math.abs(e.clientX - mouseDownRef.current.x) < 5 && Math.abs(e.clientY - mouseDownRef.current.y) < 5;
                                   
-                                  if (activeTool !== 'select' && isClick) {
+                                  // Open details if tool is NOT select/shape (e.g. some other tool or default)
+                                  if (!isSelectable && isClick) {
                                        handlePinDetails(pin); 
                                   }
                               }}
