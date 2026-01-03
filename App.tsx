@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import type { Rectangle, RfiData, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet } from './types';
 import LinkModal from './components/LinkModal';
@@ -890,26 +891,56 @@ const App: React.FC = () => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
+    if (!file) return;
+
+    const resetState = (src: string) => {
         setRectangles([]);
         setPins([]);
         setSelectedRectIds([]);
         setHoveredRectId(null);
         setLinkMenuRectId(null);
         setViewTransform({ scale: 1, translateX: 0, translateY: 0 });
-        setImageSrc(e.target?.result as string);
-        setCurrentDrawing(null); // Clear selected drawing if a local file is uploaded
+        setImageSrc(src);
+        setCurrentDrawing(null);
         setCurrentVersion(null);
         setHasUnsavedChanges(false);
         setLoadedSetIds([]);
-      };
-      reader.readAsDataURL(file);
-      event.target.value = '';
+    };
+
+    if (file.type === 'application/pdf') {
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const typedarray = new Uint8Array(e.target?.result as ArrayBuffer);
+                // @ts-ignore
+                const pdf = await window.pdfjsLib.getDocument({ data: typedarray }).promise;
+                const page = await pdf.getPage(1);
+                
+                // Use a high scale for blueprint clarity
+                const viewport = page.getViewport({ scale: 2.0 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({ canvasContext: context!, viewport }).promise;
+                resetState(canvas.toDataURL());
+            } catch (err) {
+                console.error("Error rendering PDF:", err);
+                alert("Could not load PDF. Please ensure it is a valid document.");
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    } else if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            resetState(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
     }
+    event.target.value = '';
   };
 
   const triggerFileUpload = () => fileInputRef.current?.click();
@@ -1338,7 +1369,7 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white flex flex-col items-stretch p-4 overflow-hidden">
-      <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
+      <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
       <input type="file" accept="image/*" onChange={handlePhotoFileChange} className="hidden" ref={photoFileInputRef} />
       <main className="w-full flex-grow flex flex-col items-stretch bg-white dark:bg-gray-800 rounded-2xl shadow-2xl shadow-blue-500/10 p-2 overflow-hidden">
         {!imageSrc && !currentDrawing ? (
