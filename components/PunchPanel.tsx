@@ -23,22 +23,22 @@ const PunchPanel: React.FC<PunchPanelProps> = ({
 }) => {
     return (
         <div
-            className={`h-full flex-shrink-0 bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'border-l border-gray-200 dark:border-gray-700 shadow-lg' : ''}`}
-            style={{ width: isOpen ? '28rem' : '0px' }}
+            className={`h-full flex-shrink-0 bg-gray-50/50 dark:bg-gray-900/50 transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'border-l border-gray-200 dark:border-gray-800 translate-x-0' : 'translate-x-full'}`}
+            style={{ width: isOpen ? '28rem' : '0px', visibility: isOpen ? 'visible' : 'hidden' }}
         >
             <div className={`h-full w-full flex flex-col transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="p-6 flex flex-col h-full">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{isEditMode ? 'Edit' : 'Create'} Punch List Item</h2>
-                        <button onClick={onCancel} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><XMarkIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" /></button>
+                <div className="flex flex-col h-full">
+                    <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+                        <h2 className="font-semibold text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wider">{isEditMode ? 'Edit' : 'Create'} Punch List Item</h2>
+                        <button onClick={onCancel} className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">
+                            <XMarkIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                        </button>
                     </div>
-                    
-                    {!isEditMode && (
+                    <div className="flex-grow flex flex-col p-6 overflow-y-auto custom-scrollbar">
                       <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
                           <button onClick={() => onModeChange('create')} className={`flex-1 py-2 text-sm font-semibold transition-colors ${mode === 'create' ? 'border-b-2 border-blue-500 text-blue-500 dark:text-blue-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>Create New</button>
                           <button onClick={() => onModeChange('link')} className={`flex-1 py-2 text-sm font-semibold transition-colors ${mode === 'link' ? 'border-b-2 border-blue-500 text-blue-500 dark:text-blue-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>Link Existing</button>
                       </div>
-                    )}
       
                     {mode === 'create' || isEditMode ? (
                       <form onSubmit={onSubmit} className="flex flex-col flex-grow">
@@ -64,7 +64,7 @@ const PunchPanel: React.FC<PunchPanelProps> = ({
                               onChange={onSearchTermChange}
                               className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 mb-4 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" 
                           />
-                          <ul className="overflow-y-auto -mr-6 pr-6">
+                          <ul className="space-y-2">
                               {allPunches.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()) || p.assignee.toLowerCase().includes(searchTerm.toLowerCase())).map(punch => (
                                   <li key={punch.id}>
                                       <button onClick={() => onLinkExisting(punch)} className="w-full text-left p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
@@ -76,6 +76,7 @@ const PunchPanel: React.FC<PunchPanelProps> = ({
                           </ul>
                       </div>
                     )}
+                    </div>
                 </div>
             </div>
         </div>

@@ -8,6 +8,7 @@ import {
   CustomPinIcon, FillIcon, StrokeIcon
 } from './Icons';
 import { ToolbarPosition } from '../App';
+import Tooltip from './Tooltip';
 
 type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
@@ -31,6 +32,7 @@ interface ToolButtonProps {
   icon: React.ReactNode;
   isActive: boolean;
   onClick: () => void;
+  tooltipPosition?: 'top' | 'bottom' | 'left' | 'right';
 }
 
 const ToolButton: React.FC<ToolButtonProps> = ({
@@ -38,16 +40,18 @@ const ToolButton: React.FC<ToolButtonProps> = ({
   icon,
   isActive,
   onClick,
+  tooltipPosition = 'top',
 }) => (
-  <button
-    onClick={onClick}
-    className={`p-2.5 rounded-lg transition-colors duration-200 text-white ${
-      isActive ? 'bg-blue-500' : 'hover:bg-gray-700'
-    }`}
-    title={label}
-  >
-    <div className="w-6 h-6">{icon}</div>
-  </button>
+  <Tooltip text={label} position={tooltipPosition}>
+    <button
+      onClick={onClick}
+      className={`p-2.5 rounded-lg transition-colors duration-200 text-white ${
+        isActive ? 'bg-blue-500' : 'hover:bg-gray-700'
+      }`}
+    >
+      <div className="w-6 h-6">{icon}</div>
+    </button>
+  </Tooltip>
 );
 
 const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor, setActiveColor, toolbarPosition }) => {
@@ -57,6 +61,17 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
   const shapeMenuRef = useRef<HTMLDivElement>(null);
   const pinMenuRef = useRef<HTMLDivElement>(null);
   const colorMenuRef = useRef<HTMLDivElement>(null);
+
+  const getTooltipPosition = (): 'top' | 'bottom' | 'left' | 'right' => {
+    switch (toolbarPosition) {
+      case 'top': return 'bottom';
+      case 'left': return 'right';
+      case 'right': return 'left';
+      default: return 'top';
+    }
+  };
+
+  const tooltipPos = getTooltipPosition();
 
   const handleToolClick = (tool: ActiveTool) => {
     setActiveTool(tool);
@@ -165,39 +180,41 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
             icon={<MousePointerIcon />}
             isActive={activeTool === 'select'}
             onClick={() => handleToolClick('select')}
+            tooltipPosition={tooltipPos}
         />
 
         {/* Shape Tool Flyout */}
         <div ref={shapeMenuRef} className="relative">
-            <button
-                onClick={() => handleToolClick('shape')}
-                className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
-                    activeTool === 'shape' ? 'bg-blue-500' : 'hover:bg-gray-700'
-                }`}
-                title={currentShapeTool.label}
-            >
-                <div className="w-6 h-6">{currentShapeTool.icon}</div>
-                <div className="absolute bottom-1 right-1 pointer-events-none">
-                    <svg viewBox="0 0 6 6" className="w-1.5 h-1.5 text-gray-300">
-                        <path d="M6 6L0 6L6 0Z" fill="currentColor" />
-                    </svg>
-                </div>
-            </button>
+            <Tooltip text={currentShapeTool.label} position={tooltipPos}>
+                <button
+                    onClick={() => handleToolClick('shape')}
+                    className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
+                        activeTool === 'shape' ? 'bg-blue-500' : 'hover:bg-gray-700'
+                    }`}
+                >
+                    <div className="w-6 h-6">{currentShapeTool.icon}</div>
+                    <div className="absolute bottom-1 right-1 pointer-events-none">
+                        <svg viewBox="0 0 6 6" className="w-1.5 h-1.5 text-gray-300">
+                            <path d="M6 6L0 6L6 0Z" fill="currentColor" />
+                        </svg>
+                    </div>
+                </button>
+            </Tooltip>
             {isShapeMenuOpen && (
                  <div className={`absolute flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white ${getFlyoutPositionClasses()} ${isVertical ? 'flex-col' : 'flex-row'}`}>
                     {shapeTools.map(shape => (
-                        <button
-                            key={shape.id}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onClick={(e) => { e.stopPropagation(); handleShapeClick(shape.id); }}
-                            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
-                                activeShape === shape.id && activeTool === 'shape' ? 'bg-blue-500 text-white' : 'hover:bg-gray-700'
-                            }`}
-                            title={shape.label}
-                        >
-                            {shape.icon}
-                            <span className="text-xs mt-1">{shape.label}</span>
-                        </button>
+                        <Tooltip key={shape.id} text={shape.label} position={isVertical ? (toolbarPosition === 'left' ? 'right' : 'left') : 'top'}>
+                            <button
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => { e.stopPropagation(); handleShapeClick(shape.id); }}
+                                className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
+                                    activeShape === shape.id && activeTool === 'shape' ? 'bg-blue-500 text-white' : 'hover:bg-gray-700'
+                                }`}
+                            >
+                                {shape.icon}
+                                <span className="text-xs mt-1">{shape.label}</span>
+                            </button>
+                        </Tooltip>
                     ))}
                 </div>
             )}
@@ -205,35 +222,36 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
         
         {/* Pin Tool Flyout */}
         <div ref={pinMenuRef} className="relative">
-             <button
-                onClick={() => handleToolClick('pin')}
-                className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
-                    activeTool === 'pin' ? 'bg-blue-500' : 'hover:bg-gray-700'
-                }`}
-                title={currentPinTool.label}
-            >
-                <div className="w-6 h-6">{currentPinTool.icon}</div>
-                <div className="absolute bottom-1 right-1 pointer-events-none">
-                    <svg viewBox="0 0 6 6" className="w-1.5 h-1.5 text-gray-300">
-                        <path d="M6 6L0 6L6 0Z" fill="currentColor" />
-                    </svg>
-                </div>
-            </button>
+             <Tooltip text={currentPinTool.label} position={tooltipPos}>
+                <button
+                    onClick={() => handleToolClick('pin')}
+                    className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
+                        activeTool === 'pin' ? 'bg-blue-500' : 'hover:bg-gray-700'
+                    }`}
+                >
+                    <div className="w-6 h-6">{currentPinTool.icon}</div>
+                    <div className="absolute bottom-1 right-1 pointer-events-none">
+                        <svg viewBox="0 0 6 6" className="w-1.5 h-1.5 text-gray-300">
+                            <path d="M6 6L0 6L6 0Z" fill="currentColor" />
+                        </svg>
+                    </div>
+                </button>
+            </Tooltip>
             {isPinMenuOpen && (
                 <div className={`absolute flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white ${getFlyoutPositionClasses()} ${isVertical ? 'flex-col' : 'flex-row'}`}>
                     {pinTools.map(pin => (
-                        <button
-                            key={pin.id}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onClick={(e) => { e.stopPropagation(); handlePinClick(pin.id); }}
-                            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
-                                activePinType === pin.id && activeTool === 'pin' ? 'bg-blue-500' : 'hover:bg-gray-700'
-                            }`}
-                            title={pin.label}
-                        >
-                            {pin.icon}
-                            <span className="text-xs mt-1">{pin.label}</span>
-                        </button>
+                        <Tooltip key={pin.id} text={pin.label} position={isVertical ? (toolbarPosition === 'left' ? 'right' : 'left') : 'top'}>
+                            <button
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => { e.stopPropagation(); handlePinClick(pin.id); }}
+                                className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
+                                    activePinType === pin.id && activeTool === 'pin' ? 'bg-blue-500' : 'hover:bg-gray-700'
+                                }`}
+                            >
+                                {pin.icon}
+                                <span className="text-xs mt-1">{pin.label}</span>
+                            </button>
+                        </Tooltip>
                     ))}
                 </div>
             )}
@@ -246,6 +264,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                 icon={tool.icon}
                 isActive={activeTool === tool.id}
                 onClick={() => handleToolClick(tool.id as ActiveTool)}
+                tooltipPosition={tooltipPos}
             />
         ))}
 
@@ -258,40 +277,42 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                 icon={tool.icon}
                 isActive={activeTool === tool.id}
                 onClick={() => handleToolClick(tool.id as ActiveTool)}
+                tooltipPosition={tooltipPos}
             />
         ))}
 
         {/* Color Tool Flyout */}
         <div ref={colorMenuRef} className="relative">
-            <button
-                onClick={handleColorButtonClick}
-                className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
-                    activeTool === 'fill' || activeTool === 'stroke' ? 'bg-blue-500' : 'hover:bg-gray-700'
-                }`}
-                title={currentColorTool.label}
-            >
-                <div className="w-6 h-6">{currentColorTool.icon}</div>
-                <div className="absolute bottom-1 right-1 pointer-events-none">
-                    <svg viewBox="0 0 6 6" className="w-1.5 h-1.5 text-gray-300">
-                        <path d="M6 6L0 6L6 0Z" fill="currentColor" />
-                    </svg>
-                </div>
-            </button>
+            <Tooltip text={currentColorTool.label} position={tooltipPos}>
+                <button
+                    onClick={handleColorButtonClick}
+                    className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
+                        activeTool === 'fill' || activeTool === 'stroke' ? 'bg-blue-500' : 'hover:bg-gray-700'
+                    }`}
+                >
+                    <div className="w-6 h-6">{currentColorTool.icon}</div>
+                    <div className="absolute bottom-1 right-1 pointer-events-none">
+                        <svg viewBox="0 0 6 6" className="w-1.5 h-1.5 text-gray-300">
+                            <path d="M6 6L0 6L6 0Z" fill="currentColor" />
+                        </svg>
+                    </div>
+                </button>
+            </Tooltip>
             {isColorMenuOpen && (
                 <div className={`absolute flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white ${getFlyoutPositionClasses()} ${isVertical ? 'flex-col' : 'flex-row'}`}>
                     {colorTools.map(color => (
-                        <button
-                            key={color.id}
-                            onMouseDown={(e) => e.stopPropagation()}
-                            onClick={(e) => { e.stopPropagation(); handleColorClick(color.id); }}
-                            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
-                                activeColor === color.id && (activeTool === 'fill' || activeTool === 'stroke') ? 'bg-blue-500 text-white' : 'hover:bg-gray-700'
-                            }`}
-                            title={color.label}
-                        >
-                            <div className="w-6 h-6">{color.icon}</div>
-                            <span className="text-xs mt-1">{color.label}</span>
-                        </button>
+                        <Tooltip key={color.id} text={color.label} position={isVertical ? (toolbarPosition === 'left' ? 'right' : 'left') : 'top'}>
+                            <button
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => { e.stopPropagation(); handleColorClick(color.id); }}
+                                className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
+                                    activeColor === color.id && (activeTool === 'fill' || activeTool === 'stroke') ? 'bg-blue-500 text-white' : 'hover:bg-gray-700'
+                                }`}
+                            >
+                                <div className="w-6 h-6">{color.icon}</div>
+                                <span className="text-xs mt-1">{color.label}</span>
+                            </button>
+                        </Tooltip>
                     ))}
                 </div>
             )}

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, PhotoData } from '../types';
-import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, PhotoIcon, LockClosedIcon, LockOpenIcon } from './Icons';
+import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, PhotoIcon, LockClosedIcon, LockOpenIcon, XMarkIcon } from './Icons';
 
 type LayerItem = (Rectangle & { itemType: 'rect' }) | (Pin & { itemType: 'pin' });
 
@@ -286,14 +286,21 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
     return (
         <div 
             ref={panelRef}
-            className={`relative h-full bg-gray-50 dark:bg-gray-800/50 border-r border-gray-200 dark:border-gray-700/50 transition-all duration-300 ease-in-out flex-shrink-0 ${isOpen ? 'shadow-lg' : ''}`}
-            style={{ width: isOpen ? `${panelWidth}px` : '0px' }}
+            className={`relative h-full bg-gray-50/50 dark:bg-gray-900/50 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 ease-in-out flex-shrink-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+            style={{ width: isOpen ? `${panelWidth}px` : '0px', visibility: isOpen ? 'visible' : 'hidden' }}
         >
             <div className={`h-full w-full flex flex-col transition-opacity duration-200 overflow-hidden ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-                    <h2 className="font-bold text-lg text-gray-900 dark:text-white">Layers</h2>
+                <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+                    <h2 className="font-semibold text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wider">Layers</h2>
+                    <button 
+                        onClick={onToggle} 
+                        className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+                        title="Close Sidebar"
+                    >
+                        <XMarkIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    </button>
                 </div>
-                <div className="flex-grow overflow-y-auto">
+                <div className="flex-grow overflow-y-auto custom-scrollbar">
                     {layerItems.length > 0 ? (
                         <div className="flex flex-col">
                             {sortedGroupKeys.map(key => {
@@ -337,14 +344,6 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                     className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-blue-400/50 dark:hover:bg-blue-500/50 transition-colors duration-200 z-20"
                 />
             )}
-
-            <button 
-                onClick={onToggle} 
-                className="absolute top-1/2 right-0 transform -translate-y-1/2 translate-x-full w-6 h-12 bg-blue-500 hover:bg-blue-600 rounded-r-md flex items-center justify-center text-white transition-colors z-10 shadow-md"
-                title={isOpen ? 'Collapse Panel' : 'Expand Panel'}
-            >
-                <ChevronDoubleLeftIcon className={`w-4 h-4 transition-transform duration-300 ${isOpen ? '' : 'rotate-180'}`} />
-            </button>
         </div>
     );
 };

@@ -14,18 +14,18 @@ interface RfiPanelProps {
 const RfiPanel: React.FC<RfiPanelProps> = ({ isOpen, isEditMode, formData, onFormChange, onSubmit, onCancel }) => {
     return (
         <div
-            className={`h-full flex-shrink-0 bg-white dark:bg-gray-800 transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'border-l border-gray-200 dark:border-gray-700 shadow-lg' : ''}`}
-            style={{ width: isOpen ? '28rem' : '0px' }}
+            className={`h-full flex-shrink-0 bg-gray-50/50 dark:bg-gray-900/50 transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'border-l border-gray-200 dark:border-gray-800 translate-x-0' : 'translate-x-full'}`}
+            style={{ width: isOpen ? '28rem' : '0px', visibility: isOpen ? 'visible' : 'hidden' }}
         >
             <div className={`h-full w-full flex flex-col transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="p-6 flex flex-col h-full">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{isEditMode ? 'Edit RFI' : 'Create RFI Draft'}</h2>
-                        <button onClick={onCancel} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                            <XMarkIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+                <div className="flex flex-col h-full">
+                    <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
+                        <h2 className="font-semibold text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wider">{isEditMode ? 'Edit RFI' : 'Create RFI Draft'}</h2>
+                        <button onClick={onCancel} className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">
+                            <XMarkIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                         </button>
                     </div>
-                    <form onSubmit={onSubmit} className="flex flex-col flex-grow">
+                    <form onSubmit={onSubmit} className="flex flex-col flex-grow p-6 overflow-y-auto custom-scrollbar">
                         <div className="mb-4">
                             <label htmlFor="rfi-title" className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">RFI Title</label>
                             <input type="text" name="title" id="rfi-title" value={formData.title} onChange={onFormChange} required className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" />

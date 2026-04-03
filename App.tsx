@@ -13,7 +13,7 @@ import CanvasView from './components/CanvasView';
 import { useZoomPan } from './hooks/useZoomPan';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
 import LayersPanel from './components/LayersPanel';
-import { FilterIcon, ChevronLeftIcon, ShareIcon, DocumentDuplicateIcon, FolderOpenIcon } from './components/Icons';
+import { FilterIcon, ChevronLeftIcon, ShareIcon, DocumentDuplicateIcon, FolderOpenIcon, PanelLeftIcon, PanelRightIcon } from './components/Icons';
 
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 export type RectangleTagType = Exclude<FilterCategory, 'safety'>;
@@ -401,9 +401,36 @@ interface HeaderProps {
     markupSets: MarkupSet[];
     loadedSetIds: string[];
     onToggleMarkupSet: (set: MarkupSet) => void;
+    isLeftSidebarOpen: boolean;
+    onToggleLeftSidebar: () => void;
+    isRightSidebarOpen: boolean;
+    onToggleRightSidebar: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, onDrawingChange, currentVersion, onVersionChange, hasUnsavedChanges, onSave, onShare, filters, areFiltersActive, isFilterMenuOpen, setIsFilterMenuOpen, handleFilterChange, handleToggleAllFilters, markupSets, loadedSetIds, onToggleMarkupSet }) => {
+const Header: React.FC<HeaderProps> = ({ 
+    onBack, 
+    currentDrawing, 
+    allDrawings, 
+    onDrawingChange, 
+    currentVersion, 
+    onVersionChange, 
+    hasUnsavedChanges, 
+    onSave, 
+    onShare, 
+    filters, 
+    areFiltersActive, 
+    isFilterMenuOpen, 
+    setIsFilterMenuOpen, 
+    handleFilterChange, 
+    handleToggleAllFilters, 
+    markupSets, 
+    loadedSetIds, 
+    onToggleMarkupSet,
+    isLeftSidebarOpen,
+    onToggleLeftSidebar,
+    isRightSidebarOpen,
+    onToggleRightSidebar
+}) => {
     const filterMenuRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -419,6 +446,14 @@ const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, on
     return (
         <div className="flex justify-between items-center p-2 border-b border-gray-200 dark:border-gray-700 flex-wrap gap-2">
             <div className="flex items-center gap-2">
+                <button 
+                    onClick={onToggleLeftSidebar} 
+                    className={`h-10 w-10 flex items-center justify-center rounded-md transition-colors ${isLeftSidebarOpen ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'}`} 
+                    title={isLeftSidebarOpen ? "Close Left Sidebar" : "Open Left Sidebar"}
+                >
+                    <PanelLeftIcon className="w-5 h-5" />
+                </button>
+                <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-1" />
                 <button onClick={onBack} className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-gray-200 dark:hover:bg-gray-700" title="Back to drawings">
                     <ChevronLeftIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                 </button>
@@ -472,6 +507,14 @@ const Header: React.FC<HeaderProps> = ({ onBack, currentDrawing, allDrawings, on
                     className="h-10 font-bold py-2 px-4 rounded-lg transition-colors duration-200 disabled:bg-gray-300 disabled:dark:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
                 >
                     Save Markup
+                </button>
+                <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-1" />
+                <button 
+                    onClick={onToggleRightSidebar} 
+                    className={`h-10 w-10 flex items-center justify-center rounded-md transition-colors ${isRightSidebarOpen ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'}`} 
+                    title={isRightSidebarOpen ? "Close Right Sidebar" : "Open Right Sidebar"}
+                >
+                    <PanelRightIcon className="w-5 h-5" />
                 </button>
             </div>
         </div>
@@ -1376,26 +1419,36 @@ const App: React.FC = () => {
           <WelcomeScreen onUploadClick={triggerFileUpload} />
         ) : (
           <>
-            <Header
-                onBack={handleGoBack}
-                currentDrawing={currentDrawing}
-                allDrawings={allDrawings}
-                onDrawingChange={handleDrawingChange}
-                currentVersion={currentVersion}
-                onVersionChange={handleVersionChange}
-                hasUnsavedChanges={hasUnsavedChanges}
-                onSave={handleSaveMarkup}
-                onShare={() => setIsShareModalOpen(true)}
-                filters={filters}
-                areFiltersActive={areFiltersActive}
-                isFilterMenuOpen={isFilterMenuOpen}
-                setIsFilterMenuOpen={setIsFilterMenuOpen}
-                handleFilterChange={handleFilterChange}
-                handleToggleAllFilters={handleToggleAllFilters}
-                markupSets={allMarkupSets}
-                loadedSetIds={loadedSetIds}
-                onToggleMarkupSet={handleToggleMarkupSet}
-            />
+                <Header
+                    onBack={handleGoBack}
+                    currentDrawing={currentDrawing}
+                    allDrawings={allDrawings}
+                    onDrawingChange={handleDrawingChange}
+                    currentVersion={currentVersion}
+                    onVersionChange={handleVersionChange}
+                    hasUnsavedChanges={hasUnsavedChanges}
+                    onSave={handleSaveMarkup}
+                    onShare={() => setIsShareModalOpen(true)}
+                    filters={filters}
+                    areFiltersActive={areFiltersActive}
+                    isFilterMenuOpen={isFilterMenuOpen}
+                    setIsFilterMenuOpen={setIsFilterMenuOpen}
+                    handleFilterChange={handleFilterChange}
+                    handleToggleAllFilters={handleToggleAllFilters}
+                    markupSets={allMarkupSets}
+                    loadedSetIds={loadedSetIds}
+                    onToggleMarkupSet={handleToggleMarkupSet}
+                    isLeftSidebarOpen={isLayersPanelOpen}
+                    onToggleLeftSidebar={() => setIsLayersPanelOpen(prev => !prev)}
+                    isRightSidebarOpen={activePanel !== null}
+                    onToggleRightSidebar={() => {
+                        if (activePanel !== null) {
+                            setActivePanel(null);
+                        } else {
+                            setActivePanel('rfi'); // Default to RFI if opening
+                        }
+                    }}
+                />
             <div className="flex-grow flex flex-row items-stretch overflow-hidden">
                 <LayersPanel
                   isOpen={isLayersPanelOpen}
