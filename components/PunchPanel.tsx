@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { XMarkIcon } from './Icons';
+import Tooltip from './Tooltip';
 import type { PunchData } from '../types';
 
 interface PunchPanelProps {
@@ -19,65 +20,140 @@ interface PunchPanelProps {
 }
 
 const PunchPanel: React.FC<PunchPanelProps> = ({
-    isOpen, isEditMode, mode, onModeChange, formData, onFormChange, onSubmit, onCancel, searchTerm, onSearchTermChange, allPunches, onLinkExisting
+    isOpen,
+    isEditMode,
+    mode,
+    onModeChange,
+    formData,
+    onFormChange,
+    onSubmit,
+    onCancel,
+    searchTerm,
+    onSearchTermChange,
+    allPunches,
+    onLinkExisting,
 }) => {
     return (
         <div
-            className={`h-full flex-shrink-0 bg-gray-50/50 dark:bg-gray-900/50 transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? 'border-l border-gray-200 dark:border-gray-800 translate-x-0' : 'translate-x-full'}`}
+            className={`h-full flex-shrink-0 overflow-hidden border-gray-200 bg-white transition-all duration-200 ease-in-out dark:border-zinc-800 dark:bg-zinc-900 ${isOpen ? 'border-l translate-x-0' : 'translate-x-full'}`}
             style={{ width: isOpen ? '28rem' : '0px', visibility: isOpen ? 'visible' : 'hidden' }}
         >
-            <div className={`h-full w-full flex flex-col transition-opacity duration-200 ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="flex flex-col h-full">
-                    <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
-                        <h2 className="font-semibold text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wider">{isEditMode ? 'Edit' : 'Create'} Punch List Item</h2>
-                        <button onClick={onCancel} className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">
-                            <XMarkIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            <div className={`flex h-full w-full flex-col transition-opacity duration-150 overflow-hidden ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
+                <div className="linarc-panel-header">
+                    <h2 className="linarc-panel-title">{isEditMode ? 'Edit punch item' : 'Create punch item'}</h2>
+                    <Tooltip text="Close" position="left">
+                        <button type="button" onClick={onCancel} className="linarc-panel-close" aria-label="Close panel">
+                            <XMarkIcon className="h-5 w-5" />
+                        </button>
+                    </Tooltip>
+                </div>
+                {!isEditMode && (
+                    <div className="flex flex-shrink-0 border-b border-gray-100 px-6 dark:border-zinc-800">
+                        <button
+                            type="button"
+                            onClick={() => onModeChange('create')}
+                            className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
+                                mode === 'create'
+                                    ? 'border-b-2 border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100'
+                                    : 'text-gray-500 hover:text-gray-800 dark:text-zinc-500 dark:hover:text-zinc-300'
+                            }`}
+                        >
+                            Create new
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onModeChange('link')}
+                            className={`flex-1 py-2.5 text-sm font-semibold transition-colors ${
+                                mode === 'link'
+                                    ? 'border-b-2 border-zinc-900 text-zinc-900 dark:border-zinc-100 dark:text-zinc-100'
+                                    : 'text-gray-500 hover:text-gray-800 dark:text-zinc-500 dark:hover:text-zinc-300'
+                            }`}
+                        >
+                            Link existing
                         </button>
                     </div>
-                    <div className="flex-grow flex flex-col p-6 overflow-y-auto custom-scrollbar">
-                      <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4">
-                          <button onClick={() => onModeChange('create')} className={`flex-1 py-2 text-sm font-semibold transition-colors ${mode === 'create' ? 'border-b-2 border-blue-500 text-blue-500 dark:text-blue-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>Create New</button>
-                          <button onClick={() => onModeChange('link')} className={`flex-1 py-2 text-sm font-semibold transition-colors ${mode === 'link' ? 'border-b-2 border-blue-500 text-blue-500 dark:text-blue-400' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700'}`}>Link Existing</button>
-                      </div>
-      
-                    {mode === 'create' || isEditMode ? (
-                      <form onSubmit={onSubmit} className="flex flex-col flex-grow">
-                          <div className="mb-4">
-                              <label htmlFor="punch-title" className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Title</label>
-                              <input type="text" name="title" id="punch-title" value={formData.title} onChange={onFormChange} required className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" />
-                          </div>
-                          <div className="mb-4">
-                              <label htmlFor="punch-assignee" className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Assignee</label>
-                              <input type="text" name="assignee" id="punch-assignee" value={formData.assignee} onChange={onFormChange} required className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" />
-                          </div>
-                          <div className="mt-auto flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                              <button type="button" onClick={onCancel} className="bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-600 dark:hover:bg-gray-500 dark:text-white font-bold py-2 px-4 rounded-lg">Cancel</button>
-                              <button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg">{isEditMode ? 'Save' : 'Create'}</button>
-                          </div>
-                      </form>
-                    ) : (
-                      <div className="flex flex-col flex-grow">
-                         <input 
-                              type="text" 
-                              placeholder="Search existing punch items..."
-                              value={searchTerm}
-                              onChange={onSearchTermChange}
-                              className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 mb-4 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" 
-                          />
-                          <ul className="space-y-2">
-                              {allPunches.filter(p => p.title.toLowerCase().includes(searchTerm.toLowerCase()) || p.assignee.toLowerCase().includes(searchTerm.toLowerCase())).map(punch => (
-                                  <li key={punch.id}>
-                                      <button onClick={() => onLinkExisting(punch)} className="w-full text-left p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                                          <p className="font-semibold text-gray-800 dark:text-gray-200">{punch.id}: {punch.title}</p>
-                                          <p className="text-sm text-gray-500 dark:text-gray-400">Assignee: {punch.assignee}</p>
-                                      </button>
-                                  </li>
-                              ))}
-                          </ul>
-                      </div>
-                    )}
+                )}
+
+                {mode === 'create' || isEditMode ? (
+                    <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                        <div className="linarc-panel-body custom-scrollbar flex-1 min-h-0">
+                            <div className="mb-4">
+                                <label htmlFor="punch-title" className="linarc-field-label">
+                                    Title
+                                </label>
+                                <input
+                                    type="text"
+                                    name="title"
+                                    id="punch-title"
+                                    value={formData.title}
+                                    onChange={onFormChange}
+                                    required
+                                    className="linarc-input"
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label htmlFor="punch-assignee" className="linarc-field-label">
+                                    Assignee
+                                </label>
+                                <input
+                                    type="text"
+                                    name="assignee"
+                                    id="punch-assignee"
+                                    value={formData.assignee}
+                                    onChange={onFormChange}
+                                    required
+                                    className="linarc-input"
+                                />
+                            </div>
+                        </div>
+                        <div className="linarc-panel-footer">
+                            <button type="button" onClick={onCancel} className="linarc-btn-modal-cancel">
+                                Cancel
+                            </button>
+                            <button type="submit" className="linarc-btn-primary py-2.5 px-5">
+                                {isEditMode ? 'Save' : 'Create'}
+                            </button>
+                        </div>
+                    </form>
+                ) : (
+                    <div className="linarc-panel-body custom-scrollbar flex-1 min-h-0 flex flex-col">
+                        <label htmlFor="punch-search" className="linarc-field-label">
+                            Search
+                        </label>
+                        <input
+                            id="punch-search"
+                            type="text"
+                            placeholder="Search punch items…"
+                            value={searchTerm}
+                            onChange={onSearchTermChange}
+                            className="linarc-input mb-3"
+                        />
+                        <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+                            {allPunches
+                                .filter(
+                                    p =>
+                                        p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                        p.assignee.toLowerCase().includes(searchTerm.toLowerCase())
+                                )
+                                .map(punch => (
+                                    <li key={punch.id}>
+                                        <button
+                                            type="button"
+                                            onClick={() => onLinkExisting(punch)}
+                                            className="w-full rounded-lg border border-transparent px-3 py-3 text-left transition-colors hover:border-gray-100 hover:bg-gray-50 dark:hover:border-zinc-700 dark:hover:bg-zinc-800/80"
+                                        >
+                                            <p className="text-sm font-medium text-gray-900 dark:text-zinc-100">
+                                                {punch.id}: {punch.title}
+                                            </p>
+                                            <p className="mt-0.5 text-xs text-gray-500 dark:text-zinc-500">
+                                                Assignee: {punch.assignee}
+                                            </p>
+                                        </button>
+                                    </li>
+                                ))}
+                        </ul>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, PhotoData } from '../types';
 import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, PhotoIcon, LockClosedIcon, LockOpenIcon, XMarkIcon } from './Icons';
+import Tooltip from './Tooltip';
 
 type LayerItem = (Rectangle & { itemType: 'rect' }) | (Pin & { itemType: 'pin' });
 
 interface LayersPanelProps {
     isOpen: boolean;
-    onToggle: () => void;
+    onClose: () => void;
     rectangles: Rectangle[];
     pins: Pin[];
     selectedRectIds: string[];
@@ -56,7 +57,7 @@ const LinkedItemIcon = ({ type }: { type: string }) => {
 };
 
 const LayersPanel: React.FC<LayersPanelProps> = ({ 
-    isOpen, onToggle, rectangles, pins, selectedRectIds, selectedPinId, expandedIds, onToggleExpand,
+    isOpen, onClose, rectangles, pins, selectedRectIds, selectedPinId, expandedIds, onToggleExpand,
     onSelectRect, onSelectPin, onRenameRect, onRenamePin, onDeleteRect, onDeletePin,
     onToggleRectVisibility, onTogglePinVisibility, onOpenRfiPanel, onOpenPhotoViewer, markupSetNames, onToggleBatchVisibility, onToggleLock
 }) => {
@@ -203,7 +204,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                             else onSelectPin(item.id, e);
                         }
                     }}
-                    className={`flex items-center px-3 py-2 cursor-pointer group transition-colors ${isSelected ? 'bg-blue-100 dark:bg-blue-900/50' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
+                    className={`flex items-center px-3 py-2 cursor-pointer group transition-colors ${isSelected ? 'bg-blue-50 dark:bg-blue-950/40' : 'hover:bg-gray-100 dark:hover:bg-zinc-700/50'}`}
                 >
                     <div className="w-5 flex items-center justify-center mr-2 flex-shrink-0">
                     {hasChildren ? (
@@ -221,7 +222,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                             onChange={(e) => setEditingName(e.target.value)}
                             onBlur={handleSaveEdit}
                             onKeyDown={handleKeyDown}
-                            className="flex-grow bg-transparent border-b border-blue-500 focus:outline-none text-gray-800 dark:text-gray-200"
+                            className="flex-grow bg-transparent border-b border-blue-600 focus:outline-none text-gray-800 dark:text-zinc-200"
                         />
                     ) : (
                         <span 
@@ -286,19 +287,22 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
     return (
         <div 
             ref={panelRef}
-            className={`relative h-full bg-gray-50/50 dark:bg-gray-900/50 border-r border-gray-200 dark:border-gray-800 transition-all duration-300 ease-in-out flex-shrink-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+            className={`relative h-full flex-shrink-0 overflow-hidden border-r border-gray-200 bg-white transition-all duration-200 ease-in-out dark:border-zinc-800 dark:bg-zinc-900 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
             style={{ width: isOpen ? `${panelWidth}px` : '0px', visibility: isOpen ? 'visible' : 'hidden' }}
         >
-            <div className={`h-full w-full flex flex-col transition-opacity duration-200 overflow-hidden ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
-                <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
-                    <h2 className="font-semibold text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wider">Layers</h2>
-                    <button 
-                        onClick={onToggle} 
-                        className="p-1 rounded-md hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
-                        title="Close Sidebar"
-                    >
-                        <XMarkIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                    </button>
+            <div className={`h-full w-full flex flex-col transition-opacity duration-150 overflow-hidden ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
+                <div className="linarc-panel-header">
+                    <h2 className="linarc-panel-title">Layers</h2>
+                    <Tooltip text="Close" position="left">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="linarc-panel-close"
+                            aria-label="Close layers panel"
+                        >
+                            <XMarkIcon className="h-5 w-5" />
+                        </button>
+                    </Tooltip>
                 </div>
                 <div className="flex-grow overflow-y-auto custom-scrollbar">
                     {layerItems.length > 0 ? (
@@ -331,8 +335,16 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                             })}
                         </div>
                     ) : (
-                        <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                            No markups yet. Use the toolbar to create one.
+                        <div className="flex flex-col items-center justify-center gap-3 px-8 py-12 text-center">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 dark:bg-zinc-800">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-gray-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 6.878V6a2.25 2.25 0 012.25-2.25h7.5A2.25 2.25 0 0118 6v.878m-12 0c.235-.083.487-.128.75-.128h10.5c.263 0 .515.045.75.128m-12 0A2.25 2.25 0 004.5 9v.878m13.5-3A2.25 2.25 0 0119.5 9v.878m0 0a2.246 2.246 0 00-.75-.128H5.25c-.263 0-.515.045-.75.128m15 0A2.25 2.25 0 0121 12v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6c0-.98.626-1.813 1.5-2.122" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p className="font-semibold text-gray-700 dark:text-zinc-300">No layers yet</p>
+                                <p className="mt-1 text-sm text-gray-500 dark:text-zinc-500">Markups and pins you add to the canvas will appear here.</p>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -341,7 +353,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
             {isOpen && (
                 <div 
                     onMouseDown={handleResizeMouseDown}
-                    className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-blue-400/50 dark:hover:bg-blue-500/50 transition-colors duration-200 z-20"
+                    className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-blue-400/50 dark:hover:bg-blue-500/40 transition-colors duration-200 z-20"
                 />
             )}
         </div>

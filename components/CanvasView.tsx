@@ -2,10 +2,15 @@
 
 // Fix: Import 'useCallback' from 'react' to resolve 'Cannot find name' errors.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle } from '../types';
+import { Palette } from 'lucide-react';
+import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle, Measurement } from '../types';
+import ScaleDialog from './ScaleDialog';
 import { RectangleTagType, ToolbarPosition, ImageGeom } from '../App';
 import { UploadIcon, TrashIcon, LinkIcon, ArrowUpTrayIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowsPointingOutIcon, SunIcon, MoonIcon, SafetyPinIcon, PunchPinIcon, PhotoPinIcon, InformationCircleIcon, FilterIcon, CogIcon } from './Icons';
 import Toolbar from './Toolbar';
+import Tooltip from './Tooltip';
+import MarkupColorPicker from './MarkupColorPicker';
+import { resolveRectFillColor, resolveRectStrokeColor } from '../utils/markupColors';
 
 type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
@@ -30,6 +35,7 @@ interface CanvasViewProps {
     marqueeRect: Omit<Rectangle, 'id' | 'name' | 'visible'> | null;
     isMenuVisible: boolean;
     linkMenuRectId: string | null;
+    setLinkMenuRectId: (id: string | null) => void;
     openLinkSubmenu: string | null;
     theme: 'light' | 'dark';
     toolbarPosition: ToolbarPosition;
@@ -42,7 +48,6 @@ interface CanvasViewProps {
     handleMouseMove: (event: React.MouseEvent<HTMLDivElement>) => void;
     handleMouseUp: (event: React.MouseEvent<HTMLDivElement>) => void;
     handleMouseLeave: () => void;
-    handleWheel: (e: React.WheelEvent<HTMLDivElement>) => void;
     handleZoom: (direction: 'in' | 'out' | 'reset') => void;
     handleThemeToggle: () => void;
     setHoveredRectId: (id: string | null) => void;
@@ -52,13 +57,17 @@ interface CanvasViewProps {
     activePinType: ActivePinType;
     setActivePinType: (pinType: ActivePinType) => void;
     activeColor: ActiveColor;
-    setActiveColor: (color: ActiveColor) => void;
+    markupFillColor: string;
+    markupStrokeColor: string;
+    onMarkupColorChange: (mode: ActiveColor, value: string) => void;
+    onMarkupActiveModeChange: (mode: ActiveColor) => void;
     setDraggingPinId: (id: string | null) => void;
     setSelectedPinId: (id: string | null) => void;
     handlePinDetails: (pin: Pin) => void;
     handleDeletePin: (pinId: string) => void;
     setHoveredItem: (item: HoveredItemInfo | null) => void;
     hidePopupTimer: React.MutableRefObject<number | null>;
+    showPopupTimer: React.MutableRefObject<number | null>;
     handleResizeStart: (event: React.MouseEvent<HTMLDivElement>, rectId: string, handle: ResizeHandle) => void;
     handlePublishRect: (event: React.MouseEvent, id: string) => void;
     handleLinkRect: (event: React.MouseEvent, id: string) => void;
@@ -71,25 +80,48 @@ interface CanvasViewProps {
     setSelectedRectIds: (ids: string[]) => void;
     getRelativeCoords: (event: React.MouseEvent | WheelEvent | MouseEvent) => { x: number; y: number } | null;
     setPinDragOffset: (offset: {x: number, y: number} | null) => void;
+    measurements: Measurement[];
+    drawingScale: number | null;
+    onMeasurementAdd: (m: Measurement) => void;
+    onMeasurementDelete: (id: string) => void;
+    onMeasurementUpdate: (m: Measurement) => void;
+    onDrawingScaleSet: (pixelsPerFoot: number) => void;
 }
 
 const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const {
         imageSrc, rectangles, pins, filters, viewTransform, interaction, activeTool, hoveredRectId, draggingPinId,
-        selectedRectIds, selectedPinId, currentRect, marqueeRect, isMenuVisible, linkMenuRectId, openLinkSubmenu,
+        selectedRectIds, selectedPinId, currentRect, marqueeRect, isMenuVisible, linkMenuRectId, setLinkMenuRectId, openLinkSubmenu,
         theme, toolbarPosition, setToolbarPosition, isSpacebarDown, imageContainerRef, imageGeom, onImageGeomChange,
-        handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handleWheel, handleZoom, handleThemeToggle, 
-        setHoveredRectId, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor, 
-        setActiveColor, setDraggingPinId, setSelectedPinId, handlePinDetails, handleDeletePin, setHoveredItem, 
-        hidePopupTimer, handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
-        handleSubmenuLink, onOpenRfiPanel, onOpenPhotoViewer, mouseDownRef, setSelectedRectIds, getRelativeCoords, setPinDragOffset
+        handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handleZoom, handleThemeToggle, 
+        setHoveredRectId, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor,
+        markupFillColor, markupStrokeColor, onMarkupColorChange, onMarkupActiveModeChange,
+        setDraggingPinId, setSelectedPinId, handlePinDetails, handleDeletePin, setHoveredItem,
+        hidePopupTimer, showPopupTimer, handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
+        handleSubmenuLink, onOpenRfiPanel, onOpenPhotoViewer, mouseDownRef, setSelectedRectIds, getRelativeCoords, setPinDragOffset,
+        measurements, drawingScale, onMeasurementAdd, onMeasurementDelete, onMeasurementUpdate, onDrawingScaleSet
     } = props;
 
     const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+    const [markupColorPanelOpen, setMarkupColorPanelOpen] = useState(false);
     const settingsMenuRef = useRef<HTMLDivElement>(null);
+    const markupColorPanelRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
     const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
     const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+    // Measurement tool state
+    const [showScaleDialog, setShowScaleDialog] = useState(false);
+    const [isCalibrating, setIsCalibrating] = useState(false);
+    const [measStart, setMeasStart] = useState<{ x: number; y: number } | null>(null);
+    const [measCurrent, setMeasCurrent] = useState<{ x: number; y: number } | null>(null);
+    const [calibLine, setCalibLine] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+    const [showCalibInput, setShowCalibInput] = useState(false);
+    const [calibFt, setCalibFt] = useState('');
+    const [calibIn, setCalibIn] = useState('');
+    const [hoveredMeasId, setHoveredMeasId] = useState<string | null>(null);
+    const [draggingMeasId, setDraggingMeasId] = useState<string | null>(null);
+    const [draggingMeasEndpoint, setDraggingMeasEndpoint] = useState<'p1' | 'p2' | null>(null);
 
     const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
         setNaturalSize({
@@ -110,6 +142,37 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         resizeObserver.observe(container);
         return () => { if(container) resizeObserver.unobserve(container) };
     }, [imageContainerRef]);
+
+    useEffect(() => {
+        if (linkMenuRectId) setMarkupColorPanelOpen(false);
+    }, [linkMenuRectId]);
+
+    useEffect(() => {
+        if (!markupColorPanelOpen) return;
+        const onDown = (e: MouseEvent) => {
+            const t = e.target as HTMLElement;
+            if (markupColorPanelRef.current?.contains(t)) return;
+            if (t.closest('[data-markup-color-trigger]')) return;
+            setMarkupColorPanelOpen(false);
+        };
+        document.addEventListener('mousedown', onDown);
+        return () => document.removeEventListener('mousedown', onDown);
+    }, [markupColorPanelOpen]);
+
+    useEffect(() => {
+        if (!markupColorPanelOpen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setMarkupColorPanelOpen(false);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [markupColorPanelOpen]);
+
+    useEffect(() => {
+        if (activeTool === 'measurement' && drawingScale === null && !isCalibrating && !showScaleDialog) {
+            setShowScaleDialog(true);
+        }
+    }, [activeTool, drawingScale, isCalibrating, showScaleDialog]);
 
     useEffect(() => {
         const container = imageContainerRef.current;
@@ -170,6 +233,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                 return 'cursor-crosshair';
         }
         if (activeTool === 'pin') return 'cursor-crosshair';
+        if (activeTool === 'measurement') return draggingMeasId ? 'cursor-grabbing' : 'cursor-crosshair';
         if (activeTool === 'shape') {
             if (hoveredRectId) return 'cursor-move';
             return 'cursor-crosshair';
@@ -258,6 +322,136 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         return path;
     };
 
+    const formatMeasurement = (feet: number): string => {
+        const wholeFeet = Math.floor(feet);
+        let inches = Math.round((feet - wholeFeet) * 12);
+        if (inches === 12) { return `${wholeFeet + 1}'-0"`; }
+        if (wholeFeet === 0) return `${inches}"`;
+        if (inches === 0) return `${wholeFeet}'-0"`;
+        return `${wholeFeet}'-${inches}"`;
+    };
+
+    const getMeasureDistancePx = (x1: number, y1: number, x2: number, y2: number): number => {
+        if (!naturalSize.width) return 0;
+        const dx = (x2 - x1) / 100 * naturalSize.width;
+        const dy = (y2 - y1) / 100 * naturalSize.height;
+        return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    const getLiveMeasureLabel = (x1: number, y1: number, x2: number, y2: number): string => {
+        if (!drawingScale) return '';
+        const px = getMeasureDistancePx(x1, y1, x2, y2);
+        return formatMeasurement(px / drawingScale);
+    };
+
+    // Returns the measurement and endpoint ('p1'|'p2') if the screen point is within hitRadius px of an endpoint
+    const hitTestMeasEndpoint = (screenX: number, screenY: number, hitRadius = 10): { m: Measurement; endpoint: 'p1' | 'p2' } | null => {
+        for (const m of measurements) {
+            if (!m.visible) continue;
+            const p1 = getScreenPoint(m.x1, m.y1);
+            const p2 = getScreenPoint(m.x2, m.y2);
+            if (p1) {
+                const d1 = Math.sqrt((screenX - p1.left) ** 2 + (screenY - p1.top) ** 2);
+                if (d1 <= hitRadius) return { m, endpoint: 'p1' };
+            }
+            if (p2) {
+                const d2 = Math.sqrt((screenX - p2.left) ** 2 + (screenY - p2.top) ** 2);
+                if (d2 <= hitRadius) return { m, endpoint: 'p2' };
+            }
+        }
+        return null;
+    };
+
+    const onCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (activeTool === 'measurement') {
+            if ((e.target as HTMLElement).closest('[data-interactive-ui="true"]')) return;
+            // Check if clicking near an existing endpoint to drag it
+            const hit = hitTestMeasEndpoint(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+            if (hit && drawingScale !== null) {
+                setDraggingMeasId(hit.m.id);
+                setDraggingMeasEndpoint(hit.endpoint);
+                return;
+            }
+            if (drawingScale !== null || isCalibrating) {
+                const coords = getRelativeCoords(e);
+                if (!coords) return;
+                setMeasStart(coords);
+                setMeasCurrent(coords);
+                setShowCalibInput(false);
+                return;
+            }
+        }
+        handleMouseDown(e);
+    };
+
+    const onCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (activeTool === 'measurement') {
+            // Dragging an existing endpoint
+            if (draggingMeasId && draggingMeasEndpoint) {
+                const coords = getRelativeCoords(e);
+                if (!coords) return;
+                const m = measurements.find(x => x.id === draggingMeasId);
+                if (!m) return;
+                const updated = draggingMeasEndpoint === 'p1'
+                    ? { ...m, x1: coords.x, y1: coords.y }
+                    : { ...m, x2: coords.x, y2: coords.y };
+                onMeasurementUpdate(updated);
+                return;
+            }
+            if (measStart) {
+                const coords = getRelativeCoords(e);
+                if (coords) setMeasCurrent(coords);
+                return;
+            }
+        }
+        handleMouseMove(e);
+    };
+
+    const onCanvasMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (activeTool === 'measurement') {
+            if (draggingMeasId) {
+                setDraggingMeasId(null);
+                setDraggingMeasEndpoint(null);
+                return;
+            }
+            if (measStart && measCurrent) {
+                const dx = measCurrent.x - measStart.x;
+                const dy = measCurrent.y - measStart.y;
+                const isClick = Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5;
+                if (!isClick) {
+                    const line = { x1: measStart.x, y1: measStart.y, x2: measCurrent.x, y2: measCurrent.y };
+                    if (isCalibrating) {
+                        setCalibLine(line);
+                        setShowCalibInput(true);
+                        setCalibFt('');
+                        setCalibIn('');
+                    } else {
+                        const newM: Measurement = { id: Date.now().toString(), ...line, visible: true };
+                        onMeasurementAdd(newM);
+                    }
+                }
+                setMeasStart(null);
+                setMeasCurrent(null);
+                return;
+            }
+        }
+        handleMouseUp(e);
+    };
+
+    const onCanvasMouseLeave = () => {
+        if (activeTool === 'measurement') {
+            if (draggingMeasId) {
+                setDraggingMeasId(null);
+                setDraggingMeasEndpoint(null);
+            }
+            if (measStart) {
+                setMeasStart(null);
+                setMeasCurrent(null);
+            }
+        }
+        handleMouseLeave();
+    };
+
     const isSingleSelection = selectedRectIds.length === 1;
     const isMultiSelection = selectedRectIds.length > 1;
     const selectedRectangle = isSingleSelection ? rectangles.find(r => r.id === selectedRectIds[0]) : null;
@@ -279,7 +473,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const ToolbarPositionButton: React.FC<{position: ToolbarPosition, label: string}> = ({position, label}) => (
       <button 
         onClick={() => setToolbarPosition(position)}
-        className={`w-full text-left px-3 py-1.5 text-sm rounded-md transition-colors ${toolbarPosition === position ? 'bg-blue-500 text-white' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
+        className={`w-full text-left px-3 py-1.5 text-sm rounded-md transition-colors ${toolbarPosition === position ? 'bg-blue-600 text-white' : 'text-zinc-300 hover:bg-gray-700'}`}
       >
         {label}
       </button>
@@ -290,21 +484,34 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
             <div className="relative w-full flex-grow">
                 <div
                     ref={imageContainerRef}
-                    className={`relative w-full h-full overflow-hidden rounded-lg select-none bg-gray-200 dark:bg-gray-900/50 ${getCursorClass()}`}
-                    onMouseDown={handleMouseDown}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseLeave}
-                    onWheel={handleWheel}
+                    className={`relative h-full w-full select-none overflow-hidden bg-neutral-200 dark:bg-zinc-950 ${getCursorClass()}`}
+                    onMouseDown={onCanvasMouseDown}
+                    onMouseMove={onCanvasMouseMove}
+                    onMouseUp={onCanvasMouseUp}
+                    onMouseLeave={onCanvasMouseLeave}
                 >
-                    <div className="absolute top-0 left-0" style={{ transform: `translate(${viewTransform.translateX}px, ${viewTransform.translateY}px) scale(${viewTransform.scale})`, transformOrigin: '0 0', width: `${containerSize.width}px`, height: `${containerSize.height}px` }}>
+                    <div
+                        className="absolute top-0 left-0 will-change-transform"
+                        style={{
+                            transform: `translate3d(${viewTransform.translateX}px, ${viewTransform.translateY}px, 0) scale(${viewTransform.scale})`,
+                            transformOrigin: '0 0',
+                            width: `${containerSize.width}px`,
+                            height: `${containerSize.height}px`,
+                        }}
+                    >
                          <img ref={imageRef} src={imageSrc} alt="Blueprint" className="w-full h-full object-contain pointer-events-none" onLoad={handleImageLoad} style={{ position: 'absolute', top: 0, left: 0 }} />
                         {rectangles.filter(r => r.visible).map((rect) => {
                             const normalized = normalizeRect(rect);
                             const isSelected = selectedRectIds.includes(rect.id);
-                            const strokeColor = isSelected ? '#f87171' : '#ef4444';
-                            const shapeProps = { stroke: strokeColor, strokeWidth: 2 / viewTransform.scale, fill: "rgba(0,0,0,0.05)", vectorEffect: "non-scaling-stroke" };
-                            const cloudFillColor = isSelected ? 'rgba(248, 113, 113, 0.1)' : 'rgba(239, 68, 68, 0.1)';
+                            const strokeColor = resolveRectStrokeColor(rect, isSelected);
+                            const fillColor = resolveRectFillColor(rect, rect.shape, isSelected, theme);
+                            const sw = 2 / viewTransform.scale;
+                            const shapeProps = {
+                              stroke: strokeColor,
+                              strokeWidth: sw,
+                              fill: fillColor,
+                              vectorEffect: 'non-scaling-stroke' as const,
+                            };
 
                             const pixelWidth = (normalized.width / 100) * imageGeom.width;
                             const pixelHeight = (normalized.height / 100) * imageGeom.height;
@@ -314,11 +521,21 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
 
                             return (
                                 <div key={rect.id} className="absolute" style={{ left: `${left}px`, top: `${top}px`, width: `${pixelWidth}px`, height: `${pixelHeight}px`, pointerEvents: 'none' }}>
-                                    {rect.shape === 'box' && (<div className={`w-full h-full ${isSelected ? 'border-2 border-red-400' : 'border-2 border-red-500'} bg-black/5 dark:bg-white/5`} style={{borderWidth: `${2 / viewTransform.scale}px`}} />)}
+                                    {rect.shape === 'box' && (
+                                      <div
+                                        className="w-full h-full box-border"
+                                        style={{
+                                          borderWidth: sw,
+                                          borderStyle: 'solid',
+                                          borderColor: strokeColor,
+                                          backgroundColor: fillColor === 'transparent' ? 'transparent' : fillColor,
+                                        }}
+                                      />
+                                    )}
                                     {(rect.shape === 'ellipse' || rect.shape === 'cloud') && (
                                         <svg width="100%" height="100%" viewBox={`0 0 ${pixelWidth} ${pixelHeight}`} preserveAspectRatio="none" className="overflow-visible">
                                             {rect.shape === 'ellipse' && (<ellipse cx={pixelWidth / 2} cy={pixelHeight / 2} rx={pixelWidth / 2} ry={pixelHeight / 2} {...shapeProps} />)}
-                                            {rect.shape === 'cloud' && (<path d={generateCloudPath(pixelWidth, pixelHeight)} {...shapeProps} fill={cloudFillColor} />)}
+                                            {rect.shape === 'cloud' && (<path d={generateCloudPath(pixelWidth, pixelHeight)} {...shapeProps} />)}
                                         </svg>
                                     )}
                                 </div>
@@ -369,11 +586,16 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                               }}
                               onMouseEnter={(e) => {
                                   if (draggingPinId || selectedPinId) return;
-                                  if (hidePopupTimer.current) clearTimeout(hidePopupTimer.current);
+                                  if (hidePopupTimer.current) { clearTimeout(hidePopupTimer.current); hidePopupTimer.current = null; }
                                   const pinRect = e.currentTarget.getBoundingClientRect();
-                                  setHoveredItem({ type: 'pin', pin: pin, itemId: pin.id, position: { top: pinRect.top + pinRect.height / 2, left: pinRect.right } });
+                                  const item = { type: 'pin' as const, pin: pin, itemId: pin.id, position: { top: pinRect.top + pinRect.height / 2, left: pinRect.right } };
+                                  if (showPopupTimer.current) clearTimeout(showPopupTimer.current);
+                                  showPopupTimer.current = window.setTimeout(() => setHoveredItem(item), 180);
                               }}
-                              onMouseLeave={() => { hidePopupTimer.current = window.setTimeout(() => setHoveredItem(null), 300); }}
+                              onMouseLeave={() => {
+                                  if (showPopupTimer.current) { clearTimeout(showPopupTimer.current); showPopupTimer.current = null; }
+                                  hidePopupTimer.current = window.setTimeout(() => setHoveredItem(null), 500);
+                              }}
                           >
                               <PinIcon className="w-full h-full drop-shadow-lg" />
                               {isSelected && !pin.locked && (
@@ -405,26 +627,40 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                             <div className="flex items-center gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white">
                                 <button onClick={(e) => selectedRectangle && handlePublishRect(e, selectedRectangle.id)} title="Publish" className="p-2 rounded-md hover:bg-gray-700 transition-colors"><ArrowUpTrayIcon className="w-5 h-5" /></button>
                                 <div className="relative">
-                                    <button onClick={(e) => selectedRectangle && handleLinkRect(e, selectedRectangle.id)} title="Link" className={`p-2 rounded-md transition-colors ${linkMenuRectId === selectedRectangle?.id ? 'bg-blue-500 text-white' : 'hover:bg-gray-700'}`}><LinkIcon className="w-5 h-5" /></button>
+                                    <button onClick={(e) => selectedRectangle && handleLinkRect(e, selectedRectangle.id)} title="Link" className={`p-2 rounded-md transition-colors ${linkMenuRectId === selectedRectangle?.id ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}><LinkIcon className="w-5 h-5" /></button>
                                     {linkMenuRectId === selectedRectangle?.id && (
                                     <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max" onMouseLeave={() => setOpenLinkSubmenu(null)}>
                                         <div className="flex flex-col gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-sm">
                                             <div className="relative" onMouseEnter={() => setOpenLinkSubmenu('rfi')}>
-                                                <div className="flex justify-between items-center px-3 py-1.5 text-white rounded-md hover:bg-blue-500 transition-colors text-left cursor-default">
+                                                <div className="flex justify-between items-center px-3 py-1.5 text-white rounded-md hover:bg-blue-600 transition-colors text-left cursor-default">
                                                     <span>RFI</span>
                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3 ml-4"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
                                                 </div>
                                                 {openLinkSubmenu === 'rfi' && (
                                                     <div className="absolute left-full top-0 ml-1 flex flex-col gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-sm w-max">
-                                                        <button onClick={(e) => selectedRectangle && handleSubmenuLink(e, 'New RFI', selectedRectangle.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-blue-500 transition-colors text-left whitespace-nowrap">New RFI</button>
-                                                        <button onClick={(e) => selectedRectangle && handleSubmenuLink(e, 'Link RFI', selectedRectangle.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-blue-500 transition-colors text-left whitespace-nowrap">Link RFI</button>
+                                                        <button onClick={(e) => selectedRectangle && handleSubmenuLink(e, 'New RFI', selectedRectangle.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-blue-600 transition-colors text-left whitespace-nowrap">New RFI</button>
+                                                        <button onClick={(e) => selectedRectangle && handleSubmenuLink(e, 'Link RFI', selectedRectangle.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-blue-600 transition-colors text-left whitespace-nowrap">Link RFI</button>
                                                     </div>
                                                 )}
                                             </div>
-                                            {['Link Submittal', 'Link Punch', 'Link Drawing', 'Link Photo'].map(type => (<button key={type} onClick={(e) => selectedRectangle && handleSubmenuLink(e, type, selectedRectangle.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-blue-500 transition-colors text-left">{type.replace('Link ','')}</button>))}
+                                            {['Link Submittal', 'Link Punch', 'Link Drawing', 'Link Photo'].map(type => (<button key={type} onClick={(e) => selectedRectangle && handleSubmenuLink(e, type, selectedRectangle.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-blue-600 transition-colors text-left">{type.replace('Link ','')}</button>))}
                                         </div>
                                     </div>
                                     )}
+                                </div>
+                                <div className="relative" data-markup-color-trigger>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setLinkMenuRectId(null);
+                                            setMarkupColorPanelOpen((o) => !o);
+                                        }}
+                                        title="Fill & stroke"
+                                        className={`p-2 rounded-md transition-colors ${markupColorPanelOpen ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
+                                    >
+                                        <Palette className="w-5 h-5" />
+                                    </button>
                                 </div>
                                 <button onClick={(e) => { e.stopPropagation(); onDeleteSelection(); }} title="Delete" className="p-2 rounded-md hover:bg-red-500 hover:text-white transition-colors"><TrashIcon className="w-5 h-5" /></button>
                             </div>
@@ -435,6 +671,19 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     {isMultiSelection && multiSelectionScreenRect && (
                         <div data-interactive-ui="true" className="absolute flex items-center" style={{ left: `${multiSelectionScreenRect.left + multiSelectionScreenRect.width / 2}px`, top: `${multiSelectionScreenRect.top}px`, transform: 'translate(-50%, -100%) translateY(-10px)', pointerEvents: 'auto', zIndex: 30 }}>
                             <div className="flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white">
+                                <div className="relative" data-markup-color-trigger>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setMarkupColorPanelOpen((o) => !o);
+                                        }}
+                                        title="Fill & stroke"
+                                        className={`p-2 rounded-md transition-colors ${markupColorPanelOpen ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
+                                    >
+                                        <Palette className="w-5 h-5" />
+                                    </button>
+                                </div>
                                 <button onClick={(e) => { e.stopPropagation(); onDeleteSelection(); }} title="Delete Selected" className="p-2 rounded-md hover:bg-red-500 hover:text-white transition-colors"><TrashIcon className="w-5 h-5" /></button>
                             </div>
                         </div>
@@ -443,10 +692,34 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     {currentRect && (() => {
                         const normalized = normalizeRect(currentRect);
                         const screenRect = getScreenRect(normalized);
+                        const previewStroke = markupStrokeColor;
+                        const previewFill = markupFillColor === 'transparent' ? 'transparent' : markupFillColor;
+                        const dash = `${6 / viewTransform.scale},${4 / viewTransform.scale}`;
+                        const sw = 2 / viewTransform.scale;
                         if (normalized.shape === 'box') {
-                            return <div className="absolute border-2 border-dashed border-red-400 bg-red-400/20 pointer-events-none" style={screenRect} />;
+                            return (
+                              <div
+                                className="absolute pointer-events-none box-border"
+                                style={{
+                                  ...screenRect,
+                                  borderWidth: sw,
+                                  borderStyle: 'dashed',
+                                  borderColor: previewStroke,
+                                  backgroundColor: previewFill === 'transparent' ? 'transparent' : previewFill,
+                                  opacity: previewFill === 'transparent' ? 1 : 0.85,
+                                }}
+                              />
+                            );
                         }
-                        const svgProps = { stroke: '#f87171', strokeWidth: 2 / viewTransform.scale, fill: "rgba(248, 113, 113, 0.2)", strokeDasharray: `${6 / viewTransform.scale},${4 / viewTransform.scale}`, vectorEffect: "non-scaling-stroke" };
+                        const fillDraw =
+                          previewFill === 'transparent' ? 'rgba(248, 113, 113, 0.08)' : previewFill;
+                        const svgProps = {
+                          stroke: previewStroke,
+                          strokeWidth: sw,
+                          fill: fillDraw,
+                          strokeDasharray: dash,
+                          vectorEffect: 'non-scaling-stroke' as const,
+                        };
                         return (
                             <svg className="absolute pointer-events-none overflow-visible" style={{ left: screenRect.left, top: screenRect.top, width: screenRect.width, height: screenRect.height }}>
                                 {normalized.shape === 'ellipse' && (<ellipse cx={screenRect.width / 2} cy={screenRect.height / 2} rx={screenRect.width / 2} ry={screenRect.height / 2} {...svgProps} />)}
@@ -455,7 +728,258 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         );
                     })()}
 
-                    {marqueeScreenRect && (<div className="absolute border-2 border-dashed border-blue-400 bg-blue-400/20 pointer-events-none" style={marqueeScreenRect} />)}
+                    {marqueeScreenRect && (<div className="absolute border-2 border-dashed border-blue-400 bg-blue-400/15 pointer-events-none" style={marqueeScreenRect} />)}
+
+                    {/* Measurement lines overlay */}
+                    {(measurements.length > 0 || (measStart && measCurrent) || calibLine) && (
+                      <svg
+                        className="pointer-events-none absolute left-0 top-0 h-full w-full overflow-visible"
+                        style={{ zIndex: 22 }}
+                      >
+                        {/* Saved measurements */}
+                        {measurements.filter(m => m.visible).map(m => {
+                          const p1 = getScreenPoint(m.x1, m.y1);
+                          const p2 = getScreenPoint(m.x2, m.y2);
+                          if (!p1 || !p2) return null;
+                          const label = getLiveMeasureLabel(m.x1, m.y1, m.x2, m.y2);
+                          const mx = (p1.left + p2.left) / 2;
+                          const my = (p1.top + p2.top) / 2;
+                          const dx = p2.left - p1.left;
+                          const dy = p2.top - p1.top;
+                          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                          const perpX = -dy / len;
+                          const perpY = dx / len;
+                          const sign = perpY <= 0 ? 1 : -1;
+                          const lx = mx + sign * perpX * 20;
+                          const ly = my + sign * perpY * 20;
+                          const isHovered = hoveredMeasId === m.id;
+                          const isDraggingThis = draggingMeasId === m.id;
+                          const showHandles = activeTool === 'measurement' && drawingScale !== null && (isHovered || isDraggingThis);
+                          return (
+                            <g key={m.id}
+                              className="pointer-events-auto"
+                              onMouseEnter={() => setHoveredMeasId(m.id)}
+                              onMouseLeave={() => setHoveredMeasId(null)}
+                            >
+                              {/* Wider invisible hit area for hover */}
+                              <line x1={p1.left} y1={p1.top} x2={p2.left} y2={p2.top} stroke="transparent" strokeWidth="16" />
+                              {/* Main line */}
+                              <line x1={p1.left} y1={p1.top} x2={p2.left} y2={p2.top} stroke="#3B82F6" strokeWidth={isHovered || isDraggingThis ? 2.5 : 2} />
+                              {/* Tick marks at endpoints (hidden when handles are shown) */}
+                              {!showHandles && <>
+                                <line x1={p1.left - perpX * 6} y1={p1.top - perpY * 6} x2={p1.left + perpX * 6} y2={p1.top + perpY * 6} stroke="#3B82F6" strokeWidth="2" />
+                                <line x1={p2.left - perpX * 6} y1={p2.top - perpY * 6} x2={p2.left + perpX * 6} y2={p2.top + perpY * 6} stroke="#3B82F6" strokeWidth="2" />
+                              </>}
+                              {/* Draggable endpoint handles */}
+                              {showHandles && <>
+                                <circle cx={p1.left} cy={p1.top} r="7" fill="white" stroke="#3B82F6" strokeWidth="2" style={{ cursor: 'grab' }} />
+                                <circle cx={p1.left} cy={p1.top} r="3" fill="#3B82F6" style={{ cursor: 'grab' }} />
+                                <circle cx={p2.left} cy={p2.top} r="7" fill="white" stroke="#3B82F6" strokeWidth="2" style={{ cursor: 'grab' }} />
+                                <circle cx={p2.left} cy={p2.top} r="3" fill="#3B82F6" style={{ cursor: 'grab' }} />
+                              </>}
+                              {/* Label */}
+                              <foreignObject x={lx - 36} y={ly - 12} width="72" height="24" style={{ overflow: 'visible' }}>
+                                <div
+                                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                                >
+                                  <span style={{
+                                    background: '#1d4ed8',
+                                    color: '#fff',
+                                    fontSize: '11px',
+                                    fontWeight: 600,
+                                    padding: '2px 7px',
+                                    borderRadius: '4px',
+                                    whiteSpace: 'nowrap',
+                                    fontFamily: 'monospace',
+                                    letterSpacing: '0.02em',
+                                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                                  }}>
+                                    {label}
+                                  </span>
+                                  {isHovered && activeTool === 'select' && (
+                                    <button
+                                      data-interactive-ui="true"
+                                      onClick={(e) => { e.stopPropagation(); onMeasurementDelete(m.id); setHoveredMeasId(null); }}
+                                      style={{
+                                        background: '#ef4444',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        padding: '2px 5px',
+                                        cursor: 'pointer',
+                                        fontSize: '11px',
+                                        fontWeight: 700,
+                                        lineHeight: 1,
+                                      }}
+                                    >
+                                      ×
+                                    </button>
+                                  )}
+                                </div>
+                              </foreignObject>
+                            </g>
+                          );
+                        })}
+
+                        {/* Live measurement preview */}
+                        {measStart && measCurrent && drawingScale !== null && !isCalibrating && (() => {
+                          const p1 = getScreenPoint(measStart.x, measStart.y);
+                          const p2 = getScreenPoint(measCurrent.x, measCurrent.y);
+                          if (!p1 || !p2) return null;
+                          const label = getLiveMeasureLabel(measStart.x, measStart.y, measCurrent.x, measCurrent.y);
+                          const dx = p2.left - p1.left;
+                          const dy = p2.top - p1.top;
+                          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+                          const perpX = -dy / len;
+                          const perpY = dx / len;
+                          const sign = perpY <= 0 ? 1 : -1;
+                          const lx = (p1.left + p2.left) / 2 + sign * perpX * 20;
+                          const ly = (p1.top + p2.top) / 2 + sign * perpY * 20;
+                          return (
+                            <g>
+                              <line x1={p1.left} y1={p1.top} x2={p2.left} y2={p2.top} stroke="#3B82F6" strokeWidth="2" strokeDasharray="6 3" />
+                              <circle cx={p1.left} cy={p1.top} r="4" fill="#3B82F6" />
+                              <circle cx={p2.left} cy={p2.top} r="4" fill="#3B82F6" />
+                              <foreignObject x={lx - 36} y={ly - 12} width="72" height="24" style={{ overflow: 'visible' }}>
+                                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                                  <span style={{
+                                    background: '#1d4ed8', color: '#fff', fontSize: '11px', fontWeight: 600,
+                                    padding: '2px 7px', borderRadius: '4px', whiteSpace: 'nowrap',
+                                    fontFamily: 'monospace', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                                  }}>
+                                    {label}
+                                  </span>
+                                </div>
+                              </foreignObject>
+                            </g>
+                          );
+                        })()}
+
+                        {/* Calibration line preview (while drawing) */}
+                        {measStart && measCurrent && isCalibrating && (() => {
+                          const p1 = getScreenPoint(measStart.x, measStart.y);
+                          const p2 = getScreenPoint(measCurrent.x, measCurrent.y);
+                          if (!p1 || !p2) return null;
+                          return (
+                            <g>
+                              <line x1={p1.left} y1={p1.top} x2={p2.left} y2={p2.top} stroke="#f59e0b" strokeWidth="2" strokeDasharray="6 3" />
+                              <circle cx={p1.left} cy={p1.top} r="4" fill="#f59e0b" />
+                              <circle cx={p2.left} cy={p2.top} r="4" fill="#f59e0b" />
+                            </g>
+                          );
+                        })()}
+
+                        {/* Drawn calibration line (after release, awaiting input) */}
+                        {calibLine && !measStart && (() => {
+                          const p1 = getScreenPoint(calibLine.x1, calibLine.y1);
+                          const p2 = getScreenPoint(calibLine.x2, calibLine.y2);
+                          if (!p1 || !p2) return null;
+                          return (
+                            <g>
+                              <line x1={p1.left} y1={p1.top} x2={p2.left} y2={p2.top} stroke="#f59e0b" strokeWidth="2" />
+                              <circle cx={p1.left} cy={p1.top} r="4" fill="#f59e0b" />
+                              <circle cx={p2.left} cy={p2.top} r="4" fill="#f59e0b" />
+                            </g>
+                          );
+                        })()}
+                      </svg>
+                    )}
+
+                    {/* Calibration input popup */}
+                    {showCalibInput && calibLine && (() => {
+                      const p1 = getScreenPoint(calibLine.x1, calibLine.y1);
+                      const p2 = getScreenPoint(calibLine.x2, calibLine.y2);
+                      if (!p1 || !p2) return null;
+                      const mx = (p1.left + p2.left) / 2;
+                      const my = Math.min(p1.top, p2.top) - 16;
+
+                      const confirmCalibration = () => {
+                        const ft = parseFloat(calibFt) || 0;
+                        const inches = parseFloat(calibIn) || 0;
+                        const totalFeet = ft + inches / 12;
+                        if (totalFeet <= 0) return;
+                        const pixelDist = getMeasureDistancePx(calibLine.x1, calibLine.y1, calibLine.x2, calibLine.y2);
+                        onDrawingScaleSet(pixelDist / totalFeet);
+                        setIsCalibrating(false);
+                        setShowCalibInput(false);
+                        setCalibLine(null);
+                        setCalibFt('');
+                        setCalibIn('');
+                      };
+
+                      return (
+                        <div
+                          data-interactive-ui="true"
+                          style={{
+                            position: 'absolute',
+                            left: mx,
+                            top: my,
+                            transform: 'translate(-50%, -100%)',
+                            zIndex: 50,
+                          }}
+                          className="bg-gray-900/95 backdrop-blur-sm text-white rounded-xl shadow-xl p-3 min-w-[220px]"
+                        >
+                          <p className="text-xs font-semibold text-gray-300 mb-2">Enter reference length</p>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                value={calibFt}
+                                onChange={e => setCalibFt(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && confirmCalibration()}
+                                placeholder="0"
+                                className="w-16 rounded-lg border border-gray-600 bg-gray-800 px-2 py-1.5 text-sm text-white placeholder:text-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                autoFocus
+                              />
+                              <span className="text-xs text-gray-400">ft</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                max="11"
+                                value={calibIn}
+                                onChange={e => setCalibIn(e.target.value)}
+                                onKeyDown={e => e.key === 'Enter' && confirmCalibration()}
+                                placeholder="0"
+                                className="w-16 rounded-lg border border-gray-600 bg-gray-800 px-2 py-1.5 text-sm text-white placeholder:text-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              />
+                              <span className="text-xs text-gray-400">in</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => { setShowCalibInput(false); setCalibLine(null); setIsCalibrating(false); }}
+                              className="flex-1 rounded-lg border border-gray-600 py-1.5 text-xs font-semibold text-gray-300 transition-colors hover:bg-gray-700"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              onClick={confirmCalibration}
+                              className="flex-1 rounded-lg bg-blue-600 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-500"
+                            >
+                              Set Scale
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* ScaleDialog */}
+                    <ScaleDialog
+                      isOpen={showScaleDialog}
+                      onStartCalibrating={() => {
+                        setShowScaleDialog(false);
+                        setIsCalibrating(true);
+                      }}
+                      onClose={() => {
+                        setShowScaleDialog(false);
+                        if (activeTool === 'measurement' && drawingScale === null) {
+                          setActiveTool('select');
+                        }
+                      }}
+                    />
 
                     {/* Item Tags */}
                     {rectangles.filter(r => r.visible).map(rect => {
@@ -464,7 +988,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         let tagCount = 0;
                         const renderTag = (type: RectangleTagType, item: any, text: string) => {
                             if (!filters[type]) return null;
-                            const tagColorClasses = { rfi: 'bg-cyan-600/85 hover:bg-cyan-500/85', submittal: 'bg-green-600/85 hover:bg-green-500/85', punch: 'bg-orange-600/85 hover:bg-orange-500/85', drawing: 'bg-indigo-600/85 hover:bg-indigo-500/85', photo: 'bg-blue-600/85 hover:bg-blue-500/85' };
+                            const tagColorClasses = { rfi: 'bg-blue-600/85 hover:bg-blue-500/85', submittal: 'bg-slate-600/85 hover:bg-slate-500/85', punch: 'bg-orange-600/90 hover:bg-orange-500/90', drawing: 'bg-indigo-600/85 hover:bg-indigo-500/85', photo: 'bg-sky-600/85 hover:bg-sky-500/85' };
                             const positionIndex = tagCount++;
                             return (
                                 <div
@@ -472,8 +996,17 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     className={`absolute text-white text-xs font-bold px-1.5 py-0.5 rounded-sm shadow-md cursor-pointer transition-colors ${tagColorClasses[type]}`}
                                     style={{ left: `${screenRect.left + screenRect.width + 5}px`, top: `${screenRect.top + positionIndex * 24}px`, pointerEvents: 'auto', zIndex: 25 }}
                                     onClick={(e) => { e.stopPropagation(); if(type === 'rfi') onOpenRfiPanel(rect.id, item.id); if(type === 'photo') { onOpenPhotoViewer({ rectId: rect.id, photoId: item.id }); } }}
-                                    onMouseEnter={(e) => { if (hidePopupTimer.current) clearTimeout(hidePopupTimer.current); const tagRect = e.currentTarget.getBoundingClientRect(); setHoveredItem({ type: type, rectId: rect.id, itemId: item.id, position: { top: tagRect.top + tagRect.height / 2, left: tagRect.right } }); }}
-                                    onMouseLeave={() => { hidePopupTimer.current = window.setTimeout(() => setHoveredItem(null), 300); }}
+                                    onMouseEnter={(e) => {
+                                        if (hidePopupTimer.current) { clearTimeout(hidePopupTimer.current); hidePopupTimer.current = null; }
+                                        const tagRect = e.currentTarget.getBoundingClientRect();
+                                        const hoverInfo = { type: type, rectId: rect.id, itemId: item.id, position: { top: tagRect.top + tagRect.height / 2, left: tagRect.right } };
+                                        if (showPopupTimer.current) clearTimeout(showPopupTimer.current);
+                                        showPopupTimer.current = window.setTimeout(() => setHoveredItem(hoverInfo), 180);
+                                    }}
+                                    onMouseLeave={() => {
+                                        if (showPopupTimer.current) { clearTimeout(showPopupTimer.current); showPopupTimer.current = null; }
+                                        hidePopupTimer.current = window.setTimeout(() => setHoveredItem(null), 500);
+                                    }}
                                 >
                                     {text}
                                 </div>
@@ -490,16 +1023,16 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         );
                     })}
 
-                    <div className="absolute bottom-4 right-4 flex flex-col gap-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-gray-800 dark:text-white">
-                        <button onClick={() => handleZoom('in')} title="Zoom In" className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><MagnifyingGlassPlusIcon className="w-5 h-5"/></button>
-                        <button onClick={() => handleZoom('out')} title="Zoom Out" className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><MagnifyingGlassMinusIcon className="w-5 h-5"/></button>
-                        <button onClick={() => handleZoom('reset')} title="Reset View" className="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"><ArrowsPointingOutIcon className="w-5 h-5"/></button>
+                    <div data-interactive-ui="true" className="absolute bottom-4 right-4 flex flex-col gap-2 bg-gray-900/95 backdrop-blur-sm p-1.5 rounded-lg shadow-xl text-white">
+                        <Tooltip text="Zoom In" shortcut="+" position="left"><button onClick={() => handleZoom('in')} className="p-2 rounded-md hover:bg-gray-700 transition-colors"><MagnifyingGlassPlusIcon className="w-5 h-5"/></button></Tooltip>
+                        <Tooltip text="Zoom Out" shortcut="-" position="left"><button onClick={() => handleZoom('out')} className="p-2 rounded-md hover:bg-gray-700 transition-colors"><MagnifyingGlassMinusIcon className="w-5 h-5"/></button></Tooltip>
+                        <Tooltip text="Reset View" shortcut="0" position="left"><button onClick={() => handleZoom('reset')} className="p-2 rounded-md hover:bg-gray-700 transition-colors"><ArrowsPointingOutIcon className="w-5 h-5"/></button></Tooltip>
                     </div>
                     
                     <div data-interactive-ui="true" ref={settingsMenuRef} className="absolute bottom-4 left-4 flex flex-col items-start gap-2">
                         {isSettingsMenuOpen && (
-                            <div className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-2 rounded-lg shadow-lg mb-1 w-40">
-                               <h4 className="font-semibold text-sm px-2 pb-1.5 mb-1 border-b border-gray-300 dark:border-gray-600">Toolbar Position</h4>
+                            <div className="bg-gray-900/95 backdrop-blur-sm p-2 rounded-lg shadow-xl mb-1 w-40">
+                               <h4 className="font-semibold text-sm px-2 pb-1.5 mb-1 border-b border-gray-600 text-white">Toolbar Position</h4>
                                <div className="flex flex-col gap-1">
                                    <ToolbarPositionButton position="bottom" label="Footer" />
                                    <ToolbarPositionButton position="top" label="Top" />
@@ -508,17 +1041,65 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                </div>
                             </div>
                         )}
-                        <div className="flex gap-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg">
-                            <button onClick={handleThemeToggle} className="p-2 rounded-md transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-white" title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}>
-                                {theme === 'dark' ? (<SunIcon className="w-5 h-5" />) : (<MoonIcon className="w-5 h-5" />)}
-                            </button>
-                            <button onClick={() => setIsSettingsMenuOpen(p => !p)} className="p-2 rounded-md transition-colors duration-200 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-800 dark:text-white" title="Settings">
-                                <CogIcon className="w-5 h-5" />
-                            </button>
+                        <div className="flex gap-2 bg-gray-900/95 backdrop-blur-sm p-1.5 rounded-lg shadow-xl text-white">
+                            <Tooltip text={theme === 'dark' ? 'Light Mode' : 'Dark Mode'} position="top">
+                                <button onClick={handleThemeToggle} className="p-2 rounded-md transition-colors duration-200 hover:bg-gray-700">
+                                    {theme === 'dark' ? (<SunIcon className="w-5 h-5" />) : (<MoonIcon className="w-5 h-5" />)}
+                                </button>
+                            </Tooltip>
+                            <Tooltip text="Toolbar Position" position="top">
+                                <button onClick={() => setIsSettingsMenuOpen(p => !p)} className="p-2 rounded-md transition-colors duration-200 hover:bg-gray-700">
+                                    <CogIcon className="w-5 h-5" />
+                                </button>
+                            </Tooltip>
                         </div>
                     </div>
 
-                    <div className={`absolute z-20 ${getToolbarPositionClasses()}`}>
+                    {markupColorPanelOpen && (() => {
+                        const activeSelectionRect = singleSelectionScreenRect || multiSelectionScreenRect;
+                        const PICKER_W = 300;
+                        const GAP = 12;
+                        let pickerStyle: React.CSSProperties;
+                        if (activeSelectionRect && containerSize.width > 0) {
+                            const markupRight = activeSelectionRect.left + activeSelectionRect.width;
+                            const markupLeft = activeSelectionRect.left;
+                            let left: number;
+                            if (markupRight + GAP + PICKER_W <= containerSize.width - 4) {
+                                left = markupRight + GAP;
+                            } else if (markupLeft - GAP - PICKER_W >= 4) {
+                                left = markupLeft - GAP - PICKER_W;
+                            } else {
+                                left = toolbarPosition === 'right' ? 12 : containerSize.width - PICKER_W - 12;
+                            }
+                            const top = Math.max(8, activeSelectionRect.top - 8);
+                            pickerStyle = { left: `${left}px`, top: `${top}px` };
+                        } else {
+                            pickerStyle = toolbarPosition === 'right'
+                                ? { left: '12px', top: '50%', transform: 'translateY(-50%)' }
+                                : { right: '12px', top: '50%', transform: 'translateY(-50%)' };
+                        }
+                        return (
+                            <div
+                                ref={markupColorPanelRef}
+                                data-interactive-ui="true"
+                                className="pointer-events-auto absolute z-[50] max-h-[min(640px,calc(100%-4rem))] w-[min(300px,calc(100%-1.5rem))] overflow-y-auto overscroll-contain rounded-2xl"
+                                style={pickerStyle}
+                                role="dialog"
+                                aria-label="Markup fill and outline"
+                            >
+                                <MarkupColorPicker
+                                    activeMode={activeColor}
+                                    onActiveModeChange={onMarkupActiveModeChange}
+                                    fillValue={markupFillColor}
+                                    strokeValue={markupStrokeColor}
+                                    onChange={onMarkupColorChange}
+                                    onRequestClose={() => setMarkupColorPanelOpen(false)}
+                                />
+                            </div>
+                        );
+                    })()}
+
+                    <div data-interactive-ui="true" className={`absolute z-20 ${getToolbarPositionClasses()}`}>
                          <Toolbar 
                              activeTool={activeTool} 
                              setActiveTool={setActiveTool} 
@@ -526,8 +1107,11 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                              setActiveShape={setActiveShape} 
                              activePinType={activePinType} 
                              setActivePinType={setActivePinType} 
-                             activeColor={activeColor} 
-                             setActiveColor={setActiveColor}
+                             markupFillColor={markupFillColor}
+                             markupStrokeColor={markupStrokeColor}
+                             markupColorPanelOpen={markupColorPanelOpen}
+                             onMarkupColorPanelToggle={() => setMarkupColorPanelOpen((o) => !o)}
+                             onMarkupColorPanelClose={() => setMarkupColorPanelOpen(false)}
                              toolbarPosition={toolbarPosition}
                          />
                     </div>

@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface TooltipProps {
   text: string;
+  shortcut?: string;
   children: React.ReactNode;
   position?: 'top' | 'bottom' | 'left' | 'right';
 }
 
-const Tooltip: React.FC<TooltipProps> = ({ text, children, position = 'top' }) => {
+const Tooltip: React.FC<TooltipProps> = ({ text, shortcut, children, position = 'top' }) => {
   const [isVisible, setIsVisible] = useState(false);
 
   const getPositionClasses = () => {
@@ -41,10 +42,11 @@ const Tooltip: React.FC<TooltipProps> = ({ text, children, position = 'top' }) =
   };
 
   return (
-    <div 
+    <div
       className="relative flex items-center justify-center"
       onMouseEnter={() => setIsVisible(true)}
       onMouseLeave={() => setIsVisible(false)}
+      onMouseDown={() => setIsVisible(false)}
     >
       {children}
       <AnimatePresence>
@@ -54,9 +56,14 @@ const Tooltip: React.FC<TooltipProps> = ({ text, children, position = 'top' }) =
             animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: getInitialY(), x: getInitialX() }}
             transition={{ duration: 0.15, ease: [0.23, 1, 0.32, 1] }}
-            className={`absolute z-[100] px-3 py-1.5 text-[13px] font-medium text-white bg-gray-900 rounded-md shadow-xl whitespace-nowrap pointer-events-none ${getPositionClasses()}`}
+            className={`absolute z-[100] px-3 py-1.5 text-[13px] font-medium text-white bg-gray-900 rounded-md shadow-xl whitespace-nowrap pointer-events-none flex items-center gap-2 ${getPositionClasses()}`}
           >
-            {text}
+            <span>{text}</span>
+            {shortcut && (
+              <kbd className="px-1.5 py-0.5 text-[11px] font-mono bg-gray-700 rounded border border-gray-600 leading-none">
+                {shortcut}
+              </kbd>
+            )}
             <div className={`absolute border-[5px] border-transparent ${getArrowClasses()}`} />
           </motion.div>
         )}

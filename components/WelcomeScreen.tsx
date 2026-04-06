@@ -8,15 +8,18 @@ interface WelcomeScreenProps {
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onUploadClick }) => {
   return (
-    <div className="flex flex-col items-center justify-center h-full w-full border-4 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center">
-      <UploadIcon className="w-24 h-24 text-gray-400 dark:text-gray-500 mb-4" />
-      <h2 className="text-2xl font-semibold mb-2">Upload Your Blueprint</h2>
-      <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md">Select an image or PDF file to start highlighting.</p>
+    <div className="flex h-full w-full flex-col items-center justify-center bg-gray-50/80 p-8 text-center dark:bg-zinc-900/50">
+      <UploadIcon className="w-24 h-24 text-blue-500 dark:text-blue-400/90 mb-4" />
+      <h2 className="text-2xl font-bold text-gray-900 dark:text-zinc-100 mb-2 tracking-tight">Upload your blueprint</h2>
+      <p className="text-gray-500 dark:text-zinc-400 mb-6 max-w-md text-sm leading-relaxed">
+        Select an image or PDF to start marking up — same workspace as the rest of Linarc.
+      </p>
       <button
+        type="button"
         onClick={onUploadClick}
-        className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 ease-in-out transform hover:scale-105 flex items-center gap-2"
+        className="linarc-btn-brand py-3 px-8 flex items-center gap-2 shadow-linarc-md"
       >
-        <UploadIcon className="w-5 h-5" /> Choose File
+        <UploadIcon className="w-5 h-5" /> Choose file
       </button>
     </div>
   );

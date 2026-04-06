@@ -1,7 +1,166 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Linarc design language (aligned with Linarc-Data-Sheet-Table):
+ * Lato, gray-50 workspace, crisp borders — blue + black accents (Linarc header chrome).
+ */
+@layer base {
+  /* Viewport-based min height so the app fills the window even if a % height chain breaks (iframes, embeds). */
+  html {
+    @apply h-full min-h-screen;
+  }
+
+  body {
+    @apply h-full min-h-0 min-h-screen antialiased bg-gray-50 text-gray-900 font-sans dark:bg-zinc-950 dark:text-zinc-100;
+  }
+
+  #root {
+    @apply flex h-full min-h-0 min-h-screen w-full flex-col;
+  }
+}
+
+@layer components {
+  /* Primary surface inside product chrome — matches datasheet main column */
+  .linarc-workspace-surface {
+    @apply bg-gray-50 dark:bg-zinc-950;
+  }
+
+  .linarc-app-card {
+    @apply bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-linarc;
+  }
+
+  .linarc-btn-primary {
+    @apply font-bold rounded-md px-4 py-2 text-white bg-zinc-900 border-2 border-zinc-950 shadow-sm
+      hover:bg-zinc-800 active:scale-[0.98] transition-all
+      disabled:opacity-50 disabled:pointer-events-none disabled:bg-zinc-400 disabled:border-zinc-500
+      dark:bg-zinc-100 dark:text-zinc-900 dark:border-zinc-200 dark:hover:bg-white;
+  }
+
+  .linarc-btn-brand {
+    @apply font-bold rounded-md px-4 py-2 text-white bg-blue-600 border border-blue-700 shadow-sm
+      hover:bg-blue-700 active:scale-[0.98] transition-all;
+  }
+
+  .linarc-btn-secondary {
+    @apply font-medium rounded-md px-4 py-2 border border-gray-300 dark:border-zinc-600
+      bg-white dark:bg-zinc-800 text-gray-800 dark:text-zinc-100
+      hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors;
+  }
+
+  /* Markup sub-header toolbar — matches Linarc nav-tables: ~13px medium weight, thin icons */
+  .linarc-toolbar-btn-secondary {
+    @apply relative inline-flex h-8 items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 text-[13px] font-medium leading-none text-gray-700
+      transition-colors hover:bg-gray-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700;
+  }
+
+  .linarc-toolbar-btn-primary {
+    @apply inline-flex h-8 items-center justify-center rounded-md border-2 border-zinc-950 bg-zinc-900 px-3.5 text-[13px] font-semibold leading-none text-white shadow-sm
+      transition-all hover:bg-zinc-800 active:scale-[0.98]
+      disabled:pointer-events-none disabled:opacity-50
+      dark:border-zinc-200 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white;
+  }
+
+  .linarc-toolbar-icon {
+    @apply h-4 w-4 shrink-0 text-gray-600 dark:text-zinc-400;
+  }
+
+  .linarc-toolbar-select-trigger {
+    @apply flex h-8 w-full items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-2.5 text-left text-[13px] font-medium leading-tight text-gray-700
+      transition-colors hover:border-gray-300 disabled:cursor-not-allowed disabled:bg-gray-50 dark:border-zinc-600 dark:bg-zinc-800/90 dark:text-zinc-200 dark:hover:border-zinc-500
+      dark:disabled:bg-zinc-900/40;
+  }
+
+  /* Modals & slide-in panels — Linarc datasheet / nav style (white shell, soft shadow, crisp type) */
+  .linarc-modal-overlay {
+    @apply fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6
+      bg-black/45 backdrop-blur-[2px];
+  }
+
+  .linarc-modal-panel {
+    @apply flex w-full flex-col overflow-hidden rounded-2xl border border-gray-200/95 bg-white
+      shadow-[0_22px_50px_-14px_rgba(0,0,0,0.16)] dark:border-zinc-700/90 dark:bg-zinc-900
+      dark:shadow-[0_22px_50px_-14px_rgba(0,0,0,0.45)];
+  }
+
+  .linarc-modal-header {
+    @apply flex-shrink-0 border-b border-gray-100 px-6 pb-4 pt-6 dark:border-zinc-800;
+  }
+
+  .linarc-modal-title {
+    @apply text-lg font-bold tracking-tight text-gray-900 dark:text-zinc-100;
+  }
+
+  .linarc-modal-subtitle {
+    @apply mt-1 text-sm text-gray-500 dark:text-zinc-400;
+  }
+
+  .linarc-modal-close {
+    @apply rounded-md p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800
+      dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100;
+  }
+
+  .linarc-modal-body {
+    @apply min-h-0 flex-1 overflow-y-auto px-6 py-4;
+  }
+
+  .linarc-modal-footer {
+    @apply flex flex-shrink-0 items-center justify-end gap-3 border-t border-gray-100 px-6 py-4 dark:border-zinc-800;
+  }
+
+  .linarc-field-label {
+    @apply mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-500;
+  }
+
+  .linarc-input,
+  .linarc-select,
+  .linarc-textarea {
+    @apply w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 shadow-sm
+      placeholder:text-gray-400 focus:border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-900/10
+      dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100 dark:placeholder:text-zinc-500
+      dark:focus:border-zinc-500 dark:focus:ring-blue-500/20;
+  }
+
+  .linarc-select {
+    @apply appearance-none pr-10;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.625rem center;
+    background-size: 1.125rem 1.125rem;
+  }
+
+  .linarc-textarea {
+    @apply resize-y;
+  }
+
+  .linarc-btn-modal-cancel {
+    @apply rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition-colors
+      hover:bg-gray-100 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200;
+  }
+
+  /* Slide-in detail panels (RFI / Safety / Punch) — same field + chrome language */
+  .linarc-panel-header {
+    @apply flex flex-shrink-0 items-center justify-between gap-2 border-b border-gray-100 px-5 py-2.5 dark:border-zinc-800;
+  }
+
+  .linarc-panel-title {
+    @apply text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400;
+  }
+
+  .linarc-panel-close {
+    @apply rounded-md p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800
+      dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100;
+  }
+
+  .linarc-panel-body {
+    @apply flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-5;
+  }
+
+  .linarc-panel-footer {
+    @apply flex flex-shrink-0 items-center justify-end gap-3 border-t border-gray-100 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900;
+  }
+}
 
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
@@ -18,7 +177,7 @@
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #52525b;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
@@ -26,5 +185,5 @@
 }
 
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+  background: #71717a;
 }

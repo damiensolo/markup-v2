@@ -21,58 +21,82 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, config, onClose, onSelect
 
     if (!isOpen || !config) return null;
 
-    const filteredItems = config.items.filter(item => 
-        config.searchFields.some(field => 
+    const filteredItems = config.items.filter(item =>
+        config.searchFields.some(field =>
             item[field]?.toString().toLowerCase().includes(searchTerm.toLowerCase())
         )
     );
 
     return (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onClick={onClose}>
-            <div 
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg flex flex-col" 
+        <div className="linarc-modal-overlay" onClick={onClose}>
+            <div
+                className="linarc-modal-panel flex max-h-[85vh] max-w-lg flex-col"
                 onClick={e => e.stopPropagation()}
-                style={{maxHeight: '80vh'}}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="link-modal-title"
             >
-                <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                    <div className="flex justify-between items-center">
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">{config.title}</h3>
-                        <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                          <XMarkIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
+                <div className="linarc-modal-header">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                            <h2 id="link-modal-title" className="linarc-modal-title">
+                                {config.title}
+                            </h2>
+                            <p className="linarc-modal-subtitle">Select an item to link to this markup.</p>
+                        </div>
+                        <button type="button" onClick={onClose} className="linarc-modal-close shrink-0" aria-label="Close">
+                            <XMarkIcon className="h-5 w-5" />
                         </button>
                     </div>
-                    <input 
-                        type="text" 
-                        placeholder="Search..."
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md p-2 mt-4 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" 
-                    />
+                    <div className="mt-5">
+                        <label htmlFor="link-modal-search" className="linarc-field-label">
+                            Search
+                        </label>
+                        <input
+                            id="link-modal-search"
+                            type="text"
+                            placeholder="Search…"
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            className="linarc-input"
+                        />
+                    </div>
                 </div>
-                <ul className="overflow-y-auto p-4">
-                    {filteredItems.length > 0 ? filteredItems.map(item => (
-                        <li key={item.id}>
-                            <button 
-                                onClick={() => onSelect(item)}
-                                className="w-full text-left p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            >
-                                {config.displayFields.map(field => (
-                                    <span key={field.key} className="font-semibold text-gray-800 dark:text-gray-200 mr-4">{item[field.key]}</span>
-                                ))}
-                            </button>
-                        </li>
-                    )) : (
-                        <li className="p-4 text-center text-gray-500 dark:text-gray-400">No items found.</li>
+
+                <ul className="custom-scrollbar min-h-0 flex-1 list-none overflow-y-auto px-3 py-2 sm:px-4">
+                    {filteredItems.length > 0 ? (
+                        filteredItems.map(item => (
+                            <li key={item.id} className="border-b border-gray-50 last:border-0 dark:border-zinc-800/80">
+                                <button
+                                    type="button"
+                                    onClick={() => onSelect(item)}
+                                    className="w-full rounded-lg px-3 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-zinc-800/80"
+                                >
+                                    {config.displayFields.map(field => (
+                                        <span
+                                            key={field.key}
+                                            className="mr-4 text-sm font-medium text-gray-900 dark:text-zinc-100"
+                                        >
+                                            {item[field.key]}
+                                        </span>
+                                    ))}
+                                </button>
+                            </li>
+                        ))
+                    ) : (
+                        <li className="px-3 py-8 text-center text-sm text-gray-500 dark:text-zinc-500">No items found.</li>
                     )}
                 </ul>
+
                 {config.type === 'photo' && (
-                    <div className="p-4 border-t border-gray-200 dark:border-gray-700 text-center">
-                        <button 
+                    <div className="linarc-modal-footer !justify-center">
+                        <button
+                            type="button"
                             onClick={onUploadRequest}
-                            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 mx-auto"
+                            className="linarc-btn-primary inline-flex w-full max-w-md items-center justify-center gap-2 py-2.5 sm:w-auto"
                         >
-                            <UploadIcon className="w-5 h-5" />
-                            Upload from Computer
+                            <UploadIcon className="h-5 w-5" />
+                            Upload from computer
                         </button>
                     </div>
                 )}

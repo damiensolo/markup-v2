@@ -6,6 +6,25 @@ export interface RfiData {
   title: string;
   type: string;
   question: string;
+  priority?: string;
+  sequence?: string;
+  location?: string;
+  scheduleImpact?: 'Yes' | 'No';
+  costImpact?: 'Yes' | 'No';
+  answer?: string;
+}
+
+/** Form state for create / edit RFI panel (matches product RFI workflow). */
+export interface RfiFormState {
+  title: string;
+  type: string;
+  question: string;
+  priority: string;
+  sequence: string;
+  location: string;
+  scheduleImpact: 'Yes' | 'No';
+  costImpact: 'Yes' | 'No';
+  answer: string;
 }
 
 /**
@@ -112,6 +131,10 @@ export interface Rectangle {
   height: number;
   name: string;
   visible: boolean;
+  /** Fill: hex, rgba, or 'transparent'. Omitted = legacy default. */
+  fillColor?: string;
+  /** Stroke: hex or rgba. Omitted = legacy red. */
+  strokeColor?: string;
   locked?: boolean;
   rfi?: RfiData[];
   submittals?: SubmittalData[];
@@ -197,4 +220,13 @@ export interface InteractionState {
   initialRects?: Rectangle[];
   handle?: ResizeHandle;
   initialTransform?: ViewTransform;
+}
+
+export interface Measurement {
+  id: string;
+  x1: number; // % of image width
+  y1: number; // % of image height
+  x2: number;
+  y2: number;
+  visible: boolean;
 }

@@ -14,7 +14,7 @@ type MarkupTool = 'shape' | 'pen' | 'arrow' | 'text';
 const ToolButton: React.FC<{label: string; icon: React.ReactNode; isActive: boolean; onClick: () => void;}> = ({ label, icon, isActive, onClick }) => (
     <button
         onClick={onClick}
-        className={`p-2.5 rounded-lg transition-colors duration-200 ${isActive ? 'bg-blue-500 text-white' : 'text-white hover:bg-gray-700'}`}
+        className={`p-2.5 rounded-lg transition-colors duration-200 ${isActive ? 'bg-blue-600 text-white' : 'text-white hover:bg-gray-700'}`}
         title={label}
     >
         <div className="w-5 h-5">{icon}</div>
@@ -227,24 +227,31 @@ const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({ isOpen, photoData, 
     }
 
     return (
-        <div className="fixed inset-0 bg-black/70 z-[110] flex items-center justify-center p-4" onClick={onClose}>
+        <div className="linarc-modal-overlay !z-[110]" onClick={onClose}>
             <div 
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-6xl flex flex-col relative" 
+                className="linarc-modal-panel relative flex max-h-[90vh] w-full max-w-6xl flex-col" 
                 onClick={e => e.stopPropagation()}
                 style={{height: '90vh'}}
+                role="dialog"
+                aria-modal="true"
             >
-                <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">{photoData.title}</h3>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                        <XMarkIcon className="w-6 h-6 text-gray-500 dark:text-gray-400" />
-                    </button>
+                <div className="linarc-modal-header !pb-4">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                            <h3 className="linarc-modal-title truncate">{photoData.title}</h3>
+                            <p className="linarc-modal-subtitle">Markup tools · click photo to draw</p>
+                        </div>
+                        <button type="button" onClick={onClose} className="linarc-modal-close shrink-0" aria-label="Close">
+                            <XMarkIcon className="h-5 w-5" />
+                        </button>
+                    </div>
                 </div>
-                <div className="flex-grow p-4 overflow-hidden flex items-center justify-center relative">
+                <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-gray-50/80 p-4 dark:bg-zinc-950/40">
                     <div className="absolute top-6 left-1/2 -translate-x-1/2 z-20 flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white">
                         <div ref={shapeMenuRef} className="relative">
                             <button
                                 onClick={() => { setActiveTool('shape'); setShapeMenuOpen(p => !p); }}
-                                className={`relative p-2.5 rounded-lg transition-colors duration-200 ${activeTool === 'shape' ? 'bg-blue-500 text-white' : 'text-white hover:bg-gray-700'}`}
+                                className={`relative p-2.5 rounded-lg transition-colors duration-200 ${activeTool === 'shape' ? 'bg-blue-600 text-white' : 'text-white hover:bg-gray-700'}`}
                                 title={currentShapeTool.label}
                             >
                                 <div className="w-5 h-5">{currentShapeTool.icon}</div>
@@ -255,7 +262,7 @@ const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({ isOpen, photoData, 
                             {isShapeMenuOpen && (
                                 <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg">
                                     {shapeTools.map(shape => (
-                                        <button key={shape.id} onClick={() => { setActiveShape(shape.id); setShapeMenuOpen(false); }} title={shape.label} className={`p-2 rounded-lg transition-colors ${activeShape === shape.id ? 'bg-blue-500' : 'hover:bg-gray-700'}`}>{shape.icon}</button>
+                                        <button key={shape.id} onClick={() => { setActiveShape(shape.id); setShapeMenuOpen(false); }} title={shape.label} className={`p-2 rounded-lg transition-colors ${activeShape === shape.id ? 'bg-blue-600' : 'hover:bg-gray-700'}`}>{shape.icon}</button>
                                     ))}
                                 </div>
                             )}

@@ -11,7 +11,7 @@ interface SidebarRailProps {
 }
 
 const SidebarRail: React.FC<SidebarRailProps> = ({ side, activePanel, onTogglePanel, isLayersOpen, onToggleLayers }) => {
-  const railClasses = `flex flex-col items-center gap-4 py-4 w-12 bg-gray-900 border-gray-700/50 flex-shrink-0 z-30 ${
+  const railClasses = `flex flex-col items-center gap-4 py-4 w-12 bg-gray-900 border-gray-700/50 flex-shrink-0 z-30 overflow-visible ${
     side === 'left' ? 'border-r' : 'border-l'
   }`;
 
@@ -20,11 +20,11 @@ const SidebarRail: React.FC<SidebarRailProps> = ({ side, activePanel, onTogglePa
   return (
     <div className={railClasses}>
       {side === 'left' ? (
-        <Tooltip text="Layers" position={tooltipPos}>
+        <Tooltip text={isLayersOpen ? 'Close Layers' : 'Open Layers'} position={tooltipPos}>
           <button
             onClick={onToggleLayers}
             className={`p-2 rounded-lg transition-all duration-200 ${
-              isLayersOpen ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+              isLayersOpen ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
             }`}
           >
             <LayersIcon className="w-6 h-6" />
@@ -36,7 +36,7 @@ const SidebarRail: React.FC<SidebarRailProps> = ({ side, activePanel, onTogglePa
             <button
               onClick={() => onTogglePanel('rfi')}
               className={`p-2 rounded-lg transition-all duration-200 ${
-                activePanel === 'rfi' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                activePanel === 'rfi' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
               }`}
             >
               <DocumentDuplicateIcon className="w-6 h-6" />
@@ -56,7 +56,7 @@ const SidebarRail: React.FC<SidebarRailProps> = ({ side, activePanel, onTogglePa
             <button
               onClick={() => onTogglePanel('punch')}
               className={`p-2 rounded-lg transition-all duration-200 ${
-                activePanel === 'punch' ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                activePanel === 'punch' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/25' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
               }`}
             >
               <PunchPinIcon className="w-6 h-6" />

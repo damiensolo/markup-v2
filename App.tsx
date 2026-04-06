@@ -1,19 +1,29 @@
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import type { Rectangle, RfiData, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet } from './types';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import type { Rectangle, RfiData, RfiFormState, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet, Measurement } from './types';
 import LinkModal from './components/LinkModal';
 import PhotoViewerModal from './components/PhotoViewerModal';
 import ShareModal from './components/ShareModal';
+import DownloadOptionsModal from './components/DownloadOptionsModal';
+import PublishWarningModal from './components/PublishWarningModal';
 import RfiPanel from './components/RfiPanel';
 import SafetyPanel from './components/SafetyPanel';
 import PunchPanel from './components/PunchPanel';
 import HoverPopup from './components/HoverPopup';
+import Tooltip from './components/Tooltip';
 import WelcomeScreen from './components/WelcomeScreen';
 import CanvasView from './components/CanvasView';
 import { useZoomPan } from './hooks/useZoomPan';
 import { useCanvasInteraction } from './hooks/useCanvasInteraction';
+import {
+  resolveRectFillColor,
+  resolveRectStrokeColor,
+  DEFAULT_MARKUP_FILL,
+} from './utils/markupColors';
 import LayersPanel from './components/LayersPanel';
-import { FilterIcon, ChevronLeftIcon, ShareIcon, DocumentDuplicateIcon, FolderOpenIcon, PanelLeftIcon, PanelRightIcon } from './components/Icons';
+import { LinarcAppShell } from './components/linarcShell/LinarcAppShell';
+import { FilterIcon, ChevronLeftIcon, ShareIcon, SnapshotIcon, DocumentDuplicateIcon, FolderOpenIcon, PanelLeftIcon, PanelRightIcon } from './components/Icons';
 
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 export type RectangleTagType = Exclude<FilterCategory, 'safety'>;
@@ -27,11 +37,23 @@ export interface ImageGeom {
 }
 
 const mockRfis: RfiData[] = [
-    { id: 101, title: 'Clarification on beam specification', type: 'Design Clarification', question: 'The structural drawing S-2.1 specifies a W12x26 beam, but the architectural drawing A-5.0 shows a W14x22. Please clarify which is correct.' },
-    { id: 102, title: 'Permission to use alternative sealant', type: 'Material Substitution', question: 'The specified sealant Dow Corning 795 is unavailable with a 6-week lead time. Can we substitute with Pecora 890, which has equivalent performance characteristics? Datasheet attached.' },
-    { id: 103, title: 'Unexpected conduit in wall cavity', type: 'Field Condition', question: 'During demolition of the partition wall in Room 204, we discovered an undocumented electrical conduit. Please advise on whether it is live and if it needs to be relocated.' },
-    { id: 104, title: 'Location of thermostat in Lobby', type: 'General Inquiry', question: 'The MEP drawings do not specify the exact mounting location for the main lobby thermostat. Please provide a location.' },
+    { id: 101, title: 'Clarification on beam specification', type: 'Design Clarification', question: 'The structural drawing S-2.1 specifies a W12x26 beam, but the architectural drawing A-5.0 shows a W14x22. Please clarify which is correct.', priority: 'High', scheduleImpact: 'Yes', costImpact: 'No' },
+    { id: 102, title: 'Permission to use alternative sealant', type: 'Material Substitution', question: 'The specified sealant Dow Corning 795 is unavailable with a 6-week lead time. Can we substitute with Pecora 890, which has equivalent performance characteristics? Datasheet attached.', priority: 'Medium', scheduleImpact: 'Yes', costImpact: 'Yes' },
+    { id: 103, title: 'Unexpected conduit in wall cavity', type: 'Field Condition', question: 'During demolition of the partition wall in Room 204, we discovered an undocumented electrical conduit. Please advise on whether it is live and if it needs to be relocated.', priority: 'High', scheduleImpact: 'No', costImpact: 'No' },
+    { id: 104, title: 'Location of thermostat in Lobby', type: 'General Inquiry', question: 'The MEP drawings do not specify the exact mounting location for the main lobby thermostat. Please provide a location.', priority: 'Low', scheduleImpact: 'No', costImpact: 'No' },
 ];
+
+const DEFAULT_RFI_FORM: RfiFormState = {
+  title: '',
+  type: '',
+  question: '',
+  priority: '',
+  sequence: '',
+  location: '',
+  scheduleImpact: 'Yes',
+  costImpact: 'Yes',
+  answer: '',
+};
 
 const mockSubmittals: SubmittalData[] = [
     { id: 'SUB-001', title: 'Structural Steel Shop Drawings', specSection: '05 12 00', status: 'In Review' },
@@ -169,8 +191,9 @@ interface DrawingSelectorProps {
     drawings: DrawingData[];
     value: DrawingData | null;
     onChange: (drawing: DrawingData) => void;
+    className?: string;
 }
-const DrawingSelector: React.FC<DrawingSelectorProps> = ({ drawings, value, onChange }) => {
+const DrawingSelector: React.FC<DrawingSelectorProps> = ({ drawings, value, onChange, className = '' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const selectorRef = useRef<HTMLDivElement>(null);
@@ -191,18 +214,18 @@ const DrawingSelector: React.FC<DrawingSelectorProps> = ({ drawings, value, onCh
     );
 
     return (
-        <div className="relative w-[19.5rem]" ref={selectorRef}>
+        <div className={`relative min-w-0 ${className}`} ref={selectorRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full h-10 flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-left text-sm"
+                className="linarc-toolbar-select-trigger"
             >
-                <span className="truncate text-gray-800 dark:text-gray-200">{value ? `${value.id} - ${value.title}` : 'Select a drawing'}</span>
-                <svg className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <span className="min-w-0 flex-1 truncate">{value ? `${value.id} - ${value.title}` : 'Select a drawing'}</span>
+                <svg className={`linarc-toolbar-icon shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
             {isOpen && (
-                <div className="absolute top-full mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-2">
+                <div className="absolute top-full mt-1 min-w-full w-max max-w-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-2">
                     <input
                         type="text"
                         placeholder="Search drawings..."
@@ -237,8 +260,9 @@ interface DrawingVersionSelectorProps {
     value: DrawingVersion | null;
     onChange: (version: DrawingVersion) => void;
     disabled: boolean;
+    className?: string;
 }
-const DrawingVersionSelector: React.FC<DrawingVersionSelectorProps> = ({ versions, value, onChange, disabled }) => {
+const DrawingVersionSelector: React.FC<DrawingVersionSelectorProps> = ({ versions, value, onChange, disabled, className = '' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const selectorRef = useRef<HTMLDivElement>(null);
 
@@ -253,19 +277,19 @@ const DrawingVersionSelector: React.FC<DrawingVersionSelectorProps> = ({ version
     }, []);
 
     return (
-        <div className="relative w-56" ref={selectorRef}>
+        <div className={`relative min-w-0 ${className}`} ref={selectorRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 disabled={disabled}
-                className="w-full h-10 flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-left text-sm disabled:bg-gray-100 disabled:dark:bg-gray-700/50 disabled:cursor-not-allowed"
+                className="linarc-toolbar-select-trigger disabled:text-gray-400 dark:disabled:text-zinc-500"
             >
-                <span className="truncate text-gray-800 dark:text-gray-200">{value ? `${value.name} (${value.timestamp})` : 'Select version'}</span>
-                <svg className={`w-4 h-4 text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <span className="min-w-0 flex-1 truncate">{value ? `${value.name} (${value.timestamp})` : 'Select version'}</span>
+                <svg className={`linarc-toolbar-icon shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
             </button>
             {isOpen && (
-                <div className="absolute top-full mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-2">
+                <div className="absolute top-full mt-1 min-w-full w-max max-w-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-2">
                     <ul className="max-h-60 overflow-y-auto">
                         {versions.map(v => (
                             <li key={v.id}>
@@ -322,13 +346,14 @@ const MarkupSetSelector: React.FC<MarkupSetSelectorProps> = ({ markupSets, loade
              <button
                 onClick={() => setIsOpen(!isOpen)}
                 disabled={disabled}
-                className="h-10 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-3 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="linarc-toolbar-btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Load Markup Sets"
+                type="button"
             >
-                <FolderOpenIcon className="w-5 h-5" />
+                <FolderOpenIcon className="linarc-toolbar-icon" />
                 <span className="hidden sm:inline">Load Markup</span>
                 {loadedCount > 0 && (
-                    <span className="bg-blue-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center -ml-1">
+                    <span className="-ml-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-blue-600 px-1 text-[11px] font-medium text-white">
                         {loadedCount}
                     </span>
                 )}
@@ -357,13 +382,13 @@ const MarkupSetSelector: React.FC<MarkupSetSelectorProps> = ({ markupSets, loade
                                         <li key={set.id}>
                                             <button
                                                 onClick={() => onToggle(set)}
-                                                className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-start gap-3 ${isLoaded ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                                className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors flex items-start gap-3 ${isLoaded ? 'bg-blue-50 dark:bg-blue-950/40' : 'hover:bg-gray-100 dark:hover:bg-zinc-700'}`}
                                             >
-                                                <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isLoaded ? 'bg-blue-500 border-blue-500 text-white' : 'border-gray-400 dark:border-gray-500'}`}>
+                                                <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${isLoaded ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-400 dark:border-zinc-500'}`}>
                                                     {isLoaded && <svg viewBox="0 0 14 14" fill="none" className="w-3 h-3"><path d="M3 7L5.5 9.5L11.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                                                 </div>
                                                 <div className="flex-grow">
-                                                    <p className={`font-semibold ${isLoaded ? 'text-blue-700 dark:text-blue-300' : 'text-gray-800 dark:text-gray-200'}`}>{set.name}</p>
+                                                    <p className={`font-semibold ${isLoaded ? 'text-blue-800 dark:text-blue-300' : 'text-gray-800 dark:text-zinc-200'}`}>{set.name}</p>
                                                     <div className="flex justify-between items-center mt-1">
                                                         <p className="text-xs text-gray-500">{set.author}</p>
                                                         <p className="text-xs text-gray-400">{set.timestamp}</p>
@@ -392,6 +417,7 @@ interface HeaderProps {
     hasUnsavedChanges: boolean;
     onSave: () => void;
     onShare: () => void;
+    onDownload: () => void;
     filters: Record<FilterCategory, boolean>;
     areFiltersActive: boolean;
     isFilterMenuOpen: boolean;
@@ -401,10 +427,6 @@ interface HeaderProps {
     markupSets: MarkupSet[];
     loadedSetIds: string[];
     onToggleMarkupSet: (set: MarkupSet) => void;
-    isLeftSidebarOpen: boolean;
-    onToggleLeftSidebar: () => void;
-    isRightSidebarOpen: boolean;
-    onToggleRightSidebar: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -417,6 +439,7 @@ const Header: React.FC<HeaderProps> = ({
     hasUnsavedChanges, 
     onSave, 
     onShare, 
+    onDownload,
     filters, 
     areFiltersActive, 
     isFilterMenuOpen, 
@@ -425,11 +448,7 @@ const Header: React.FC<HeaderProps> = ({
     handleToggleAllFilters, 
     markupSets, 
     loadedSetIds, 
-    onToggleMarkupSet,
-    isLeftSidebarOpen,
-    onToggleLeftSidebar,
-    isRightSidebarOpen,
-    onToggleRightSidebar
+    onToggleMarkupSet
 }) => {
     const filterMenuRef = useRef<HTMLDivElement>(null);
 
@@ -444,21 +463,13 @@ const Header: React.FC<HeaderProps> = ({
     }, [setIsFilterMenuOpen]);
 
     return (
-        <div className="flex justify-between items-center p-2 border-b border-gray-200 dark:border-gray-700 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-                <button 
-                    onClick={onToggleLeftSidebar} 
-                    className={`h-10 w-10 flex items-center justify-center rounded-md transition-colors ${isLeftSidebarOpen ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'}`} 
-                    title={isLeftSidebarOpen ? "Close Left Sidebar" : "Open Left Sidebar"}
-                >
-                    <PanelLeftIcon className="w-5 h-5" />
+        <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900/95">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                <button type="button" onClick={onBack} className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-gray-200 dark:text-zinc-400 dark:hover:bg-zinc-800" title="Back to drawings">
+                    <ChevronLeftIcon className="h-5 w-5" />
                 </button>
-                <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-1" />
-                <button onClick={onBack} className="h-10 w-10 flex items-center justify-center rounded-md hover:bg-gray-200 dark:hover:bg-gray-700" title="Back to drawings">
-                    <ChevronLeftIcon className="w-6 h-6 text-gray-600 dark:text-gray-400" />
-                </button>
-                <DrawingSelector drawings={allDrawings} value={currentDrawing} onChange={onDrawingChange} />
-                <DrawingVersionSelector versions={currentDrawing?.versions || []} value={currentVersion} onChange={onVersionChange} disabled={!currentDrawing} />
+                <DrawingSelector drawings={allDrawings} value={currentDrawing} onChange={onDrawingChange} className="w-auto min-w-[8rem] max-w-[22rem] shrink" />
+                <DrawingVersionSelector versions={currentDrawing?.versions || []} value={currentVersion} onChange={onVersionChange} disabled={!currentDrawing} className="w-auto min-w-[8rem] max-w-[13rem] flex-shrink-0" />
                 <MarkupSetSelector
                     markupSets={currentDrawing ? markupSets.filter(s => s.drawingId === currentDrawing?.id && s.versionId === currentVersion?.id) : markupSets}
                     loadedSetIds={loadedSetIds}
@@ -466,15 +477,17 @@ const Header: React.FC<HeaderProps> = ({
                     disabled={false}
                 />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
                  <div ref={filterMenuRef} className="relative">
-                    <button onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)} className={`h-10 relative bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600`}>
-                        <FilterIcon className="w-5 h-5" /> Filter
-                        {areFiltersActive && <span className="absolute -top-1 -right-1 block h-3 w-3 rounded-full bg-blue-500 border-2 border-white dark:border-gray-800" />}
+                    <Tooltip text="Filter items" position="bottom">
+                    <button type="button" onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)} className="linarc-toolbar-btn-secondary relative">
+                        <FilterIcon className="linarc-toolbar-icon" /> Filter
+                        {areFiltersActive && <span className="absolute -right-0.5 -top-0.5 block h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-zinc-800" />}
                     </button>
+                    </Tooltip>
                     {isFilterMenuOpen && (
-                        <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-4">
-                           <div className="flex justify-between items-center pb-2 border-b border-gray-200 dark:border-gray-700 mb-2">
+                        <div className="absolute top-full right-0 mt-2 w-64 bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-linarc-md z-50 p-4">
+                           <div className="flex justify-between items-center pb-2 border-b border-gray-200 dark:border-zinc-700 mb-2">
                                 <h4 className="font-semibold">Filter Items</h4>
                                 <button onClick={handleToggleAllFilters} className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline">
                                     {Object.values(filters).every(v => v) ? 'Hide All' : 'Show All'}
@@ -486,7 +499,7 @@ const Header: React.FC<HeaderProps> = ({
                                         <span className="capitalize text-sm text-gray-700 dark:text-gray-300">{key.replace('punch', 'Punch Item').replace('safety', 'Safety Issue')}</span>
                                         <div className="relative">
                                             <input type="checkbox" className="sr-only" checked={filters[key]} onChange={() => handleFilterChange(key)} />
-                                            <div className={`block w-10 h-6 rounded-full transition-colors ${filters[key] ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                                            <div className={`block w-10 h-6 rounded-full transition-colors ${filters[key] ? 'bg-blue-600' : 'bg-gray-300 dark:bg-zinc-600'}`}></div>
                                             <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${filters[key] ? 'transform translate-x-4' : ''}`}></div>
                                         </div>
                                     </label>
@@ -495,31 +508,134 @@ const Header: React.FC<HeaderProps> = ({
                         </div>
                     )}
                 </div>
-                <button onClick={onShare} className="h-10 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600">
-                    <ShareIcon className="w-5 h-5" /> Share
-                </button>
-                <button onClick={() => alert('Compare functionality not implemented')} className="h-10 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-semibold py-2 px-4 rounded-lg transition-colors duration-200 flex items-center gap-2 border border-gray-300 dark:border-gray-600">
-                    <DocumentDuplicateIcon className="w-5 h-5" /> Compare
-                </button>
+                <Tooltip text="Share drawing" position="bottom">
+                    <button type="button" onClick={onShare} className="linarc-toolbar-btn-secondary">
+                        <ShareIcon className="linarc-toolbar-icon" /> Share
+                    </button>
+                </Tooltip>
+                <Tooltip text="Download snapshot" position="bottom">
+                    <button type="button" onClick={onDownload} className="linarc-toolbar-btn-secondary">
+                        <SnapshotIcon className="linarc-toolbar-icon" /> Snapshot
+                    </button>
+                </Tooltip>
+                <Tooltip text="Compare versions" position="bottom">
+                    <button type="button" onClick={() => alert('Compare functionality not implemented')} className="linarc-toolbar-btn-secondary">
+                        <DocumentDuplicateIcon className="linarc-toolbar-icon" /> Compare
+                    </button>
+                </Tooltip>
                 <button
+                    type="button"
                     onClick={onSave}
                     disabled={!hasUnsavedChanges}
-                    className="h-10 font-bold py-2 px-4 rounded-lg transition-colors duration-200 disabled:bg-gray-300 disabled:dark:bg-gray-600 disabled:text-gray-500 disabled:cursor-not-allowed bg-blue-500 hover:bg-blue-600 text-white flex items-center gap-2"
+                    className="linarc-toolbar-btn-primary"
                 >
                     Save Markup
-                </button>
-                <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 mx-1" />
-                <button 
-                    onClick={onToggleRightSidebar} 
-                    className={`h-10 w-10 flex items-center justify-center rounded-md transition-colors ${isRightSidebarOpen ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400' : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'}`} 
-                    title={isRightSidebarOpen ? "Close Right Sidebar" : "Open Right Sidebar"}
-                >
-                    <PanelRightIcon className="w-5 h-5" />
                 </button>
             </div>
         </div>
     );
-}
+};
+
+/** Floats over the canvas to open a panel only. Close uses panel chrome (layers header / right panel header). */
+const CanvasSidebarFloatToggles: React.FC<{
+    isLayersOpen: boolean;
+    onToggleLayers: () => void;
+    isRightPanelOpen: boolean;
+    onToggleRightPanel: () => void;
+}> = ({ isLayersOpen, onToggleLayers, isRightPanelOpen, onToggleRightPanel }) => {
+    const reduceMotion = useReducedMotion();
+    const [showLeftFloat, setShowLeftFloat] = useState(false);
+    const [showRightFloat, setShowRightFloat] = useState(false);
+
+    useEffect(() => {
+        if (isLayersOpen) {
+            setShowLeftFloat(false);
+            return;
+        }
+        setShowLeftFloat(true);
+    }, [isLayersOpen]);
+
+    useEffect(() => {
+        if (isRightPanelOpen) {
+            setShowRightFloat(false);
+            return;
+        }
+        setShowRightFloat(true);
+    }, [isRightPanelOpen]);
+
+    const introSpring = reduceMotion
+        ? { duration: 0.12, delay: 0 }
+        : {
+              type: 'spring' as const,
+              stiffness: 520,
+              damping: 22,
+              mass: 0.65,
+              delay: 0,
+          };
+    const exitEase = reduceMotion ? { duration: 0.1, delay: 0 } : { duration: 0.18, delay: 0, ease: [0.32, 0.72, 0, 1] as const };
+
+    const openPill =
+        'inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300/90 bg-gray-100/95 text-gray-700 shadow-lg backdrop-blur-sm transition-colors hover:bg-gray-200/90 dark:border-zinc-600 dark:bg-zinc-800/95 dark:text-zinc-200 dark:hover:bg-zinc-700/90';
+
+    const hidden = reduceMotion
+        ? { opacity: 0, scale: 0.96 }
+        : { opacity: 0, scale: 0.78, y: 6, filter: 'blur(8px)' };
+    const visible = reduceMotion
+        ? { opacity: 1, scale: 1 }
+        : { opacity: 1, scale: 1, y: 0, filter: 'blur(0px)' };
+    const exit = reduceMotion
+        ? { opacity: 0, scale: 0.96 }
+        : { opacity: 0, scale: 0.9, y: 3, filter: 'blur(3px)' };
+
+    return (
+        <div className="pointer-events-none absolute inset-0 z-30" role="toolbar" aria-label="Open side panels">
+            <AnimatePresence mode="sync">
+                {showLeftFloat && (
+                    <motion.div
+                        key="sidebar-float-left"
+                        className="pointer-events-auto absolute left-3 top-3 will-change-transform"
+                        style={{ transformOrigin: '20% 50%' }}
+                        initial={hidden}
+                        animate={{ ...visible, transition: introSpring }}
+                        exit={{ ...exit, transition: exitEase }}
+                    >
+                        <Tooltip text="Layers" position="right">
+                            <button
+                                type="button"
+                                onClick={onToggleLayers}
+                                className={openPill}
+                                aria-label="Open layers panel"
+                            >
+                                <PanelLeftIcon className="h-5 w-5" />
+                            </button>
+                        </Tooltip>
+                    </motion.div>
+                )}
+                {showRightFloat && (
+                    <motion.div
+                        key="sidebar-float-right"
+                        className="pointer-events-auto absolute right-3 top-3 will-change-transform"
+                        style={{ transformOrigin: '80% 50%' }}
+                        initial={hidden}
+                        animate={{ ...visible, transition: introSpring }}
+                        exit={{ ...exit, transition: exitEase }}
+                    >
+                        <Tooltip text="Details" position="left">
+                            <button
+                                type="button"
+                                onClick={onToggleRightPanel}
+                                className={openPill}
+                                aria-label="Open details panel"
+                            >
+                                <PanelRightIcon className="h-5 w-5" />
+                            </button>
+                        </Tooltip>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
 
 
 const App: React.FC = () => {
@@ -527,6 +643,8 @@ const App: React.FC = () => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [rectangles, setRectangles] = useState<Rectangle[]>([]);
   const [pins, setPins] = useState<Pin[]>([]);
+  const [measurements, setMeasurements] = useState<Measurement[]>([]);
+  const [drawingScale, setDrawingScale] = useState<number | null>(null); // natural img pixels per foot
   const [allRfis, setAllRfis] = useState<RfiData[]>(mockRfis);
   const [allPhotos, setAllPhotos] = useState<PhotoData[]>(mockPhotos);
   const [allPunches, setAllPunches] = useState<PunchData[]>(mockPunches);
@@ -549,13 +667,15 @@ const App: React.FC = () => {
   const [activeShape, setActiveShape] = useState<'cloud' | 'box' | 'ellipse'>('box');
   const [activePinType, setActivePinType] = useState<'photo' | 'safety' | 'punch'>('safety');
   const [activeColor, setActiveColor] = useState<'fill' | 'stroke'>('fill');
+  const [markupFillColor, setMarkupFillColor] = useState<string>(DEFAULT_MARKUP_FILL);
+  const [markupStrokeColor, setMarkupStrokeColor] = useState<string>('#EF4444');
 
   // Panel & Modal State
-  const [activePanel, setActivePanel] = useState<'rfi' | 'safety' | 'punch' | null>(null);
+  const [activePanel, setActivePanel] = useState<'rfi' | 'safety' | 'punch' | 'empty' | null>(null);
 
   const [rfiTargetRectId, setRfiTargetRectId] = useState<string | null>(null);
   const [rfiTargetRfiId, setRfiTargetRfiId] = useState<number | null>(null);
-  const [rfiFormData, setRfiFormData] = useState({ title: '', type: 'General Inquiry', question: '' });
+  const [rfiFormData, setRfiFormData] = useState<RfiFormState>(DEFAULT_RFI_FORM);
   const [isRfiEditMode, setIsRfiEditMode] = useState(false);
 
   const [safetyTargetPinId, setSafetyTargetPinId] = useState<string | null>(null);
@@ -574,6 +694,9 @@ const App: React.FC = () => {
   const [photoViewerConfig, setPhotoViewerConfig] = useState<{ rectId?: string; photoId: string, pinId?: string } | null>(null);
   
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const [isPublishWarningOpen, setIsPublishWarningOpen] = useState(false);
+  const pendingNavCallback = useRef<(() => void) | null>(null);
 
   // UI State
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -608,10 +731,18 @@ const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoFileInputRef = useRef<HTMLInputElement>(null);
   const hidePopupTimer = useRef<number | null>(null);
+  const showPopupTimer = useRef<number | null>(null);
   const mouseDownRef = useRef<{x: number, y: number} | null>(null);
+  const lastMarkupSyncedRectId = useRef<string | null>(null);
 
   // Custom Hooks for complex logic
-  const { viewTransform, setViewTransform, handleWheel, handleZoom } = useZoomPan(imageContainerRef);
+  const canvasVisible = !!(imageSrc || currentDrawing);
+  const { viewTransform, setViewTransform, handleZoom } = useZoomPan(imageContainerRef, canvasVisible);
+
+  const defaultDownloadFileName = useMemo(() => {
+    if (currentDrawing) return `${currentDrawing.id}_markup`;
+    return 'Drawing_markup';
+  }, [currentDrawing]);
 
   useEffect(() => {
     if (currentDrawing) {
@@ -620,6 +751,8 @@ const App: React.FC = () => {
         setImageSrc(latestVersion.thumbnailUrl);
         setRectangles([]);
         setPins([]);
+        setMeasurements([]);
+        setDrawingScale(null);
         setSelectedRectIds([]);
         setHoveredRectId(null);
         setLinkMenuRectId(null);
@@ -667,7 +800,7 @@ const App: React.FC = () => {
     setActivePanel(null);
     setRfiTargetRectId(null);
     setRfiTargetRfiId(null);
-    setRfiFormData({ title: '', type: 'General Inquiry', question: '' });
+    setRfiFormData(DEFAULT_RFI_FORM);
     setIsRfiEditMode(false);
     if (activeTool === 'pin') {
         setActiveTool('select');
@@ -678,13 +811,23 @@ const App: React.FC = () => {
     if (rfiId !== null) {
         const rfiToEdit = allRfis.find(r => r.id === rfiId);
         if (rfiToEdit) {
-            setRfiFormData({title: rfiToEdit.title, type: rfiToEdit.type, question: rfiToEdit.question});
+            setRfiFormData({
+              title: rfiToEdit.title,
+              type: rfiToEdit.type,
+              question: rfiToEdit.question,
+              priority: rfiToEdit.priority ?? '',
+              sequence: rfiToEdit.sequence ?? '',
+              location: rfiToEdit.location ?? '',
+              scheduleImpact: rfiToEdit.scheduleImpact ?? 'Yes',
+              costImpact: rfiToEdit.costImpact ?? 'Yes',
+              answer: rfiToEdit.answer ?? '',
+            });
             setIsRfiEditMode(true);
         } else {
             return;
         }
     } else {
-        setRfiFormData({ title: '', type: 'General Inquiry', question: '' });
+        setRfiFormData(DEFAULT_RFI_FORM);
         setIsRfiEditMode(false);
     }
     
@@ -768,6 +911,46 @@ const App: React.FC = () => {
     setActivePanel(null);
   }, []);
 
+  const handleMarkupColorChange = useCallback(
+    (mode: 'fill' | 'stroke', value: string) => {
+      if (mode === 'fill') setMarkupFillColor(value);
+      else setMarkupStrokeColor(value);
+      setRectangles((prev) => {
+        if (selectedRectIds.length === 0) return prev;
+        return prev.map((r) =>
+          selectedRectIds.includes(r.id)
+            ? { ...r, ...(mode === 'fill' ? { fillColor: value } : { strokeColor: value }) }
+            : r
+        );
+      });
+      if (selectedRectIds.length > 0) setHasUnsavedChanges(true);
+    },
+    [selectedRectIds]
+  );
+
+  const handleMarkupActiveModeChange = useCallback((mode: 'fill' | 'stroke') => {
+    setActiveColor(mode);
+    setActivePanel(null);
+  }, []);
+
+  useEffect(() => {
+    if (selectedRectIds.length !== 1) {
+      lastMarkupSyncedRectId.current = null;
+      return;
+    }
+    const id = selectedRectIds[0];
+    if (lastMarkupSyncedRectId.current === id) return;
+    lastMarkupSyncedRectId.current = id;
+    const r = rectangles.find((x) => x.id === id);
+    if (!r) return;
+    setMarkupFillColor(
+      r.fillColor !== undefined ? r.fillColor : resolveRectFillColor(r, r.shape, true, theme)
+    );
+    setMarkupStrokeColor(
+      r.strokeColor !== undefined ? r.strokeColor : resolveRectStrokeColor(r, false)
+    );
+  }, [selectedRectIds, rectangles, theme]);
+
   const handleToggleItemLock = useCallback((id: string, type: 'rect' | 'pin') => {
     if (type === 'rect') {
         setRectangles(prev => prev.map(r => r.id === id ? { ...r, locked: !r.locked } : r));
@@ -805,6 +988,8 @@ const App: React.FC = () => {
     isSpacebarDown,
     setHasUnsavedChanges,
     pinDragOffset,
+    markupFillColor,
+    markupStrokeColor,
   });
 
   const deleteSelection = useCallback(() => {
@@ -836,7 +1021,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         const target = e.target as HTMLElement;
-        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || isLinkModalOpen || isPhotoViewerOpen || isShareModalOpen) {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || isLinkModalOpen || isPhotoViewerOpen || isShareModalOpen || isDownloadModalOpen) {
             return;
         }
 
@@ -897,6 +1082,7 @@ const App: React.FC = () => {
       isLinkModalOpen,
       isPhotoViewerOpen,
       isShareModalOpen,
+      isDownloadModalOpen,
       interaction,
       handleMouseUp
   ]);
@@ -1050,8 +1236,42 @@ const App: React.FC = () => {
   };
 
   const handleRfiFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setRfiFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    const el = e.target;
+    const name = el.name as keyof RfiFormState;
+    if (el instanceof HTMLInputElement && el.type === 'radio') {
+      setRfiFormData((prev) => ({ ...prev, [name]: el.value as RfiFormState[typeof name] }));
+      return;
+    }
+    setRfiFormData((prev) => ({ ...prev, [name]: el.value }));
   };
+
+  const handleRfiHeaderTrash = useCallback(() => {
+    if (isRfiEditMode && rfiTargetRfiId !== null) {
+      if (!window.confirm('Delete this RFI? It will be removed from the drawing and the list.')) return;
+      setAllRfis((prev) => prev.filter((r) => r.id !== rfiTargetRfiId));
+      setRectangles((prev) =>
+        prev.map((rect) => ({
+          ...rect,
+          rfi: rect.rfi?.filter((r) => r.id !== rfiTargetRfiId),
+        }))
+      );
+      setHasUnsavedChanges(true);
+      handleRfiCancel();
+    } else {
+      setRfiFormData({ ...DEFAULT_RFI_FORM });
+    }
+  }, [isRfiEditMode, rfiTargetRfiId, handleRfiCancel]);
+
+  const handleRfiDownload = useCallback(() => {
+    const blob = new Blob([JSON.stringify(rfiFormData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safe = (rfiFormData.title || 'draft').replace(/\s+/g, '-').replace(/[^a-zA-Z0-9-_]/g, '').slice(0, 48);
+    a.download = `rfi-${safe || 'draft'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [rfiFormData]);
 
   const handleRfiSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1298,6 +1518,8 @@ const App: React.FC = () => {
       setImageSrc(version.thumbnailUrl);
       setRectangles([]);
       setPins([]);
+      setMeasurements([]);
+      setDrawingScale(null);
       setSelectedRectIds([]);
       setViewTransform({ scale: 1, translateX: 0, translateY: 0 });
       setHasUnsavedChanges(false);
@@ -1321,12 +1543,7 @@ const App: React.FC = () => {
     }
   };
   
-  const handleGoBack = () => {
-      if (hasUnsavedChanges) {
-          if (!window.confirm("You have unsaved changes that will be lost. Are you sure you want to go back?")) {
-              return;
-          }
-      }
+  const performGoBack = useCallback(() => {
       setImageSrc(null);
       setCurrentDrawing(null);
       setRectangles([]);
@@ -1334,7 +1551,71 @@ const App: React.FC = () => {
       setSelectedRectIds([]);
       setHasUnsavedChanges(false);
       setLoadedSetIds([]);
-  };
+  }, []);
+
+  const handleGoBack = useCallback(() => {
+      if (hasUnsavedChanges) {
+          pendingNavCallback.current = performGoBack;
+          setIsPublishWarningOpen(true);
+          return;
+      }
+      performGoBack();
+  }, [hasUnsavedChanges, performGoBack]);
+
+  const handlePublishWarningCancel = useCallback(() => {
+      setIsPublishWarningOpen(false);
+      pendingNavCallback.current = null;
+  }, []);
+
+  const handlePublishWarningDiscard = useCallback(() => {
+      setIsPublishWarningOpen(false);
+      setHasUnsavedChanges(false);
+      const action = pendingNavCallback.current;
+      pendingNavCallback.current = null;
+      action?.();
+  }, []);
+
+  const handlePublishWarningPublish = useCallback((name: string) => {
+      if (!name) return;
+      const newSet: MarkupSet = {
+          id: `set-${Date.now()}`,
+          name,
+          drawingId: currentDrawing?.id ?? '',
+          versionId: currentVersion?.id ?? '',
+          timestamp: new Date().toLocaleString(),
+          author: 'Current User',
+          rectangles: rectangles.filter(r => !r.sourceSetId),
+          pins: pins.filter(p => !p.sourceSetId),
+      };
+      setAllMarkupSets(prev => [...prev, newSet]);
+      setHasUnsavedChanges(false);
+      setIsPublishWarningOpen(false);
+      const action = pendingNavCallback.current;
+      pendingNavCallback.current = null;
+      action?.();
+  }, [currentDrawing, currentVersion, rectangles, pins]);
+
+  // Handle browser back button when canvas is visible
+  useEffect(() => {
+      if (!canvasVisible) return;
+      // Push a sentinel state so we can intercept the browser back button
+      history.pushState({ markupSentinel: true }, '');
+
+      const handlePopState = () => {
+          // Re-push the sentinel to keep intercepting future back presses
+          history.pushState({ markupSentinel: true }, '');
+          if (hasUnsavedChanges) {
+              pendingNavCallback.current = performGoBack;
+              setIsPublishWarningOpen(true);
+          } else {
+              performGoBack();
+          }
+      };
+
+      window.addEventListener('popstate', handlePopState);
+      return () => window.removeEventListener('popstate', handlePopState);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvasVisible, hasUnsavedChanges, performGoBack]);
 
   const currentPhotoForViewer = photoViewerConfig ? allPhotos.find(p => p.id === photoViewerConfig.photoId) : null;
   const areFiltersActive = Object.values(filters).some(v => !v);
@@ -1411,10 +1692,10 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white flex flex-col items-stretch p-4 overflow-hidden">
+    <LinarcAppShell>
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden text-gray-900 dark:text-zinc-100">
       <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
       <input type="file" accept="image/*" onChange={handlePhotoFileChange} className="hidden" ref={photoFileInputRef} />
-      <main className="w-full flex-grow flex flex-col items-stretch bg-white dark:bg-gray-800 rounded-2xl shadow-2xl shadow-blue-500/10 p-2 overflow-hidden">
         {!imageSrc && !currentDrawing ? (
           <WelcomeScreen onUploadClick={triggerFileUpload} />
         ) : (
@@ -1429,6 +1710,7 @@ const App: React.FC = () => {
                     hasUnsavedChanges={hasUnsavedChanges}
                     onSave={handleSaveMarkup}
                     onShare={() => setIsShareModalOpen(true)}
+                    onDownload={() => setIsDownloadModalOpen(true)}
                     filters={filters}
                     areFiltersActive={areFiltersActive}
                     isFilterMenuOpen={isFilterMenuOpen}
@@ -1438,21 +1720,11 @@ const App: React.FC = () => {
                     markupSets={allMarkupSets}
                     loadedSetIds={loadedSetIds}
                     onToggleMarkupSet={handleToggleMarkupSet}
-                    isLeftSidebarOpen={isLayersPanelOpen}
-                    onToggleLeftSidebar={() => setIsLayersPanelOpen(prev => !prev)}
-                    isRightSidebarOpen={activePanel !== null}
-                    onToggleRightSidebar={() => {
-                        if (activePanel !== null) {
-                            setActivePanel(null);
-                        } else {
-                            setActivePanel('rfi'); // Default to RFI if opening
-                        }
-                    }}
                 />
-            <div className="flex-grow flex flex-row items-stretch overflow-hidden">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-row items-stretch overflow-hidden">
                 <LayersPanel
                   isOpen={isLayersPanelOpen}
-                  onToggle={() => setIsLayersPanelOpen(p => !p)}
+                  onClose={() => setIsLayersPanelOpen(false)}
                   rectangles={rectangles}
                   pins={pins}
                   selectedRectIds={selectedRectIds}
@@ -1473,7 +1745,7 @@ const App: React.FC = () => {
                   onToggleBatchVisibility={handleToggleBatchVisibility}
                   onToggleLock={handleToggleItemLock}
                 />
-                <div className="flex-grow h-full relative">
+                <div className="relative min-h-0 min-w-0 flex-1">
                   <CanvasView
                     imageSrc={imageSrc || ''}
                     rectangles={rectangles}
@@ -1490,6 +1762,7 @@ const App: React.FC = () => {
                     marqueeRect={marqueeRect}
                     isMenuVisible={isMenuVisible}
                     linkMenuRectId={linkMenuRectId}
+                    setLinkMenuRectId={setLinkMenuRectId}
                     openLinkSubmenu={openLinkSubmenu}
                     theme={theme}
                     toolbarPosition={toolbarPosition}
@@ -1502,7 +1775,6 @@ const App: React.FC = () => {
                     handleMouseMove={handleMouseMove}
                     handleMouseUp={handleMouseUp}
                     handleMouseLeave={handleMouseLeave}
-                    handleWheel={handleWheel}
                     handleZoom={handleZoom}
                     handleThemeToggle={handleThemeToggle}
                     setHoveredRectId={setHoveredRectId}
@@ -1512,13 +1784,17 @@ const App: React.FC = () => {
                     activePinType={activePinType}
                     setActivePinType={setActivePinType}
                     activeColor={activeColor}
-                    setActiveColor={setActiveColor}
+                    markupFillColor={markupFillColor}
+                    markupStrokeColor={markupStrokeColor}
+                    onMarkupColorChange={handleMarkupColorChange}
+                    onMarkupActiveModeChange={handleMarkupActiveModeChange}
                     setDraggingPinId={setDraggingPinId}
                     setSelectedPinId={setSelectedPinId}
                     handlePinDetails={handlePinDetails}
                     handleDeletePin={handleDeletePin}
                     setHoveredItem={setHoveredItem}
                     hidePopupTimer={hidePopupTimer}
+                    showPopupTimer={showPopupTimer}
                     handleResizeStart={(e, rectId, handle) => {
                       e.stopPropagation();
                       const startPoint = getRelativeCoords(e);
@@ -1548,7 +1824,49 @@ const App: React.FC = () => {
                     setSelectedRectIds={setSelectedRectIds}
                     getRelativeCoords={getRelativeCoords}
                     setPinDragOffset={setPinDragOffset}
+                    measurements={measurements}
+                    drawingScale={drawingScale}
+                    onMeasurementAdd={(m) => { setMeasurements(prev => [...prev, m]); setHasUnsavedChanges(true); }}
+                    onMeasurementDelete={(id) => { setMeasurements(prev => prev.filter(m => m.id !== id)); setHasUnsavedChanges(true); }}
+                    onMeasurementUpdate={(m) => { setMeasurements(prev => prev.map(x => x.id === m.id ? m : x)); setHasUnsavedChanges(true); }}
+                    onDrawingScaleSet={(pxPerFt) => setDrawingScale(pxPerFt)}
                   />
+                  <CanvasSidebarFloatToggles
+                    isLayersOpen={isLayersPanelOpen}
+                    onToggleLayers={() => setIsLayersPanelOpen((p) => !p)}
+                    isRightPanelOpen={activePanel !== null}
+                    onToggleRightPanel={() => {
+                        if (activePanel !== null) {
+                            setActivePanel(null);
+                        } else {
+                            setActivePanel('empty');
+                        }
+                    }}
+                  />
+                </div>
+                <div
+                    className={`h-full flex-shrink-0 overflow-hidden border-gray-200 bg-white transition-all duration-200 ease-in-out dark:border-zinc-800 dark:bg-zinc-900 ${activePanel === 'empty' ? 'border-l translate-x-0' : 'translate-x-full'}`}
+                    style={{ width: activePanel === 'empty' ? '28rem' : '0px', visibility: activePanel === 'empty' ? 'visible' : 'hidden' }}
+                >
+                    <div className={`flex h-full w-full flex-col transition-opacity duration-150 overflow-hidden ${activePanel === 'empty' ? 'opacity-100' : 'opacity-0'}`}>
+                        <div className="linarc-panel-header">
+                            <h2 className="linarc-panel-title">Details</h2>
+                            <button type="button" onClick={() => setActivePanel(null)} className="linarc-panel-close" aria-label="Close panel">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                            </button>
+                        </div>
+                        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 text-center">
+                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100 dark:bg-zinc-800">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-gray-400 dark:text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zm-7.518-.267A8.25 8.25 0 1120.25 10.5M8.288 14.212A5.25 5.25 0 1117.25 10.5" />
+                                </svg>
+                            </div>
+                            <div>
+                                <p className="font-semibold text-gray-700 dark:text-zinc-300">No details to show</p>
+                                <p className="mt-1 text-sm text-gray-500 dark:text-zinc-500">This panel displays linked items such as RFIs, safety issues, and punch items when relevant.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <RfiPanel
                     isOpen={activePanel === 'rfi'}
@@ -1557,6 +1875,9 @@ const App: React.FC = () => {
                     onFormChange={handleRfiFormChange}
                     onSubmit={handleRfiSubmit}
                     onCancel={handleRfiCancel}
+                    onHeaderTrash={handleRfiHeaderTrash}
+                    onDownload={handleRfiDownload}
+                    onClearQuestion={() => setRfiFormData((prev) => ({ ...prev, question: '' }))}
                 />
                 <SafetyPanel
                     isOpen={activePanel === 'safety'}
@@ -1583,7 +1904,6 @@ const App: React.FC = () => {
             </div>
           </>
         )}
-      </main>
 
       {hoveredItem && !draggingPinId && !selectedPinId && (
         <HoverPopup
@@ -1599,6 +1919,7 @@ const App: React.FC = () => {
             onOpenRfiPanel={handleOpenRfiPanel}
             onClearHover={() => setHoveredItem(null)}
             hidePopupTimer={hidePopupTimer}
+            showPopupTimer={showPopupTimer}
             onPinClick={handlePinDetails}
         />
       )}
@@ -1631,7 +1952,22 @@ const App: React.FC = () => {
         companies={mockCompanies}
         employees={mockEmployees}
       />
+
+      <DownloadOptionsModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
+        defaultFileName={defaultDownloadFileName}
+        imageSrc={imageSrc}
+      />
+
+      <PublishWarningModal
+        isOpen={isPublishWarningOpen}
+        onCancel={handlePublishWarningCancel}
+        onDiscard={handlePublishWarningDiscard}
+        onPublish={handlePublishWarningPublish}
+      />
     </div>
+    </LinarcAppShell>
   );
 };
 

@@ -11,11 +11,12 @@ interface HoverPopupProps {
     onOpenRfiPanel: (rectId: string, rfiId: number | null) => void;
     onClearHover: () => void;
     hidePopupTimer: React.MutableRefObject<number | null>;
+    showPopupTimer: React.MutableRefObject<number | null>;
     onPinClick: (pin: Pin) => void;
 }
 
-const HoverPopup: React.FC<HoverPopupProps> = ({ 
-    hoveredItem, rectangles, allPhotos, allPunches, allSafetyIssues, onOpenPhotoViewer, onOpenRfiPanel, onClearHover, hidePopupTimer, onPinClick
+const HoverPopup: React.FC<HoverPopupProps> = ({
+    hoveredItem, rectangles, allPhotos, allPunches, allSafetyIssues, onOpenPhotoViewer, onOpenRfiPanel, onClearHover, hidePopupTimer, showPopupTimer, onPinClick
 }) => {
     if (!hoveredItem) return null;
 
@@ -84,7 +85,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                                     <span className="font-semibold text-gray-500 dark:text-gray-400">Question:</span>
                                     <p className="whitespace-pre-wrap break-words">{rfi.question}</p>
                                 </div>
-                                <a href="https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/document/rfi/uiSFtnkKXNpn5Koz/details?tab=details" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-400 text-sm font-semibold">View Full RFI &rarr;</a>
+                                <a href="https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/document/rfi/uiSFtnkKXNpn5Koz/details?tab=details" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-500 dark:text-blue-400 text-sm font-semibold">View Full RFI &rarr;</a>
                             </>
                         );
                         break;
@@ -95,7 +96,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                                 <h4 className="font-bold text-green-400 mb-2 truncate">{submittal.id}: {submittal.title}</h4>
                                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-1"><span className="font-semibold text-gray-500 dark:text-gray-400">Spec Section:</span> {submittal.specSection}</p>
                                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-3"><span className="font-semibold text-gray-500 dark:text-gray-400">Status:</span> {submittal.status}</p>
-                                <a href="https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/document/submittals/package/FMVmW4xEe9bcHUTp/registries/Xh6FHaQZ9Dyv6V3i/?tab=response" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-400 text-sm font-semibold">View Full Submittal &rarr;</a>
+                                <a href="https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/document/submittals/package/FMVmW4xEe9bcHUTp/registries/Xh6FHaQZ9Dyv6V3i/?tab=response" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-500 dark:text-blue-400 text-sm font-semibold">View Full Submittal &rarr;</a>
                             </>
                         );
                         break;
@@ -106,7 +107,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                                 <h4 className="font-bold text-orange-400 mb-2 truncate">{punch.id}: {punch.title}</h4>
                                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-1"><span className="font-semibold text-gray-500 dark:text-gray-400">Assignee:</span> {punch.assignee}</p>
                                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-3"><span className="font-semibold text-gray-500 dark:text-gray-400">Status:</span> {punch.status}</p>
-                                <a href="https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/quality/punchList/H7SakWBed794KRdU/details?tab=details" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-400 text-sm font-semibold">View Full Punch Item &rarr;</a>
+                                <a href="https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/quality/punchList/H7SakWBed794KRdU/details?tab=details" target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-orange-600 hover:text-orange-500 dark:text-orange-400 dark:hover:text-orange-300">View Full Punch Item &rarr;</a>
                             </>
                         );
                         break;
@@ -117,7 +118,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                             <>
                                 <h4 className="font-bold text-indigo-400 mb-2 truncate">{drawing.id}: {drawing.title}</h4>
                                 <img src={drawing.versions[0].thumbnailUrl} alt={drawing.title} className="rounded-md mb-3 w-full object-cover" />
-                                <a href="https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/document/newPlans/markup/A-3.2/AHV6vNEm20250627115709/latest" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-400 text-sm font-semibold">View Full Drawing &rarr;</a>
+                                <a href="https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/document/newPlans/markup/A-3.2/AHV6vNEm20250627115709/latest" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-500 dark:text-blue-400 text-sm font-semibold">View Full Drawing &rarr;</a>
                             </>
                         );
                         break;
@@ -154,8 +155,13 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                 left: `${hoveredItem.position.left + 10}px`,
                 transform: 'translateY(-50%)'
             }}
-            onMouseEnter={() => { if (hidePopupTimer.current) clearTimeout(hidePopupTimer.current); }}
-            onMouseLeave={onClearHover}
+            onMouseEnter={() => {
+                if (hidePopupTimer.current) { clearTimeout(hidePopupTimer.current); hidePopupTimer.current = null; }
+                if (showPopupTimer.current) { clearTimeout(showPopupTimer.current); showPopupTimer.current = null; }
+            }}
+            onMouseLeave={() => {
+                hidePopupTimer.current = window.setTimeout(onClearHover, 500);
+            }}
         >
             {content}
         </div>

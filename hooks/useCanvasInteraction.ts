@@ -24,6 +24,7 @@ export const useCanvasInteraction = ({
   rectangles, setRectangles,
   pins, setPins,
   activeTool, activeShape, activePinType,
+  markupFillColor, markupStrokeColor,
   selectedRectIds, setSelectedRectIds,
   setSelectedPinId,
   viewTransform, setViewTransform,
@@ -212,7 +213,14 @@ export const useCanvasInteraction = ({
       if (Math.abs(normalized.width) > 1 && Math.abs(normalized.height) > 1) {
         const shapeName = normalized.shape.charAt(0).toUpperCase() + normalized.shape.slice(1);
         const count = rectangles.filter((r: Rectangle) => r.shape === normalized.shape).length + 1;
-        const newRect = { ...normalized, id: Date.now().toString(), name: `${shapeName} ${count}`, visible: true };
+        const newRect = {
+          ...normalized,
+          id: Date.now().toString(),
+          name: `${shapeName} ${count}`,
+          visible: true,
+          fillColor: markupFillColor,
+          strokeColor: markupStrokeColor,
+        };
         setRectangles((prev: Rectangle[]) => [...prev, newRect]);
         setSelectedRectIds([newRect.id]);
         setHasUnsavedChanges(true);
@@ -250,7 +258,7 @@ export const useCanvasInteraction = ({
     setInteraction({ type: 'none' });
     setCurrentRect(null);
     setMarqueeRect(null);
-  }, [interaction, currentRect, marqueeRect, rectangles, activeTool, activePinType, getRelativeCoords, handleSubmenuLink, draggingPinId, mouseDownRef, activeShape, setHasUnsavedChanges, setRectangles, setSelectedRectIds]);
+  }, [interaction, currentRect, marqueeRect, rectangles, activeTool, activePinType, getRelativeCoords, handleSubmenuLink, draggingPinId, mouseDownRef, activeShape, setHasUnsavedChanges, setRectangles, setSelectedRectIds, markupFillColor, markupStrokeColor]);
   
   const handleMouseLeave = useCallback(() => {
     if (interaction.type !== 'none' || draggingPinId) {

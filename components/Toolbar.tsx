@@ -5,7 +5,7 @@ import {
   MousePointerIcon, PenIcon, BoxIcon, ArrowIcon, TextIcon,
   CloudIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon,
   ImageIcon, LocationIcon, MeasurementIcon, PolygonIcon, HighlighterIcon,
-  CustomPinIcon, FillIcon, StrokeIcon
+  CustomPinIcon,
 } from './Icons';
 import { ToolbarPosition } from '../App';
 import Tooltip from './Tooltip';
@@ -13,7 +13,6 @@ import Tooltip from './Tooltip';
 type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
 type ActivePinType = 'photo' | 'safety' | 'punch';
-type ActiveColor = 'fill' | 'stroke';
 
 interface ToolbarProps {
   activeTool: ActiveTool;
@@ -22,13 +21,17 @@ interface ToolbarProps {
   setActiveShape: (shape: ActiveShape) => void;
   activePinType: ActivePinType;
   setActivePinType: (pinType: ActivePinType) => void;
-  activeColor: ActiveColor;
-  setActiveColor: (color: ActiveColor) => void;
+  markupFillColor: string;
+  markupStrokeColor: string;
+  markupColorPanelOpen: boolean;
+  onMarkupColorPanelToggle: () => void;
+  onMarkupColorPanelClose: () => void;
   toolbarPosition: ToolbarPosition;
 }
 
 interface ToolButtonProps {
   label: string;
+  shortcut?: string;
   icon: React.ReactNode;
   isActive: boolean;
   onClick: () => void;
@@ -37,16 +40,17 @@ interface ToolButtonProps {
 
 const ToolButton: React.FC<ToolButtonProps> = ({
   label,
+  shortcut,
   icon,
   isActive,
   onClick,
   tooltipPosition = 'top',
 }) => (
-  <Tooltip text={label} position={tooltipPosition}>
+  <Tooltip text={label} shortcut={shortcut} position={tooltipPosition}>
     <button
       onClick={onClick}
       className={`p-2.5 rounded-lg transition-colors duration-200 text-white ${
-        isActive ? 'bg-blue-500' : 'hover:bg-gray-700'
+        isActive ? 'bg-blue-600' : 'hover:bg-gray-700'
       }`}
     >
       <div className="w-6 h-6">{icon}</div>
@@ -54,13 +58,24 @@ const ToolButton: React.FC<ToolButtonProps> = ({
   </Tooltip>
 );
 
-const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor, setActiveColor, toolbarPosition }) => {
+const Toolbar: React.FC<ToolbarProps> = ({
+  activeTool,
+  setActiveTool,
+  activeShape,
+  setActiveShape,
+  activePinType,
+  setActivePinType,
+  markupFillColor,
+  markupStrokeColor,
+  markupColorPanelOpen,
+  onMarkupColorPanelToggle,
+  onMarkupColorPanelClose,
+  toolbarPosition,
+}) => {
   const [isShapeMenuOpen, setShapeMenuOpen] = useState(false);
   const [isPinMenuOpen, setPinMenuOpen] = useState(false);
-  const [isColorMenuOpen, setColorMenuOpen] = useState(false);
   const shapeMenuRef = useRef<HTMLDivElement>(null);
   const pinMenuRef = useRef<HTMLDivElement>(null);
-  const colorMenuRef = useRef<HTMLDivElement>(null);
 
   const getTooltipPosition = (): 'top' | 'bottom' | 'left' | 'right' => {
     switch (toolbarPosition) {
@@ -78,20 +93,20 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
     if (tool === 'shape') {
         setShapeMenuOpen(prev => !prev);
         setPinMenuOpen(false);
-        setColorMenuOpen(false);
+        onMarkupColorPanelClose();
     } else if (tool === 'pin') {
         setPinMenuOpen(prev => !prev);
         setShapeMenuOpen(false);
-        setColorMenuOpen(false);
+        onMarkupColorPanelClose();
     } else {
         setShapeMenuOpen(false);
         setPinMenuOpen(false);
-        setColorMenuOpen(false);
+        onMarkupColorPanelClose();
     }
   };
 
   const handleColorButtonClick = () => {
-    setColorMenuOpen(prev => !prev);
+    onMarkupColorPanelToggle();
     setShapeMenuOpen(false);
     setPinMenuOpen(false);
   }
@@ -108,18 +123,11 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
       setPinMenuOpen(false);
   }
 
-  const handleColorClick = (color: ActiveColor) => {
-    setActiveColor(color);
-    setActiveTool(color);
-    setColorMenuOpen(false);
-  }
-
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
       if (shapeMenuRef.current && !shapeMenuRef.current.contains(target)) setShapeMenuOpen(false);
       if (pinMenuRef.current && !pinMenuRef.current.contains(target)) setPinMenuOpen(false);
-      if (colorMenuRef.current && !colorMenuRef.current.contains(target)) setColorMenuOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -140,10 +148,10 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
     { id: 'customPin', label: 'Custom Pin', icon: <CustomPinIcon /> },
   ];
 
-  const shapeTools: { id: ActiveShape; label: string; icon: React.ReactNode }[] = [
+  const shapeTools: { id: ActiveShape; label: string; shortcut?: string; icon: React.ReactNode }[] = [
       { id: 'cloud', label: 'Cloud', icon: <CloudIcon className="w-6 h-6" /> },
-      { id: 'box', label: 'Box', icon: <BoxIcon className="w-6 h-6" /> },
-      { id: 'ellipse', label: 'Ellipse', icon: <EllipseIcon className="w-6 h-6" /> },
+      { id: 'box', label: 'Rectangle', shortcut: 'R', icon: <BoxIcon className="w-6 h-6" /> },
+      { id: 'ellipse', label: 'Ellipse', shortcut: 'O', icon: <EllipseIcon className="w-6 h-6" /> },
   ];
 
   const pinTools: { id: ActivePinType; label: string; icon: React.ReactNode }[] = [
@@ -152,14 +160,8 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
     { id: 'punch', label: 'Punch', icon: <PunchPinIcon className="w-6 h-6" /> },
   ];
 
-  const colorTools: { id: ActiveColor; label: string; icon: React.ReactNode }[] = [
-    { id: 'fill', label: 'Fill', icon: <FillIcon /> },
-    { id: 'stroke', label: 'Stroke', icon: <StrokeIcon /> },
-  ];
-  
   const currentShapeTool = shapeTools.find(s => s.id === activeShape) || shapeTools[1];
   const currentPinTool = pinTools.find(p => p.id === activePinType) || pinTools[1];
-  const currentColorTool = colorTools.find(c => c.id === activeColor) || colorTools[0];
 
   const getFlyoutPositionClasses = () => {
     switch (toolbarPosition) {
@@ -177,6 +179,7 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
       <div className={`flex items-center gap-1 bg-gray-900/95 backdrop-blur-sm p-1.5 rounded-lg shadow-xl ${isVertical ? 'flex-col' : 'flex-row'}`}>
         <ToolButton
             label="Select"
+            shortcut="V"
             icon={<MousePointerIcon />}
             isActive={activeTool === 'select'}
             onClick={() => handleToolClick('select')}
@@ -185,11 +188,11 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
 
         {/* Shape Tool Flyout */}
         <div ref={shapeMenuRef} className="relative">
-            <Tooltip text={currentShapeTool.label} position={tooltipPos}>
+            <Tooltip text={currentShapeTool.label} shortcut={currentShapeTool.shortcut} position={tooltipPos}>
                 <button
                     onClick={() => handleToolClick('shape')}
                     className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
-                        activeTool === 'shape' ? 'bg-blue-500' : 'hover:bg-gray-700'
+                        activeTool === 'shape' ? 'bg-blue-600' : 'hover:bg-gray-700'
                     }`}
                 >
                     <div className="w-6 h-6">{currentShapeTool.icon}</div>
@@ -203,12 +206,12 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
             {isShapeMenuOpen && (
                  <div className={`absolute flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white ${getFlyoutPositionClasses()} ${isVertical ? 'flex-col' : 'flex-row'}`}>
                     {shapeTools.map(shape => (
-                        <Tooltip key={shape.id} text={shape.label} position={isVertical ? (toolbarPosition === 'left' ? 'right' : 'left') : 'top'}>
+                        <Tooltip key={shape.id} text={shape.label} shortcut={shape.shortcut} position={isVertical ? (toolbarPosition === 'left' ? 'right' : 'left') : 'top'}>
                             <button
                                 onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); handleShapeClick(shape.id); }}
                                 className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
-                                    activeShape === shape.id && activeTool === 'shape' ? 'bg-blue-500 text-white' : 'hover:bg-gray-700'
+                                    activeShape === shape.id && activeTool === 'shape' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'
                                 }`}
                             >
                                 {shape.icon}
@@ -222,11 +225,17 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
         
         {/* Pin Tool Flyout */}
         <div ref={pinMenuRef} className="relative">
-             <Tooltip text={currentPinTool.label} position={tooltipPos}>
+             <Tooltip text={currentPinTool.label} shortcut="P" position={tooltipPos}>
                 <button
                     onClick={() => handleToolClick('pin')}
                     className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
-                        activeTool === 'pin' ? 'bg-blue-500' : 'hover:bg-gray-700'
+                        activeTool === 'pin'
+                            ? activePinType === 'punch'
+                                ? 'bg-orange-600'
+                                : activePinType === 'safety'
+                                  ? 'bg-red-600'
+                                  : 'bg-blue-600'
+                            : 'hover:bg-gray-700'
                     }`}
                 >
                     <div className="w-6 h-6">{currentPinTool.icon}</div>
@@ -245,7 +254,13 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                                 onMouseDown={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); handlePinClick(pin.id); }}
                                 className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
-                                    activePinType === pin.id && activeTool === 'pin' ? 'bg-blue-500' : 'hover:bg-gray-700'
+                                    activePinType === pin.id && activeTool === 'pin'
+                                        ? pin.id === 'punch'
+                                            ? 'bg-orange-600'
+                                            : pin.id === 'safety'
+                                              ? 'bg-red-600'
+                                              : 'bg-blue-600'
+                                        : 'hover:bg-gray-700'
                                 }`}
                             >
                                 {pin.icon}
@@ -281,16 +296,31 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
             />
         ))}
 
-        {/* Color Tool Flyout */}
-        <div ref={colorMenuRef} className="relative">
-            <Tooltip text={currentColorTool.label} position={tooltipPos}>
+        {/* Fill / stroke — opens docked panel on canvas */}
+        <div className="relative" data-markup-color-trigger>
+            <Tooltip text="Fill & stroke" position={tooltipPos}>
                 <button
+                    type="button"
                     onClick={handleColorButtonClick}
-                    className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
-                        activeTool === 'fill' || activeTool === 'stroke' ? 'bg-blue-500' : 'hover:bg-gray-700'
+                    className={`relative flex h-11 w-11 items-center justify-center rounded-lg transition-colors duration-200 ${
+                        markupColorPanelOpen || activeTool === 'fill' || activeTool === 'stroke' ? 'bg-blue-600' : 'hover:bg-gray-700'
                     }`}
                 >
-                    <div className="w-6 h-6">{currentColorTool.icon}</div>
+                    <span className="relative h-6 w-6 overflow-hidden rounded-full border border-white/40 shadow-sm">
+                      <span
+                        className="absolute inset-y-0 left-0 w-1/2"
+                        style={{
+                          background:
+                            markupFillColor === 'transparent'
+                              ? 'linear-gradient(135deg, #fff 45%, #ef4444 45%, #ef4444 55%, #fff 55%)'
+                              : markupFillColor,
+                        }}
+                      />
+                      <span
+                        className="absolute inset-y-0 right-0 w-1/2"
+                        style={{ backgroundColor: markupStrokeColor }}
+                      />
+                    </span>
                     <div className="absolute bottom-1 right-1 pointer-events-none">
                         <svg viewBox="0 0 6 6" className="w-1.5 h-1.5 text-gray-300">
                             <path d="M6 6L0 6L6 0Z" fill="currentColor" />
@@ -298,24 +328,6 @@ const Toolbar: React.FC<ToolbarProps> = ({ activeTool, setActiveTool, activeShap
                     </div>
                 </button>
             </Tooltip>
-            {isColorMenuOpen && (
-                <div className={`absolute flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white ${getFlyoutPositionClasses()} ${isVertical ? 'flex-col' : 'flex-row'}`}>
-                    {colorTools.map(color => (
-                        <Tooltip key={color.id} text={color.label} position={isVertical ? (toolbarPosition === 'left' ? 'right' : 'left') : 'top'}>
-                            <button
-                                onMouseDown={(e) => e.stopPropagation()}
-                                onClick={(e) => { e.stopPropagation(); handleColorClick(color.id); }}
-                                className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
-                                    activeColor === color.id && (activeTool === 'fill' || activeTool === 'stroke') ? 'bg-blue-500 text-white' : 'hover:bg-gray-700'
-                                }`}
-                            >
-                                <div className="w-6 h-6">{color.icon}</div>
-                                <span className="text-xs mt-1">{color.label}</span>
-                            </button>
-                        </Tooltip>
-                    ))}
-                </div>
-            )}
         </div>
       </div>
     </div>
