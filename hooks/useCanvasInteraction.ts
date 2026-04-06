@@ -211,7 +211,7 @@ export const useCanvasInteraction = ({
     if (interaction.type === 'drawing' && currentRect) {
       const normalized = normalizeRect(currentRect, activeShape);
       if (Math.abs(normalized.width) > 1 && Math.abs(normalized.height) > 1) {
-        const shapeName = normalized.shape.charAt(0).toUpperCase() + normalized.shape.slice(1);
+        const shapeName = normalized.shape === 'box' ? 'Rectangle' : normalized.shape.charAt(0).toUpperCase() + normalized.shape.slice(1);
         const count = rectangles.filter((r: Rectangle) => r.shape === normalized.shape).length + 1;
         const newRect = {
           ...normalized,

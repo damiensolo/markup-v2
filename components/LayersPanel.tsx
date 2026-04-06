@@ -32,10 +32,11 @@ interface LayersPanelProps {
     onToggleLock: (id: string, type: 'rect' | 'pin') => void;
     drawingScale?: number | null;
     naturalSize?: { width: number; height: number };
+    onRecalibrateDrawingScale?: () => void;
 }
 
 const ItemIcon = ({ item }: { item: LayerItem }) => {
-    const iconClass = "w-5 h-5 mr-2 text-gray-500 dark:text-gray-400 flex-shrink-0";
+    const iconClass = "w-4 h-4 mr-1.5 text-gray-500 dark:text-gray-400 flex-shrink-0";
     if (item.itemType === 'rect') {
         if (item.shape === 'cloud') return <CloudIcon className={iconClass} />;
         if (item.shape === 'ellipse') return <EllipseIcon className={iconClass} />;
@@ -61,13 +62,13 @@ const LinkedItemIcon = ({ type }: { type: string }) => {
 
 const MeasurementChip: React.FC<{ label: string; value: string; emphasized?: boolean }> = ({ label, value, emphasized = false }) => (
     <span
-        className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] leading-tight ${
+        className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs leading-none ${
             emphasized
                 ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
                 : 'border-gray-200 bg-gray-50 text-gray-600 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300'
         }`}
     >
-        <span className="font-semibold uppercase tracking-wide">{label}</span>
+        <span className="font-bold uppercase tracking-wide">{label}</span>
         <span className="font-medium">{value}</span>
     </span>
 );
@@ -76,12 +77,13 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
     isOpen, onClose, rectangles, pins, selectedRectIds, selectedPinId, expandedIds, onToggleExpand,
     onSelectRect, onSelectPin, onRenameRect, onRenamePin, onDeleteRect, onDeletePin,
     onToggleRectVisibility, onTogglePinVisibility, onOpenRfiPanel, onOpenPhotoViewer, markupSetNames, onToggleBatchVisibility, onToggleLock,
-    drawingScale, naturalSize
+    drawingScale, naturalSize, onRecalibrateDrawingScale,
 }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
+    const [showTakeoff, setShowTakeoff] = useState(true);
     const inputRef = useRef<HTMLInputElement>(null);
-    
+
     // Resizing logic
     const [panelWidth, setPanelWidth] = useState(320);
     const isResizing = useRef(false);
@@ -201,26 +203,19 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
         window.open(url, '_blank', 'noopener,noreferrer');
     };
 
-    const renderMeasurementSummary = (item: LayerItem, showFull: boolean) => {
-        if (item.itemType !== 'rect' || !drawingScale || !naturalSize?.width) return null;
+    const renderMeasurementSummary = (item: LayerItem) => {
+        if (!showTakeoff || item.itemType !== 'rect' || !drawingScale || !naturalSize?.width) return null;
 
         if (item.shape === 'box') {
             const dims = getRectDimensions(item, drawingScale, naturalSize);
-            const area = formatArea(dims.area);
             const length = formatFt(dims.length);
             const width = formatFt(dims.width);
-            const tooltip = `Length ${length}, Width ${width}, Area ${area}`;
+            const area = formatArea(dims.area);
             return (
-                <div className="mt-1 flex flex-wrap items-center gap-1" title={tooltip}>
-                    {showFull ? (
-                        <>
-                            <MeasurementChip label="L" value={length} />
-                            <MeasurementChip label="W" value={width} />
-                            <MeasurementChip label="A" value={area} emphasized />
-                        </>
-                    ) : (
-                        <MeasurementChip label="A" value={area} emphasized />
-                    )}
+                <div className="mt-1.5 flex flex-nowrap items-center gap-1.5 overflow-x-auto pl-9 pb-0.5">
+                    <MeasurementChip label="L" value={length} />
+                    <MeasurementChip label="W" value={width} />
+                    <MeasurementChip label="A" value={area} />
                 </div>
             );
         }
@@ -228,29 +223,17 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
         if (item.shape === 'ellipse') {
             const dims = getEllipseDimensions(item, drawingScale, naturalSize);
             const area = formatArea(dims.area);
-            const diameterH = formatFt(dims.wFt);
-            const diameterV = formatFt(dims.hFt);
-            const tooltip = dims.isCircle
-                ? `Diameter ${diameterH}, Area ${area}`
-                : `Diameter H ${diameterH}, Diameter V ${diameterV}, Area ${area}`;
-
             return (
-                <div className="mt-1 flex flex-wrap items-center gap-1" title={tooltip}>
-                    {showFull ? (
-                        <>
-                            {dims.isCircle ? (
-                                <MeasurementChip label="D" value={diameterH} />
-                            ) : (
-                                <>
-                                    <MeasurementChip label="Dh" value={diameterH} />
-                                    <MeasurementChip label="Dv" value={diameterV} />
-                                </>
-                            )}
-                            <MeasurementChip label="A" value={area} emphasized />
-                        </>
+                <div className="mt-1.5 flex flex-nowrap items-center gap-1.5 overflow-x-auto pl-9 pb-0.5">
+                    {dims.isCircle ? (
+                        <MeasurementChip label="D" value={formatFt(dims.wFt)} />
                     ) : (
-                        <MeasurementChip label="A" value={area} emphasized />
+                        <>
+                            <MeasurementChip label="Dh" value={formatFt(dims.wFt)} />
+                            <MeasurementChip label="Dv" value={formatFt(dims.hFt)} />
+                        </>
                     )}
+                    <MeasurementChip label="A" value={area} />
                 </div>
             );
         }
@@ -261,7 +244,6 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
     const renderItem = (item: LayerItem) => {
         const isSelected = item.itemType === 'rect' ? selectedRectIds.includes(item.id) : selectedPinId === item.id;
         const isExpanded = expandedIds.includes(item.id);
-        const showFullMeasurements = isSelected || isExpanded;
         const hasChildren = item.itemType === 'rect' && (
             (item.rfi?.length || 0) > 0 ||
             (item.submittals?.length || 0) > 0 ||
@@ -272,60 +254,61 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 
         return (
             <React.Fragment key={item.id}>
-                <li 
+                <li
                     onClick={(e) => {
                         if (editingId !== item.id) {
                             if (item.itemType === 'rect') onSelectRect(item.id, e);
                             else onSelectPin(item.id, e);
                         }
                     }}
-                    className={`flex items-center px-3 py-2 cursor-pointer group transition-colors ${isSelected ? 'bg-blue-50 dark:bg-blue-950/40' : 'hover:bg-gray-100 dark:hover:bg-zinc-700/50'}`}
+                    className={`flex flex-col px-1.5 py-1.5 cursor-pointer group transition-colors ${isSelected ? 'bg-blue-50 dark:bg-blue-950/40' : 'hover:bg-gray-100 dark:hover:bg-zinc-700/50'}`}
                 >
-                    <div className="w-5 flex items-center justify-center mr-2 flex-shrink-0">
-                    {hasChildren ? (
-                        <button onClick={(e) => { e.stopPropagation(); onToggleExpand(item.id); }} className="p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600">
-                            <ChevronRightIcon className={`w-3 h-3 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                        </button>
-                    ) : <div className="w-3 h-3" />}
-                    </div>
-                    <ItemIcon item={item} />
-                    {editingId === item.id ? (
-                        <input
-                            ref={inputRef}
-                            type="text"
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                            onBlur={handleSaveEdit}
-                            onKeyDown={handleKeyDown}
-                            className="flex-grow bg-transparent border-b border-blue-600 focus:outline-none text-gray-800 dark:text-zinc-200"
-                        />
-                    ) : (
-                        <div className="flex min-w-0 flex-1 flex-col">
+                    {/* Row 1: chevron + icon + name + actions */}
+                    <div className="flex items-center min-w-0">
+                        <div className="flex w-5 flex-shrink-0 items-center justify-center mr-0.5">
+                            {hasChildren ? (
+                                <button onClick={(e) => { e.stopPropagation(); onToggleExpand(item.id); }} className="flex items-center justify-center w-5 h-5 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
+                                    <ChevronRightIcon className={`w-3.5 h-3.5 text-gray-500 dark:text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                </button>
+                            ) : <div className="w-5 h-5" />}
+                        </div>
+                        <ItemIcon item={item} />
+                        {editingId === item.id ? (
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                                onBlur={handleSaveEdit}
+                                onKeyDown={handleKeyDown}
+                                className="min-w-0 flex-1 bg-transparent border-b border-blue-600 focus:outline-none text-sm text-gray-800 dark:text-zinc-200"
+                            />
+                        ) : (
                             <span
                                 onDoubleClick={() => handleStartEdit(item)}
-                                className="truncate select-none text-gray-800 dark:text-gray-200"
+                                className="min-w-0 flex-1 truncate select-none text-sm text-gray-800 dark:text-gray-200"
                                 title={item.name}
                             >
                                 {item.name}
                             </span>
-                            {renderMeasurementSummary(item, showFullMeasurements)}
+                        )}
+                        <div className="ml-1 flex flex-shrink-0 items-center">
+                            <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onDeleteRect(item.id) : onDeletePin(item.id); }} className="p-1 rounded-full hover:bg-red-500 hover:text-white text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
+                                <TrashIcon className="w-4 h-4" />
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); onToggleLock(item.id, item.itemType); }} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
+                                {item.locked ? <LockClosedIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : <LockOpenIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onToggleRectVisibility(item.id) : onTogglePinVisibility(item.id); }} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
+                                {item.visible ? <EyeIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : <EyeSlashIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+                            </button>
                         </div>
-                    )}
-
-                    <div className="flex items-center ml-2">
-                        <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onDeleteRect(item.id) : onDeletePin(item.id); }} className="p-1 rounded-full hover:bg-red-500 hover:text-white text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
-                            <TrashIcon className="w-4 h-4" />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); onToggleLock(item.id, item.itemType); }} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
-                             {item.locked ? <LockClosedIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : <LockOpenIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onToggleRectVisibility(item.id) : onTogglePinVisibility(item.id); }} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
-                            {item.visible ? <EyeIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : <EyeSlashIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-                        </button>
                     </div>
+                    {/* Row 2: measurement chips — aligned with name text */}
+                    {editingId !== item.id && renderMeasurementSummary(item)}
                 </li>
                 {isExpanded && hasChildren && item.itemType === 'rect' && (
-                    <ul className="pl-10 bg-gray-100/50 dark:bg-gray-900/20">
+                    <ul className="pl-8 bg-gray-100/50 dark:bg-gray-900/20">
                         {item.rfi?.map((rfi: RfiData) => (
                             <li key={`rfi-${rfi.id}`} onClick={() => onOpenRfiPanel(item.id, rfi.id)} className="flex items-center px-4 py-2 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60">
                                 <LinkedItemIcon type="rfi" />
@@ -382,6 +365,32 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                         </button>
                     </Tooltip>
                 </div>
+                {drawingScale != null && (
+                    <div className="flex items-start justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-zinc-800">
+                        <div className="min-w-0 flex flex-col gap-1.5">
+                            <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-zinc-400">Takeoff</span>
+                            {onRecalibrateDrawingScale && (
+                                <button
+                                    type="button"
+                                    onClick={() => onRecalibrateDrawingScale()}
+                                    className="w-fit text-left text-[11px] font-semibold text-blue-600 hover:underline dark:text-blue-400"
+                                >
+                                    Recalibrate Scale
+                                </button>
+                            )}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowTakeoff(v => !v)}
+                            className={`relative mt-0.5 inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${showTakeoff ? 'bg-blue-600' : 'bg-gray-200 dark:bg-zinc-700'}`}
+                            role="switch"
+                            aria-checked={showTakeoff}
+                            aria-label="Toggle takeoff measurements"
+                        >
+                            <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ${showTakeoff ? 'translate-x-4' : 'translate-x-0'}`} />
+                        </button>
+                    </div>
+                )}
                 <div className="flex-grow overflow-y-auto custom-scrollbar">
                     {layerItems.length > 0 ? (
                         <div className="flex flex-col">

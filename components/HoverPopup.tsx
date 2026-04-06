@@ -30,7 +30,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                     const photo = allPhotos.find(p => p.id === pin.linkedId);
                      if (photo) content = (
                         <>
-                            <h4 className="font-bold text-blue-400 mb-2 truncate">{photo.id}: {photo.title}</h4>
+                            <h4 className="font-semibold text-gray-900 dark:text-zinc-100 mb-2 truncate">{photo.id}: {photo.title}</h4>
                              <button
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -49,7 +49,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                     if (issue) content = (
                          <>
                             <button onClick={(e) => { e.stopPropagation(); onPinClick(pin); onClearHover(); }} className="w-full text-left group">
-                                <h4 className="font-bold text-red-400 mb-2 truncate group-hover:text-red-300 transition-colors underline decoration-dotted">{issue.id}: {issue.title}</h4>
+                                <h4 className="font-semibold text-gray-900 dark:text-zinc-100 mb-2 truncate group-hover:text-gray-700 dark:group-hover:text-zinc-300 transition-colors underline decoration-dotted">{issue.id}: {issue.title}</h4>
                             </button>
                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-1"><span className="font-semibold text-gray-500 dark:text-gray-400">Severity:</span> {issue.severity}</p>
                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3"><span className="font-semibold text-gray-500 dark:text-gray-400">Status:</span> {issue.status}</p>
@@ -61,7 +61,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                     if (punch) content = (
                         <>
                             <button onClick={(e) => { e.stopPropagation(); onPinClick(pin); onClearHover(); }} className="w-full text-left group">
-                                <h4 className="font-bold text-orange-400 mb-2 truncate group-hover:text-orange-300 transition-colors underline decoration-dotted">{punch.id}: {punch.title}</h4>
+                                <h4 className="font-semibold text-gray-900 dark:text-zinc-100 mb-2 truncate group-hover:text-gray-700 dark:group-hover:text-zinc-300 transition-colors underline decoration-dotted">{punch.id}: {punch.title}</h4>
                             </button>
                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-1"><span className="font-semibold text-gray-500 dark:text-gray-400">Assignee:</span> {punch.assignee}</p>
                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3"><span className="font-semibold text-gray-500 dark:text-gray-400">Status:</span> {punch.status}</p>
@@ -79,7 +79,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                         const rfi = rect.rfi?.find(r => r.id === hoveredItem.itemId);
                         if (rfi) content = (
                             <>
-                                <h4 className="font-bold text-blue-400 mb-2 truncate">RFI-{rfi.id}: {rfi.title}</h4>
+                                <h4 className="font-semibold text-gray-900 dark:text-zinc-100 mb-2 truncate">RFI-{rfi.id}: {rfi.title}</h4>
                                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-1"><span className="font-semibold text-gray-500 dark:text-gray-400">Type:</span> {rfi.type}</p>
                                 <div className="text-sm text-gray-600 dark:text-gray-300 mb-3 max-h-24 overflow-y-auto">
                                     <span className="font-semibold text-gray-500 dark:text-gray-400">Question:</span>
@@ -93,7 +93,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                         const submittal = rect.submittals?.find(s => s.id === hoveredItem.itemId);
                         if (submittal) content = (
                             <>
-                                <h4 className="font-bold text-green-400 mb-2 truncate">{submittal.id}: {submittal.title}</h4>
+                                <h4 className="font-semibold text-gray-900 dark:text-zinc-100 mb-2 truncate">{submittal.id}: {submittal.title}</h4>
                                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-1"><span className="font-semibold text-gray-500 dark:text-gray-400">Spec Section:</span> {submittal.specSection}</p>
                                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-3"><span className="font-semibold text-gray-500 dark:text-gray-400">Status:</span> {submittal.status}</p>
                                 <a href="https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/document/submittals/package/FMVmW4xEe9bcHUTp/registries/Xh6FHaQZ9Dyv6V3i/?tab=response" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-500 dark:text-blue-400 text-sm font-semibold">View Full Submittal &rarr;</a>
@@ -104,7 +104,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                         const punch = rect.punches?.find(p => p.id === hoveredItem.itemId);
                         if (punch) content = (
                             <>
-                                <h4 className="font-bold text-orange-400 mb-2 truncate">{punch.id}: {punch.title}</h4>
+                                <h4 className="font-semibold text-gray-900 dark:text-zinc-100 mb-2 truncate">{punch.id}: {punch.title}</h4>
                                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-1"><span className="font-semibold text-gray-500 dark:text-gray-400">Assignee:</span> {punch.assignee}</p>
                                 <p className="text-sm text-gray-600 dark:text-gray-300 mb-3"><span className="font-semibold text-gray-500 dark:text-gray-400">Status:</span> {punch.status}</p>
                                 <a href="https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/quality/punchList/H7SakWBed794KRdU/details?tab=details" target="_blank" rel="noopener noreferrer" className="text-sm font-semibold text-orange-600 hover:text-orange-500 dark:text-orange-400 dark:hover:text-orange-300">View Full Punch Item &rarr;</a>
@@ -116,7 +116,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                         // Fix: Access thumbnailUrl from the first version of the drawing.
                         if (drawing && drawing.versions?.[0]) content = (
                             <>
-                                <h4 className="font-bold text-indigo-400 mb-2 truncate">{drawing.id}: {drawing.title}</h4>
+                                <h4 className="font-semibold text-gray-900 dark:text-zinc-100 mb-2 truncate">{drawing.id}: {drawing.title}</h4>
                                 <img src={drawing.versions[0].thumbnailUrl} alt={drawing.title} className="rounded-md mb-3 w-full object-cover" />
                                 <a href="https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/document/newPlans/markup/A-3.2/AHV6vNEm20250627115709/latest" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-500 dark:text-blue-400 text-sm font-semibold">View Full Drawing &rarr;</a>
                             </>
@@ -126,7 +126,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                         const photo = rect.photos?.find(p => p.id === hoveredItem.itemId);
                         if (photo) content = (
                             <>
-                                <h4 className="font-bold text-blue-400 mb-2 truncate">{photo.id}: {photo.title}</h4>
+                                <h4 className="font-semibold text-gray-900 dark:text-zinc-100 mb-2 truncate">{photo.id}: {photo.title}</h4>
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();

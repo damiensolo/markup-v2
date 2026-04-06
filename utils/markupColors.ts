@@ -6,9 +6,9 @@ import type { Rectangle } from '../types';
 
 export const LEGACY_STROKE = '#ef4444';
 export const LEGACY_STROKE_SELECTED = '#f87171';
-/** Default new-shape fill: warm highlight so the sheet stays readable underneath. */
-export const DEFAULT_MARKUP_FILL = 'rgba(232,150,35,0.14)';
-export const DEFAULT_FILL_OPACITY = 0.14;
+/** Default new-shape fill: soft purple highlight so the sheet stays readable underneath. */
+export const DEFAULT_MARKUP_FILL = 'rgba(139,92,246,0.08)';
+export const DEFAULT_FILL_OPACITY = 0.08;
 export const LEGACY_FILL_FLAT = 'rgba(0,0,0,0.05)';
 export const LEGACY_CLOUD_FILL = 'rgba(239, 68, 68, 0.1)';
 export const LEGACY_CLOUD_FILL_SELECTED = 'rgba(248, 113, 113, 0.1)';
@@ -107,7 +107,7 @@ export function parseFillForPicker(fillValue: string): {
   opacity: number;
 } {
   if (fillValue === 'transparent') {
-    return { ...hexToHsv('#E89623'), opacity: 0 };
+    return { ...hexToHsv('#8B5CF6'), opacity: 0 };
   }
   const hex = parseHex6(fillValue);
   if (hex) {
@@ -119,7 +119,7 @@ export function parseFillForPicker(fillValue: string): {
     const { h, s, v } = rgbToHsv(rgba.r, rgba.g, rgba.b);
     return { h, s, v, opacity: Math.max(0, Math.min(1, rgba.a)) };
   }
-  return { ...hexToHsv('#E89623'), opacity: DEFAULT_FILL_OPACITY };
+  return { ...hexToHsv('#8B5CF6'), opacity: DEFAULT_FILL_OPACITY };
 }
 
 export function resolveRectFillColor(

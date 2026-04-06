@@ -88,6 +88,12 @@ interface CanvasViewProps {
     onMeasurementUpdate: (m: Measurement) => void;
     onDrawingScaleSet: (pixelsPerFoot: number) => void;
     onNaturalSizeChange?: (size: { width: number; height: number }) => void;
+    /** Incremented from App when user clears scale — syncs calibration UI */
+    drawingScaleClearTick: number;
+    /** Incremented when user recalibrates — resets UI and opens scale dialog */
+    drawingScaleRecalibrateTick: number;
+    /** Called when user confirms "Start Calibrating" — clears drawing scale in parent */
+    onBeginScaleRecalibration: () => void;
 }
 
 const CanvasView: React.FC<CanvasViewProps> = (props) => {
@@ -101,7 +107,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         setDraggingPinId, setSelectedPinId, handlePinDetails, handleDeletePin, setHoveredItem,
         hidePopupTimer, showPopupTimer, handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
         handleSubmenuLink, onOpenRfiPanel, onOpenPhotoViewer, mouseDownRef, setSelectedRectIds, getRelativeCoords, setPinDragOffset,
-        measurements, drawingScale, onMeasurementAdd, onMeasurementDelete, onMeasurementUpdate, onDrawingScaleSet, onNaturalSizeChange
+        measurements, drawingScale, onMeasurementAdd, onMeasurementDelete, onMeasurementUpdate, onDrawingScaleSet, onNaturalSizeChange,
+        drawingScaleClearTick, drawingScaleRecalibrateTick, onBeginScaleRecalibration,
     } = props;
 
     const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
@@ -124,6 +131,38 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const [hoveredMeasId, setHoveredMeasId] = useState<string | null>(null);
     const [draggingMeasId, setDraggingMeasId] = useState<string | null>(null);
     const [draggingMeasEndpoint, setDraggingMeasEndpoint] = useState<'p1' | 'p2' | null>(null);
+
+    const resetMeasurementCalibrationUi = useCallback(() => {
+        setIsCalibrating(false);
+        setShowCalibInput(false);
+        setCalibLine(null);
+        setMeasStart(null);
+        setMeasCurrent(null);
+        setCalibFt('');
+        setCalibIn('');
+        setHoveredMeasId(null);
+        setDraggingMeasId(null);
+        setDraggingMeasEndpoint(null);
+    }, []);
+
+    const prevDrawingScaleClearTick = useRef(0);
+    const prevDrawingScaleRecalibrateTick = useRef(0);
+
+    useEffect(() => {
+        if (drawingScaleClearTick === 0) return;
+        if (drawingScaleClearTick === prevDrawingScaleClearTick.current) return;
+        prevDrawingScaleClearTick.current = drawingScaleClearTick;
+        resetMeasurementCalibrationUi();
+        setShowScaleDialog(activeTool === 'measurement');
+    }, [drawingScaleClearTick, activeTool, resetMeasurementCalibrationUi]);
+
+    useEffect(() => {
+        if (drawingScaleRecalibrateTick === 0) return;
+        if (drawingScaleRecalibrateTick === prevDrawingScaleRecalibrateTick.current) return;
+        prevDrawingScaleRecalibrateTick.current = drawingScaleRecalibrateTick;
+        resetMeasurementCalibrationUi();
+        setShowScaleDialog(true);
+    }, [drawingScaleRecalibrateTick, resetMeasurementCalibrationUi]);
 
     const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
         const size = { width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight };
@@ -234,7 +273,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                 return 'cursor-crosshair';
         }
         if (activeTool === 'pin') return 'cursor-crosshair';
-        if (activeTool === 'measurement') return draggingMeasId ? 'cursor-grabbing' : 'cursor-crosshair';
+        if (draggingMeasId) return 'cursor-grabbing';
+        if (activeTool === 'measurement') return 'cursor-crosshair';
         if (activeTool === 'shape') {
             if (hoveredRectId) return 'cursor-move';
             return 'cursor-crosshair';
@@ -364,15 +404,19 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        // Endpoint drag: available in both select and measurement tool modes
+        if ((activeTool === 'select' || activeTool === 'measurement') && drawingScale !== null && measurements.length > 0) {
+            if (!(e.target as HTMLElement).closest('[data-interactive-ui="true"]')) {
+                const hit = hitTestMeasEndpoint(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+                if (hit) {
+                    setDraggingMeasId(hit.m.id);
+                    setDraggingMeasEndpoint(hit.endpoint);
+                    return;
+                }
+            }
+        }
         if (activeTool === 'measurement') {
             if ((e.target as HTMLElement).closest('[data-interactive-ui="true"]')) return;
-            // Check if clicking near an existing endpoint to drag it
-            const hit = hitTestMeasEndpoint(e.nativeEvent.offsetX, e.nativeEvent.offsetY);
-            if (hit && drawingScale !== null) {
-                setDraggingMeasId(hit.m.id);
-                setDraggingMeasEndpoint(hit.endpoint);
-                return;
-            }
             if (drawingScale !== null || isCalibrating) {
                 const coords = getRelativeCoords(e);
                 if (!coords) return;
@@ -386,69 +430,64 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (activeTool === 'measurement') {
-            // Dragging an existing endpoint
-            if (draggingMeasId && draggingMeasEndpoint) {
-                const coords = getRelativeCoords(e);
-                if (!coords) return;
-                const m = measurements.find(x => x.id === draggingMeasId);
-                if (!m) return;
-                const updated = draggingMeasEndpoint === 'p1'
-                    ? { ...m, x1: coords.x, y1: coords.y }
-                    : { ...m, x2: coords.x, y2: coords.y };
-                onMeasurementUpdate(updated);
-                return;
-            }
-            if (measStart) {
-                const coords = getRelativeCoords(e);
-                if (coords) setMeasCurrent(coords);
-                return;
-            }
+        // Endpoint drag runs regardless of active tool
+        if (draggingMeasId && draggingMeasEndpoint) {
+            const coords = getRelativeCoords(e);
+            if (!coords) return;
+            const m = measurements.find(x => x.id === draggingMeasId);
+            if (!m) return;
+            const updated = draggingMeasEndpoint === 'p1'
+                ? { ...m, x1: coords.x, y1: coords.y }
+                : { ...m, x2: coords.x, y2: coords.y };
+            onMeasurementUpdate(updated);
+            return;
+        }
+        if (activeTool === 'measurement' && measStart) {
+            const coords = getRelativeCoords(e);
+            if (coords) setMeasCurrent(coords);
+            return;
         }
         handleMouseMove(e);
     };
 
     const onCanvasMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (activeTool === 'measurement') {
-            if (draggingMeasId) {
-                setDraggingMeasId(null);
-                setDraggingMeasEndpoint(null);
-                return;
-            }
-            if (measStart && measCurrent) {
-                const dx = measCurrent.x - measStart.x;
-                const dy = measCurrent.y - measStart.y;
-                const isClick = Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5;
-                if (!isClick) {
-                    const line = { x1: measStart.x, y1: measStart.y, x2: measCurrent.x, y2: measCurrent.y };
-                    if (isCalibrating) {
-                        setCalibLine(line);
-                        setShowCalibInput(true);
-                        setCalibFt('');
-                        setCalibIn('');
-                    } else {
-                        const newM: Measurement = { id: Date.now().toString(), ...line, visible: true };
-                        onMeasurementAdd(newM);
-                    }
+        // Endpoint drag runs regardless of active tool
+        if (draggingMeasId) {
+            setDraggingMeasId(null);
+            setDraggingMeasEndpoint(null);
+            return;
+        }
+        if (activeTool === 'measurement' && measStart && measCurrent) {
+            const dx = measCurrent.x - measStart.x;
+            const dy = measCurrent.y - measStart.y;
+            const isClick = Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5;
+            if (!isClick) {
+                const line = { x1: measStart.x, y1: measStart.y, x2: measCurrent.x, y2: measCurrent.y };
+                if (isCalibrating) {
+                    setCalibLine(line);
+                    setShowCalibInput(true);
+                    setCalibFt('');
+                    setCalibIn('');
+                } else {
+                    const newM: Measurement = { id: Date.now().toString(), ...line, visible: true };
+                    onMeasurementAdd(newM);
                 }
-                setMeasStart(null);
-                setMeasCurrent(null);
-                return;
             }
+            setMeasStart(null);
+            setMeasCurrent(null);
+            return;
         }
         handleMouseUp(e);
     };
 
     const onCanvasMouseLeave = () => {
-        if (activeTool === 'measurement') {
-            if (draggingMeasId) {
-                setDraggingMeasId(null);
-                setDraggingMeasEndpoint(null);
-            }
-            if (measStart) {
-                setMeasStart(null);
-                setMeasCurrent(null);
-            }
+        if (draggingMeasId) {
+            setDraggingMeasId(null);
+            setDraggingMeasEndpoint(null);
+        }
+        if (activeTool === 'measurement' && measStart) {
+            setMeasStart(null);
+            setMeasCurrent(null);
         }
         handleMouseLeave();
     };
@@ -844,7 +883,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                           const ly = my + sign * perpY * 20;
                           const isHovered = hoveredMeasId === m.id;
                           const isDraggingThis = draggingMeasId === m.id;
-                          const showHandles = activeTool === 'measurement' && drawingScale !== null && (isHovered || isDraggingThis);
+                          const showHandles = (activeTool === 'measurement' || activeTool === 'select') && drawingScale !== null && (isHovered || isDraggingThis);
                           return (
                             <g key={m.id}
                               className="pointer-events-auto"
@@ -1060,8 +1099,10 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     <ScaleDialog
                       isOpen={showScaleDialog}
                       onStartCalibrating={() => {
+                        resetMeasurementCalibrationUi();
                         setShowScaleDialog(false);
                         setIsCalibrating(true);
+                        onBeginScaleRecalibration();
                       }}
                       onClose={() => {
                         setShowScaleDialog(false);

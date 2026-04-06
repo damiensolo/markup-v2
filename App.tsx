@@ -6,6 +6,7 @@ import LinkModal from './components/LinkModal';
 import PhotoViewerModal from './components/PhotoViewerModal';
 import ShareModal from './components/ShareModal';
 import DownloadOptionsModal from './components/DownloadOptionsModal';
+import CompareSheetsModal from './components/CompareSheetsModal';
 import PublishWarningModal from './components/PublishWarningModal';
 import RfiPanel from './components/RfiPanel';
 import SafetyPanel from './components/SafetyPanel';
@@ -23,7 +24,7 @@ import {
 } from './utils/markupColors';
 import LayersPanel from './components/LayersPanel';
 import { LinarcAppShell } from './components/linarcShell/LinarcAppShell';
-import { FilterIcon, ChevronLeftIcon, ShareIcon, SnapshotIcon, DocumentDuplicateIcon, FolderOpenIcon, PanelLeftIcon, PanelRightIcon } from './components/Icons';
+import { FilterIcon, ChevronLeftIcon, ShareIcon, SnapshotIcon, DocumentDuplicateIcon, FolderOpenIcon, SquarePenIcon, PanelLeftIcon, PanelRightIcon } from './components/Icons';
 
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 export type RectangleTagType = Exclude<FilterCategory, 'safety'>;
@@ -350,7 +351,7 @@ const MarkupSetSelector: React.FC<MarkupSetSelectorProps> = ({ markupSets, loade
                 title="Load Markup Sets"
                 type="button"
             >
-                <FolderOpenIcon className="linarc-toolbar-icon" />
+                <SquarePenIcon className="linarc-toolbar-icon" />
                 <span className="hidden sm:inline">Load Markup</span>
                 {loadedCount > 0 && (
                     <span className="-ml-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-blue-600 px-1 text-[11px] font-medium text-white">
@@ -427,6 +428,7 @@ interface HeaderProps {
     markupSets: MarkupSet[];
     loadedSetIds: string[];
     onToggleMarkupSet: (set: MarkupSet) => void;
+    onCompare: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -448,7 +450,8 @@ const Header: React.FC<HeaderProps> = ({
     handleToggleAllFilters, 
     markupSets, 
     loadedSetIds, 
-    onToggleMarkupSet
+    onToggleMarkupSet,
+    onCompare,
 }) => {
     const filterMenuRef = useRef<HTMLDivElement>(null);
 
@@ -481,7 +484,7 @@ const Header: React.FC<HeaderProps> = ({
                  <div ref={filterMenuRef} className="relative">
                     <Tooltip text="Filter items" position="bottom">
                     <button type="button" onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)} className="linarc-toolbar-btn-secondary relative">
-                        <FilterIcon className="linarc-toolbar-icon" /> Filter
+                        <FilterIcon className="linarc-toolbar-icon" />
                         {areFiltersActive && <span className="absolute -right-0.5 -top-0.5 block h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-zinc-800" />}
                     </button>
                     </Tooltip>
@@ -510,17 +513,17 @@ const Header: React.FC<HeaderProps> = ({
                 </div>
                 <Tooltip text="Share drawing" position="bottom">
                     <button type="button" onClick={onShare} className="linarc-toolbar-btn-secondary">
-                        <ShareIcon className="linarc-toolbar-icon" /> Share
+                        <ShareIcon className="linarc-toolbar-icon" />
                     </button>
                 </Tooltip>
                 <Tooltip text="Download snapshot" position="bottom">
                     <button type="button" onClick={onDownload} className="linarc-toolbar-btn-secondary">
-                        <SnapshotIcon className="linarc-toolbar-icon" /> Snapshot
+                        <SnapshotIcon className="linarc-toolbar-icon" />
                     </button>
                 </Tooltip>
-                <Tooltip text="Compare versions" position="bottom">
-                    <button type="button" onClick={() => alert('Compare functionality not implemented')} className="linarc-toolbar-btn-secondary">
-                        <DocumentDuplicateIcon className="linarc-toolbar-icon" /> Compare
+                <Tooltip text="Compare two sheets" position="bottom">
+                    <button type="button" onClick={onCompare} className="linarc-toolbar-btn-secondary">
+                        <DocumentDuplicateIcon className="linarc-toolbar-icon" />
                     </button>
                 </Tooltip>
                 <button
@@ -645,6 +648,10 @@ const App: React.FC = () => {
   const [pins, setPins] = useState<Pin[]>([]);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [drawingScale, setDrawingScale] = useState<number | null>(null); // natural img pixels per foot
+  /** Bumped when user clears scale from UI so CanvasView resets calibration state */
+  const [drawingScaleClearTick, setDrawingScaleClearTick] = useState(0);
+  /** Bumped when user recalibrates; CanvasView resets UI and reopens scale dialog */
+  const [drawingScaleRecalibrateTick, setDrawingScaleRecalibrateTick] = useState(0);
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
   const [allRfis, setAllRfis] = useState<RfiData[]>(mockRfis);
   const [allPhotos, setAllPhotos] = useState<PhotoData[]>(mockPhotos);
@@ -696,6 +703,7 @@ const App: React.FC = () => {
   
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
   const [isPublishWarningOpen, setIsPublishWarningOpen] = useState(false);
   const pendingNavCallback = useRef<(() => void) | null>(null);
 
@@ -754,6 +762,7 @@ const App: React.FC = () => {
         setPins([]);
         setMeasurements([]);
         setDrawingScale(null);
+        setDrawingScaleClearTick((t) => t + 1);
         setNaturalSize({ width: 0, height: 0 });
         setSelectedRectIds([]);
         setHoveredRectId(null);
@@ -913,6 +922,17 @@ const App: React.FC = () => {
     setActivePanel(null);
   }, []);
 
+  /** Clears scale only after user clicks "Start Calibrating" in the modal (see CanvasView). */
+  const handleBeginScaleRecalibration = useCallback(() => {
+    setDrawingScale(null);
+  }, []);
+
+  /** Opens scale modal without clearing scale — measurements stay valid until user starts calibrating or cancels. */
+  const handleRecalibrateDrawingScale = useCallback(() => {
+    setDrawingScaleRecalibrateTick((t) => t + 1);
+    handleSetActiveTool('measurement');
+  }, [handleSetActiveTool]);
+
   const handleMarkupColorChange = useCallback(
     (mode: 'fill' | 'stroke', value: string) => {
       if (mode === 'fill') setMarkupFillColor(value);
@@ -1023,7 +1043,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         const target = e.target as HTMLElement;
-        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || isLinkModalOpen || isPhotoViewerOpen || isShareModalOpen || isDownloadModalOpen) {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || isLinkModalOpen || isPhotoViewerOpen || isShareModalOpen || isDownloadModalOpen || isCompareModalOpen) {
             return;
         }
 
@@ -1085,6 +1105,7 @@ const App: React.FC = () => {
       isPhotoViewerOpen,
       isShareModalOpen,
       isDownloadModalOpen,
+      isCompareModalOpen,
       interaction,
       handleMouseUp
   ]);
@@ -1522,6 +1543,7 @@ const App: React.FC = () => {
       setPins([]);
       setMeasurements([]);
       setDrawingScale(null);
+      setDrawingScaleClearTick((t) => t + 1);
       setSelectedRectIds([]);
       setViewTransform({ scale: 1, translateX: 0, translateY: 0 });
       setHasUnsavedChanges(false);
@@ -1722,6 +1744,7 @@ const App: React.FC = () => {
                     markupSets={allMarkupSets}
                     loadedSetIds={loadedSetIds}
                     onToggleMarkupSet={handleToggleMarkupSet}
+                    onCompare={() => setIsCompareModalOpen(true)}
                 />
             <div className="flex min-h-0 min-w-0 flex-1 flex-row items-stretch overflow-hidden">
                 <LayersPanel
@@ -1748,6 +1771,7 @@ const App: React.FC = () => {
                   onToggleLock={handleToggleItemLock}
                   drawingScale={drawingScale}
                   naturalSize={naturalSize}
+                  onRecalibrateDrawingScale={handleRecalibrateDrawingScale}
                 />
                 <div className="relative min-h-0 min-w-0 flex-1">
                   <CanvasView
@@ -1835,6 +1859,9 @@ const App: React.FC = () => {
                     onMeasurementUpdate={(m) => { setMeasurements(prev => prev.map(x => x.id === m.id ? m : x)); setHasUnsavedChanges(true); }}
                     onDrawingScaleSet={(pxPerFt) => setDrawingScale(pxPerFt)}
                     onNaturalSizeChange={setNaturalSize}
+                    drawingScaleClearTick={drawingScaleClearTick}
+                    drawingScaleRecalibrateTick={drawingScaleRecalibrateTick}
+                    onBeginScaleRecalibration={handleBeginScaleRecalibration}
                   />
                   <CanvasSidebarFloatToggles
                     isLayersOpen={isLayersPanelOpen}
@@ -1963,6 +1990,17 @@ const App: React.FC = () => {
         onClose={() => setIsDownloadModalOpen(false)}
         defaultFileName={defaultDownloadFileName}
         imageSrc={imageSrc}
+      />
+
+      <CompareSheetsModal
+        isOpen={isCompareModalOpen}
+        onClose={() => setIsCompareModalOpen(false)}
+        allDrawings={allDrawings}
+        currentDrawing={currentDrawing}
+        currentVersion={currentVersion}
+        onCompare={() => {
+          /* Demo: overlay compare not implemented — modal closes in CompareSheetsModal */
+        }}
       />
 
       <PublishWarningModal

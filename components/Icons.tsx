@@ -1,8 +1,9 @@
 
 import React from 'react';
-import { 
-  Upload, 
-  FolderOpen, 
+import {
+  Upload,
+  FolderOpen,
+  SquarePen, 
   Trash2, 
   MousePointer2, 
   Link, 
@@ -54,6 +55,7 @@ interface IconProps {
 
 export const UploadIcon: React.FC<IconProps> = ({ className }) => <Upload className={className} />;
 export const FolderOpenIcon: React.FC<IconProps> = ({ className }) => <FolderOpen className={className} />;
+export const SquarePenIcon: React.FC<IconProps> = ({ className }) => <SquarePen className={className} />;
 export const TrashIcon: React.FC<IconProps> = ({ className }) => <Trash2 className={className} />;
 export const MousePointerIcon: React.FC<IconProps> = ({ className }) => <MousePointer2 className={className} />;
 export const LinkIcon: React.FC<IconProps> = ({ className }) => <Link className={className} />;
