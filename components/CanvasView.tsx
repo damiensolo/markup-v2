@@ -2,7 +2,7 @@
 
 // Fix: Import 'useCallback' from 'react' to resolve 'Cannot find name' errors.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Palette } from 'lucide-react';
+import { Palette, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle, Measurement } from '../types';
 import ScaleDialog from './ScaleDialog';
 import { RectangleTagType, ToolbarPosition, ImageGeom } from '../App';
@@ -95,6 +95,84 @@ interface CanvasViewProps {
     /** Called when user confirms "Start Calibrating" — clears drawing scale in parent */
     onBeginScaleRecalibration: () => void;
 }
+
+const calibSpinHidden =
+    '[-moz-appearance:textfield] [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none';
+
+interface CalibStepperFieldProps {
+    value: string;
+    onChange: (v: string) => void;
+    min?: number;
+    max?: number;
+    step?: number;
+    inputMode?: 'decimal' | 'numeric';
+    onEnter?: () => void;
+    autoFocus?: boolean;
+}
+
+/** Native spinners stay hidden; custom chevrons match the dark calibration popover. */
+const CalibStepperField: React.FC<CalibStepperFieldProps> = ({
+    value,
+    onChange,
+    min = 0,
+    max = Number.POSITIVE_INFINITY,
+    step = 1,
+    inputMode = 'numeric',
+    onEnter,
+    autoFocus,
+}) => {
+    const bump = (direction: 1 | -1) => {
+        const n = parseFloat(value);
+        const base = Number.isFinite(n) ? n : 0;
+        const next = Math.min(max, Math.max(min, base + direction * step));
+        onChange(String(next));
+    };
+
+    const stepBtn =
+        'flex flex-1 items-center justify-center text-gray-400 transition-colors hover:bg-gray-700/90 hover:text-white active:bg-gray-600';
+
+    return (
+        <div className="flex overflow-hidden rounded-lg border border-gray-600 bg-gray-800 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
+            <input
+                type="number"
+                min={min}
+                max={Number.isFinite(max) ? max : undefined}
+                step={step}
+                inputMode={inputMode}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') onEnter?.();
+                    if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        bump(1);
+                    }
+                    if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        bump(-1);
+                    }
+                }}
+                placeholder="0"
+                autoFocus={autoFocus}
+                className={`min-w-0 w-11 border-0 bg-transparent px-2 py-1.5 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-0 ${calibSpinHidden}`}
+            />
+            <div className="flex w-7 flex-shrink-0 flex-col border-l border-gray-600">
+                <button
+                    type="button"
+                    tabIndex={-1}
+                    aria-label="Increase"
+                    onClick={() => bump(1)}
+                    className={`${stepBtn} rounded-none border-b border-gray-600/80`}
+                >
+                    <ChevronUp className="h-3.5 w-3.5" strokeWidth={2.25} />
+                </button>
+                <button type="button" tabIndex={-1} aria-label="Decrease" onClick={() => bump(-1)} className={stepBtn}>
+                    <ChevronDown className="h-3.5 w-3.5" strokeWidth={2.25} />
+                </button>
+            </div>
+        </div>
+    );
+};
 
 const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const {
@@ -754,7 +832,6 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         ))}
                         <div data-interactive-ui="true" className={`absolute flex transition-opacity transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isMenuVisible ? 'opacity-100' : 'opacity-0'}`} style={{ left: `${singleSelectionScreenRect.left + singleSelectionScreenRect.width / 2}px`, top: `${singleSelectionScreenRect.top}px`, transform: `translate(-50%, -100%) translateY(-10px) scale(${isMenuVisible ? 1 : 0.9})`, transformOrigin: 'bottom center', pointerEvents: isMenuVisible ? 'auto' : 'none', zIndex: 30 }}>
                             <div className="flex items-center gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white">
-                                <button onClick={(e) => selectedRectangle && handlePublishRect(e, selectedRectangle.id)} title="Publish" className="p-2 rounded-md hover:bg-gray-700 transition-colors"><ArrowUpTrayIcon className="w-5 h-5" /></button>
                                 <div className="relative">
                                     <button onClick={(e) => selectedRectangle && handleLinkRect(e, selectedRectangle.id)} title="Link" className={`p-2 rounded-md transition-colors ${linkMenuRectId === selectedRectangle?.id ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}><LinkIcon className="w-5 h-5" /></button>
                                     {linkMenuRectId === selectedRectangle?.id && (
@@ -1051,28 +1128,26 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                           <p className="text-xs font-semibold text-gray-300 mb-2">Enter reference length</p>
                           <div className="flex items-center gap-2 mb-3">
                             <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                min="0"
+                              <CalibStepperField
                                 value={calibFt}
-                                onChange={e => setCalibFt(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && confirmCalibration()}
-                                placeholder="0"
-                                className="w-16 rounded-lg border border-gray-600 bg-gray-800 px-2 py-1.5 text-sm text-white placeholder:text-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                onChange={setCalibFt}
+                                min={0}
+                                step={1}
+                                inputMode="decimal"
+                                onEnter={confirmCalibration}
                                 autoFocus
                               />
                               <span className="text-xs text-gray-400">ft</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <input
-                                type="number"
-                                min="0"
-                                max="11"
+                              <CalibStepperField
                                 value={calibIn}
-                                onChange={e => setCalibIn(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && confirmCalibration()}
-                                placeholder="0"
-                                className="w-16 rounded-lg border border-gray-600 bg-gray-800 px-2 py-1.5 text-sm text-white placeholder:text-gray-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                onChange={setCalibIn}
+                                min={0}
+                                max={11}
+                                step={1}
+                                inputMode="numeric"
+                                onEnter={confirmCalibration}
                               />
                               <span className="text-xs text-gray-400">in</span>
                             </div>

@@ -162,7 +162,7 @@ const DownloadOptionsModal: React.FC<DownloadOptionsModalProps> = ({
             type="button"
             onClick={handleDirectDownload}
             disabled={!imageSrc}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-black px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-950 dark:hover:bg-zinc-800"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-black px-4 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-950 dark:hover:bg-zinc-800"
           >
             <DownloadIcon className="h-5 w-5 shrink-0 text-white" />
             Direct Download
