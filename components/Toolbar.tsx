@@ -136,7 +136,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
   const mainTools = [
     { id: 'image', label: 'Image', icon: <ImageIcon /> },
     { id: 'location', label: 'Location', icon: <LocationIcon /> },
-    { id: 'measurement', label: 'Measurement', icon: <MeasurementIcon /> },
     { id: 'polygon', label: 'Polygon', icon: <PolygonIcon /> },
     { id: 'pen', label: 'Pen', icon: <PenIcon /> },
     { id: 'highlighter', label: 'Highlighter', icon: <HighlighterIcon /> },
@@ -271,6 +270,14 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 </div>
             )}
         </div>
+
+        <ToolButton
+            label="Measurement"
+            icon={<MeasurementIcon />}
+            isActive={activeTool === 'measurement'}
+            onClick={() => handleToolClick('measurement')}
+            tooltipPosition={tooltipPos}
+        />
 
         {mainTools.map((tool) => (
              <ToolButton

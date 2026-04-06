@@ -4,7 +4,12 @@
       "Bash(npx tsc:*)",
       "Bash(npx vite:*)",
       "Bash(grep -o \"min-w-[^;,{} ]*\\\\|max-w-[^;,{} ]*\" \"C:\\\\Users\\\\damie\\\\Projects\\\\markup-v2\\\\dist\\\\assets\\\\index-SuhrdZY2.css\")",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "mcp__plugin_figma_figma__get_screenshot",
+      "mcp__plugin_figma_figma__generate_figma_design",
+      "Bash(netstat -ano)",
+      "Bash(findstr :5173)",
+      "Bash(start:*)"
     ]
   }
 }
