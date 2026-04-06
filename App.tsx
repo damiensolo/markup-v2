@@ -645,6 +645,7 @@ const App: React.FC = () => {
   const [pins, setPins] = useState<Pin[]>([]);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [drawingScale, setDrawingScale] = useState<number | null>(null); // natural img pixels per foot
+  const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
   const [allRfis, setAllRfis] = useState<RfiData[]>(mockRfis);
   const [allPhotos, setAllPhotos] = useState<PhotoData[]>(mockPhotos);
   const [allPunches, setAllPunches] = useState<PunchData[]>(mockPunches);
@@ -753,6 +754,7 @@ const App: React.FC = () => {
         setPins([]);
         setMeasurements([]);
         setDrawingScale(null);
+        setNaturalSize({ width: 0, height: 0 });
         setSelectedRectIds([]);
         setHoveredRectId(null);
         setLinkMenuRectId(null);
@@ -1744,6 +1746,8 @@ const App: React.FC = () => {
                   markupSetNames={markupSetNames}
                   onToggleBatchVisibility={handleToggleBatchVisibility}
                   onToggleLock={handleToggleItemLock}
+                  drawingScale={drawingScale}
+                  naturalSize={naturalSize}
                 />
                 <div className="relative min-h-0 min-w-0 flex-1">
                   <CanvasView
@@ -1830,6 +1834,7 @@ const App: React.FC = () => {
                     onMeasurementDelete={(id) => { setMeasurements(prev => prev.filter(m => m.id !== id)); setHasUnsavedChanges(true); }}
                     onMeasurementUpdate={(m) => { setMeasurements(prev => prev.map(x => x.id === m.id ? m : x)); setHasUnsavedChanges(true); }}
                     onDrawingScaleSet={(pxPerFt) => setDrawingScale(pxPerFt)}
+                    onNaturalSizeChange={setNaturalSize}
                   />
                   <CanvasSidebarFloatToggles
                     isLayersOpen={isLayersPanelOpen}

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, PhotoData } from '../types';
 import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, PhotoIcon, LockClosedIcon, LockOpenIcon, XMarkIcon } from './Icons';
 import Tooltip from './Tooltip';
+import { getRectDimensions, getEllipseDimensions, formatFt, formatArea } from '../utils/measurementUtils';
 
 type LayerItem = (Rectangle & { itemType: 'rect' }) | (Pin & { itemType: 'pin' });
 
@@ -29,6 +30,8 @@ interface LayersPanelProps {
     markupSetNames: Record<string, string>;
     onToggleBatchVisibility: (items: { id: string; type: 'rect' | 'pin' }[], visible: boolean) => void;
     onToggleLock: (id: string, type: 'rect' | 'pin') => void;
+    drawingScale?: number | null;
+    naturalSize?: { width: number; height: number };
 }
 
 const ItemIcon = ({ item }: { item: LayerItem }) => {
@@ -56,10 +59,24 @@ const LinkedItemIcon = ({ type }: { type: string }) => {
     }
 };
 
-const LayersPanel: React.FC<LayersPanelProps> = ({ 
+const MeasurementChip: React.FC<{ label: string; value: string; emphasized?: boolean }> = ({ label, value, emphasized = false }) => (
+    <span
+        className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] leading-tight ${
+            emphasized
+                ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+                : 'border-gray-200 bg-gray-50 text-gray-600 dark:border-zinc-700 dark:bg-zinc-800/80 dark:text-zinc-300'
+        }`}
+    >
+        <span className="font-semibold uppercase tracking-wide">{label}</span>
+        <span className="font-medium">{value}</span>
+    </span>
+);
+
+const LayersPanel: React.FC<LayersPanelProps> = ({
     isOpen, onClose, rectangles, pins, selectedRectIds, selectedPinId, expandedIds, onToggleExpand,
     onSelectRect, onSelectPin, onRenameRect, onRenamePin, onDeleteRect, onDeletePin,
-    onToggleRectVisibility, onTogglePinVisibility, onOpenRfiPanel, onOpenPhotoViewer, markupSetNames, onToggleBatchVisibility, onToggleLock
+    onToggleRectVisibility, onTogglePinVisibility, onOpenRfiPanel, onOpenPhotoViewer, markupSetNames, onToggleBatchVisibility, onToggleLock,
+    drawingScale, naturalSize
 }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
@@ -184,9 +201,67 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
         window.open(url, '_blank', 'noopener,noreferrer');
     };
 
+    const renderMeasurementSummary = (item: LayerItem, showFull: boolean) => {
+        if (item.itemType !== 'rect' || !drawingScale || !naturalSize?.width) return null;
+
+        if (item.shape === 'box') {
+            const dims = getRectDimensions(item, drawingScale, naturalSize);
+            const area = formatArea(dims.area);
+            const length = formatFt(dims.length);
+            const width = formatFt(dims.width);
+            const tooltip = `Length ${length}, Width ${width}, Area ${area}`;
+            return (
+                <div className="mt-1 flex flex-wrap items-center gap-1" title={tooltip}>
+                    {showFull ? (
+                        <>
+                            <MeasurementChip label="L" value={length} />
+                            <MeasurementChip label="W" value={width} />
+                            <MeasurementChip label="A" value={area} emphasized />
+                        </>
+                    ) : (
+                        <MeasurementChip label="A" value={area} emphasized />
+                    )}
+                </div>
+            );
+        }
+
+        if (item.shape === 'ellipse') {
+            const dims = getEllipseDimensions(item, drawingScale, naturalSize);
+            const area = formatArea(dims.area);
+            const diameterH = formatFt(dims.wFt);
+            const diameterV = formatFt(dims.hFt);
+            const tooltip = dims.isCircle
+                ? `Diameter ${diameterH}, Area ${area}`
+                : `Diameter H ${diameterH}, Diameter V ${diameterV}, Area ${area}`;
+
+            return (
+                <div className="mt-1 flex flex-wrap items-center gap-1" title={tooltip}>
+                    {showFull ? (
+                        <>
+                            {dims.isCircle ? (
+                                <MeasurementChip label="D" value={diameterH} />
+                            ) : (
+                                <>
+                                    <MeasurementChip label="Dh" value={diameterH} />
+                                    <MeasurementChip label="Dv" value={diameterV} />
+                                </>
+                            )}
+                            <MeasurementChip label="A" value={area} emphasized />
+                        </>
+                    ) : (
+                        <MeasurementChip label="A" value={area} emphasized />
+                    )}
+                </div>
+            );
+        }
+
+        return null;
+    };
+
     const renderItem = (item: LayerItem) => {
         const isSelected = item.itemType === 'rect' ? selectedRectIds.includes(item.id) : selectedPinId === item.id;
         const isExpanded = expandedIds.includes(item.id);
+        const showFullMeasurements = isSelected || isExpanded;
         const hasChildren = item.itemType === 'rect' && (
             (item.rfi?.length || 0) > 0 ||
             (item.submittals?.length || 0) > 0 ||
@@ -225,13 +300,16 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                             className="flex-grow bg-transparent border-b border-blue-600 focus:outline-none text-gray-800 dark:text-zinc-200"
                         />
                     ) : (
-                        <span 
-                            onDoubleClick={() => handleStartEdit(item)} 
-                            className="flex-grow truncate select-none text-gray-800 dark:text-gray-200"
-                            title={item.name}
-                        >
-                            {item.name}
-                        </span>
+                        <div className="flex min-w-0 flex-1 flex-col">
+                            <span
+                                onDoubleClick={() => handleStartEdit(item)}
+                                className="truncate select-none text-gray-800 dark:text-gray-200"
+                                title={item.name}
+                            >
+                                {item.name}
+                            </span>
+                            {renderMeasurementSummary(item, showFullMeasurements)}
+                        </div>
                     )}
 
                     <div className="flex items-center ml-2">

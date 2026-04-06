@@ -11,6 +11,7 @@ import Toolbar from './Toolbar';
 import Tooltip from './Tooltip';
 import MarkupColorPicker from './MarkupColorPicker';
 import { resolveRectFillColor, resolveRectStrokeColor } from '../utils/markupColors';
+import { getRectDimensions, formatFt, formatArea } from '../utils/measurementUtils';
 
 type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
@@ -86,6 +87,7 @@ interface CanvasViewProps {
     onMeasurementDelete: (id: string) => void;
     onMeasurementUpdate: (m: Measurement) => void;
     onDrawingScaleSet: (pixelsPerFoot: number) => void;
+    onNaturalSizeChange?: (size: { width: number; height: number }) => void;
 }
 
 const CanvasView: React.FC<CanvasViewProps> = (props) => {
@@ -99,7 +101,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         setDraggingPinId, setSelectedPinId, handlePinDetails, handleDeletePin, setHoveredItem,
         hidePopupTimer, showPopupTimer, handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
         handleSubmenuLink, onOpenRfiPanel, onOpenPhotoViewer, mouseDownRef, setSelectedRectIds, getRelativeCoords, setPinDragOffset,
-        measurements, drawingScale, onMeasurementAdd, onMeasurementDelete, onMeasurementUpdate, onDrawingScaleSet
+        measurements, drawingScale, onMeasurementAdd, onMeasurementDelete, onMeasurementUpdate, onDrawingScaleSet, onNaturalSizeChange
     } = props;
 
     const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
@@ -124,10 +126,9 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const [draggingMeasEndpoint, setDraggingMeasEndpoint] = useState<'p1' | 'p2' | null>(null);
 
     const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-        setNaturalSize({
-            width: e.currentTarget.naturalWidth,
-            height: e.currentTarget.naturalHeight
-        });
+        const size = { width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight };
+        setNaturalSize(size);
+        onNaturalSizeChange?.(size);
     };
 
     useEffect(() => {
@@ -521,23 +522,112 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
 
                             return (
                                 <div key={rect.id} className="absolute" style={{ left: `${left}px`, top: `${top}px`, width: `${pixelWidth}px`, height: `${pixelHeight}px`, pointerEvents: 'none' }}>
-                                    {rect.shape === 'box' && (
-                                      <div
-                                        className="w-full h-full box-border"
-                                        style={{
-                                          borderWidth: sw,
-                                          borderStyle: 'solid',
-                                          borderColor: strokeColor,
-                                          backgroundColor: fillColor === 'transparent' ? 'transparent' : fillColor,
-                                        }}
-                                      />
-                                    )}
-                                    {(rect.shape === 'ellipse' || rect.shape === 'cloud') && (
-                                        <svg width="100%" height="100%" viewBox={`0 0 ${pixelWidth} ${pixelHeight}`} preserveAspectRatio="none" className="overflow-visible">
-                                            {rect.shape === 'ellipse' && (<ellipse cx={pixelWidth / 2} cy={pixelHeight / 2} rx={pixelWidth / 2} ry={pixelHeight / 2} {...shapeProps} />)}
-                                            {rect.shape === 'cloud' && (<path d={generateCloudPath(pixelWidth, pixelHeight)} {...shapeProps} />)}
-                                        </svg>
-                                    )}
+                                    {rect.shape === 'box' && (() => {
+                                      // Compute per-axis real-world dims (wFt = horizontal, hFt = vertical)
+                                      const wFt = drawingScale && naturalSize.width
+                                        ? (rect.width / 100) * naturalSize.width / drawingScale : null;
+                                      const hFt = drawingScale && naturalSize.height
+                                        ? (rect.height / 100) * naturalSize.height / drawingScale : null;
+                                      const area = wFt != null && hFt != null ? wFt * hFt : null;
+                                      // "Length" = longer side, "Width" = shorter side
+                                      const hLabel = wFt != null && hFt != null
+                                        ? (wFt >= hFt ? `L ${formatFt(wFt)}` : `W ${formatFt(wFt)}`) : null;
+                                      const vLabel = wFt != null && hFt != null
+                                        ? (hFt > wFt ? `L ${formatFt(hFt)}` : `W ${formatFt(hFt)}`) : null;
+                                      const dimTag: React.CSSProperties = {
+                                        position: 'absolute',
+                                        background: 'rgba(255,255,255,0.92)',
+                                        color: '#111',
+                                        fontSize: '9px',
+                                        fontWeight: 600,
+                                        fontFamily: 'monospace',
+                                        letterSpacing: '0.02em',
+                                        padding: '1px 5px',
+                                        borderRadius: '3px',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+                                        border: '0.5px solid rgba(0,0,0,0.1)',
+                                        whiteSpace: 'nowrap',
+                                        lineHeight: 1.6,
+                                        pointerEvents: 'none',
+                                      };
+                                      return (
+                                        <div className="relative w-full h-full box-border" style={{ borderWidth: sw, borderStyle: 'solid', borderColor: strokeColor, backgroundColor: fillColor === 'transparent' ? 'transparent' : fillColor }}>
+                                          {isSelected && hLabel && (
+                                            // Bottom edge — horizontal dimension (length)
+                                            <div style={{ ...dimTag, bottom: 0, left: '50%', transform: 'translate(-50%, 50%)' }}>
+                                              {hLabel}
+                                            </div>
+                                          )}
+                                          {isSelected && vLabel && (
+                                            // Left edge — vertical dimension (width), rotated
+                                            <div style={{ ...dimTag, left: 0, top: '50%', transform: 'translate(-50%, -50%) rotate(-90deg)', transformOrigin: 'center center' }}>
+                                              {vLabel}
+                                            </div>
+                                          )}
+                                          {isSelected && area != null && (
+                                            // Center — area
+                                            <div style={{ ...dimTag, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
+                                              {formatArea(area)}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
+                                    {(rect.shape === 'ellipse' || rect.shape === 'cloud') && (() => {
+                                        // Ellipse measurements
+                                        const eFt = drawingScale && naturalSize.width ? {
+                                            w: (rect.width / 100) * naturalSize.width / drawingScale,
+                                            h: (rect.height / 100) * naturalSize.height / drawingScale,
+                                        } : null;
+                                        const eArea = eFt ? Math.PI * (eFt.w / 2) * (eFt.h / 2) : null;
+                                        // Ramanujan perimeter approximation
+                                        const ePerim = eFt ? (() => {
+                                            const a = eFt.w / 2, b = eFt.h / 2;
+                                            return Math.PI * (3 * (a + b) - Math.sqrt((3 * a + b) * (a + 3 * b)));
+                                        })() : null;
+                                        const isCircle = eFt ? Math.abs(eFt.w - eFt.h) / Math.max(eFt.w, eFt.h) < 0.03 : false;
+                                        const dimTag: React.CSSProperties = {
+                                            position: 'absolute',
+                                            background: 'rgba(255,255,255,0.92)',
+                                            color: '#111',
+                                            fontSize: '9px',
+                                            fontWeight: 600,
+                                            fontFamily: 'monospace',
+                                            letterSpacing: '0.02em',
+                                            padding: '1px 5px',
+                                            borderRadius: '3px',
+                                            boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+                                            border: '0.5px solid rgba(0,0,0,0.1)',
+                                            whiteSpace: 'nowrap',
+                                            lineHeight: 1.6,
+                                            pointerEvents: 'none',
+                                        };
+                                        return (
+                                            <div className="relative w-full h-full">
+                                                <svg width="100%" height="100%" viewBox={`0 0 ${pixelWidth} ${pixelHeight}`} preserveAspectRatio="none" className="overflow-visible">
+                                                    {rect.shape === 'ellipse' && (<ellipse cx={pixelWidth / 2} cy={pixelHeight / 2} rx={pixelWidth / 2} ry={pixelHeight / 2} {...shapeProps} />)}
+                                                    {rect.shape === 'cloud' && (<path d={generateCloudPath(pixelWidth, pixelHeight)} {...shapeProps} />)}
+                                                </svg>
+                                                {isSelected && rect.shape === 'ellipse' && eFt && eArea != null && ePerim != null && (<>
+                                                    {/* Bottom — horizontal diameter */}
+                                                    <div style={{ ...dimTag, bottom: 0, left: '50%', transform: 'translate(-50%, 50%)' }}>
+                                                        {isCircle ? `⌀ ${formatFt(eFt.w)}` : `⌀h ${formatFt(eFt.w)}`}
+                                                    </div>
+                                                    {/* Left — vertical diameter, rotated */}
+                                                    {!isCircle && (
+                                                        <div style={{ ...dimTag, left: 0, top: '50%', transform: 'translate(-50%, -50%) rotate(-90deg)', transformOrigin: 'center center' }}>
+                                                            {`⌀v ${formatFt(eFt.h)}`}
+                                                        </div>
+                                                    )}
+                                                    {/* Center — area + perimeter */}
+                                                    <div style={{ ...dimTag, top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
+                                                        <div>{formatArea(eArea)}</div>
+                                                        <div style={{ opacity: 0.75 }}>P {formatFt(ePerim)}</div>
+                                                    </div>
+                                                </>)}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             );
                         })}
