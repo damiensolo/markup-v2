@@ -12,6 +12,7 @@ import Tooltip from './Tooltip';
 import MarkupColorPicker from './MarkupColorPicker';
 import { resolveRectFillColor, resolveRectStrokeColor } from '../utils/markupColors';
 import { getRectDimensions, formatFt, formatArea } from '../utils/measurementUtils';
+import { MENUS_MODE } from '../utils/showcaseMode';
 
 type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
@@ -190,9 +191,12 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     } = props;
 
     const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
-    const [markupColorPanelOpen, setMarkupColorPanelOpen] = useState(false);
+    const [markupColorPanelOpen, setMarkupColorPanelOpen] = useState(MENUS_MODE);
+    /** Where the color panel was opened from — drives anchoring (toolbar vs selection bar). */
+    const [markupColorPanelSource, setMarkupColorPanelSource] = useState<'toolbar' | 'selection' | null>(null);
     const settingsMenuRef = useRef<HTMLDivElement>(null);
     const markupColorPanelRef = useRef<HTMLDivElement>(null);
+    const markupToolbarFillStrokeRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
     const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
     const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
@@ -266,8 +270,13 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     }, [linkMenuRectId]);
 
     useEffect(() => {
+        if (!markupColorPanelOpen) setMarkupColorPanelSource(null);
+    }, [markupColorPanelOpen]);
+
+    useEffect(() => {
         if (!markupColorPanelOpen) return;
         const onDown = (e: MouseEvent) => {
+            if (MENUS_MODE) return;
             const t = e.target as HTMLElement;
             if (markupColorPanelRef.current?.contains(t)) return;
             if (t.closest('[data-markup-color-trigger]')) return;
@@ -860,7 +869,11 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             setLinkMenuRectId(null);
-                                            setMarkupColorPanelOpen((o) => !o);
+                                            setMarkupColorPanelOpen((o) => {
+                                                const next = !o;
+                                                if (next) setMarkupColorPanelSource('selection');
+                                                return next;
+                                            });
                                         }}
                                         title="Fill & stroke"
                                         className={`p-2 rounded-md transition-colors ${markupColorPanelOpen ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
@@ -882,7 +895,11 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                         type="button"
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            setMarkupColorPanelOpen((o) => !o);
+                                            setMarkupColorPanelOpen((o) => {
+                                                const next = !o;
+                                                if (next) setMarkupColorPanelSource('selection');
+                                                return next;
+                                            });
                                         }}
                                         title="Fill & stroke"
                                         className={`p-2 rounded-md transition-colors ${markupColorPanelOpen ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
@@ -1314,7 +1331,24 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         const PICKER_W = 300;
                         const GAP = 12;
                         let pickerStyle: React.CSSProperties;
-                        if (activeSelectionRect && containerSize.width > 0) {
+                        const containerEl = imageContainerRef.current;
+                        const toolbarAnchor = markupToolbarFillStrokeRef.current;
+                        if (
+                            markupColorPanelSource === 'toolbar' &&
+                            containerEl &&
+                            toolbarAnchor &&
+                            containerSize.width > 0
+                        ) {
+                            const cr = containerEl.getBoundingClientRect();
+                            const ar = toolbarAnchor.getBoundingClientRect();
+                            const relLeft = ar.left - cr.left;
+                            const relTop = ar.top - cr.top;
+                            const W = containerSize.width;
+                            const H = containerSize.height;
+                            const left = Math.max(8, Math.min(relLeft + ar.width / 2 - PICKER_W / 2, W - PICKER_W - 8));
+                            const bottom = H - relTop + GAP;
+                            pickerStyle = { left: `${left}px`, bottom: `${bottom}px` };
+                        } else if (activeSelectionRect && containerSize.width > 0) {
                             const markupRight = activeSelectionRect.left + activeSelectionRect.width;
                             const markupLeft = activeSelectionRect.left;
                             let left: number;
@@ -1364,9 +1398,16 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                              markupFillColor={markupFillColor}
                              markupStrokeColor={markupStrokeColor}
                              markupColorPanelOpen={markupColorPanelOpen}
-                             onMarkupColorPanelToggle={() => setMarkupColorPanelOpen((o) => !o)}
+                             onMarkupColorPanelToggle={() => {
+                                 setMarkupColorPanelOpen((o) => {
+                                     const next = !o;
+                                     if (next) setMarkupColorPanelSource('toolbar');
+                                     return next;
+                                 });
+                             }}
                              onMarkupColorPanelClose={() => setMarkupColorPanelOpen(false)}
                              toolbarPosition={toolbarPosition}
+                             ref={markupToolbarFillStrokeRef}
                          />
                     </div>
                 </div>

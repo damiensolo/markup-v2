@@ -5,6 +5,7 @@ import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, Ph
 import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, PhotoIcon, LockClosedIcon, LockOpenIcon, XMarkIcon } from './Icons';
 import Tooltip from './Tooltip';
 import { getRectDimensions, getEllipseDimensions, formatFt, formatArea } from '../utils/measurementUtils';
+import { MENUS_MODE } from '../utils/showcaseMode';
 
 type LayerItem = (Rectangle & { itemType: 'rect' }) | (Pin & { itemType: 'pin' });
 
@@ -293,13 +294,13 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                             </span>
                         )}
                         <div className="ml-1 flex flex-shrink-0 items-center">
-                            <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onDeleteRect(item.id) : onDeletePin(item.id); }} className="p-1 rounded-full hover:bg-red-500 hover:text-white text-gray-500 dark:text-gray-400 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
+                            <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onDeleteRect(item.id) : onDeletePin(item.id); }} className={`p-1 rounded-full hover:bg-red-500 hover:text-white text-gray-500 dark:text-gray-400 ${MENUS_MODE ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'} transition-opacity`}>
                                 <TrashIcon className="w-4 h-4" />
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); onToggleLock(item.id, item.itemType); }} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
+                            <button onClick={(e) => { e.stopPropagation(); onToggleLock(item.id, item.itemType); }} className={`p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 ${MENUS_MODE ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'} transition-opacity`}>
                                 {item.locked ? <LockClosedIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : <LockOpenIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onToggleRectVisibility(item.id) : onTogglePinVisibility(item.id); }} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity">
+                            <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onToggleRectVisibility(item.id) : onTogglePinVisibility(item.id); }} className={`p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 ${MENUS_MODE ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'} transition-opacity`}>
                                 {item.visible ? <EyeIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : <EyeSlashIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
                             </button>
                         </div>

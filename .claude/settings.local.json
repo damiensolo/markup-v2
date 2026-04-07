@@ -9,7 +9,9 @@
       "mcp__plugin_figma_figma__generate_figma_design",
       "Bash(netstat -ano)",
       "Bash(findstr :5173)",
-      "Bash(start:*)"
+      "Bash(start:*)",
+      "Bash(node node_modules/typescript/bin/tsc --noEmit)",
+      "Bash(node:*)"
     ]
   }
 }

@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { MENUS_MODE } from './utils/showcaseMode';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { Rectangle, RfiData, RfiFormState, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet, Measurement } from './types';
 import LinkModal from './components/LinkModal';
@@ -195,12 +196,13 @@ interface DrawingSelectorProps {
     className?: string;
 }
 const DrawingSelector: React.FC<DrawingSelectorProps> = ({ drawings, value, onChange, className = '' }) => {
-    const [isOpen, setIsOpen] = useState(false);
+    const [isOpen, setIsOpen] = useState(MENUS_MODE);
     const [searchTerm, setSearchTerm] = useState('');
     const selectorRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
+            if (MENUS_MODE) return;
             if (selectorRef.current && !selectorRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
@@ -269,6 +271,7 @@ const DrawingVersionSelector: React.FC<DrawingVersionSelectorProps> = ({ version
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
+            if (MENUS_MODE) return;
             if (selectorRef.current && !selectorRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
@@ -327,6 +330,7 @@ const MarkupSetSelector: React.FC<MarkupSetSelectorProps> = ({ markupSets, loade
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
+            if (MENUS_MODE) return;
             if (selectorRef.current && !selectorRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
@@ -351,10 +355,13 @@ const MarkupSetSelector: React.FC<MarkupSetSelectorProps> = ({ markupSets, loade
                 title="Load Markup Sets"
                 type="button"
             >
-                <SquarePenIcon className="linarc-toolbar-icon" />
-                <span className="hidden sm:inline">Load Markup</span>
+                <SquarePenIcon className="linarc-toolbar-icon" aria-hidden />
+                <span className="hidden sm:inline shrink-0 leading-none">Load Markup</span>
                 {loadedCount > 0 && (
-                    <span className="-ml-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-blue-600 px-1 text-[11px] font-medium text-white">
+                    <span
+                        className="inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-blue-600 px-1 text-[11px] font-medium leading-none text-white tabular-nums"
+                        aria-hidden
+                    >
                         {loadedCount}
                     </span>
                 )}
@@ -457,6 +464,7 @@ const Header: React.FC<HeaderProps> = ({
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
+            if (MENUS_MODE) return;
             if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
                 setIsFilterMenuOpen(false);
             }
@@ -659,10 +667,10 @@ const App: React.FC = () => {
   const [allSafetyIssues, setAllSafetyIssues] = useState<SafetyIssueData[]>(mockSafetyIssues);
   
   // Selection & Interaction State
-  const [selectedRectIds, setSelectedRectIds] = useState<string[]>([]);
+  const [selectedRectIds, setSelectedRectIds] = useState<string[]>(MENUS_MODE ? ['rect-101'] : []);
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
   const [hoveredRectId, setHoveredRectId] = useState<string | null>(null);
-  const [linkMenuRectId, setLinkMenuRectId] = useState<string | null>(null);
+  const [linkMenuRectId, setLinkMenuRectId] = useState<string | null>(MENUS_MODE ? 'rect-101' : null);
   const [draggingPinId, setDraggingPinId] = useState<string | null>(null);
   const [pinDragOffset, setPinDragOffset] = useState<{x: number, y: number} | null>(null);
   const [hoveredItem, setHoveredItem] = useState<HoveredItemInfo | null>(null);
@@ -710,8 +718,8 @@ const App: React.FC = () => {
   // UI State
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [toolbarPosition, setToolbarPosition] = useState<ToolbarPosition>('bottom');
-  const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const [openLinkSubmenu, setOpenLinkSubmenu] = useState<string | null>(null);
+  const [isMenuVisible, setIsMenuVisible] = useState(MENUS_MODE);
+  const [openLinkSubmenu, setOpenLinkSubmenu] = useState<string | null>(MENUS_MODE ? 'rfi' : null);
   const [filters, setFilters] = useState<Record<FilterCategory, boolean>>({
     rfi: true,
     submittal: true,
@@ -720,7 +728,7 @@ const App: React.FC = () => {
     photo: true,
     safety: true,
   });
-  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(MENUS_MODE);
   const [isLayersPanelOpen, setIsLayersPanelOpen] = useState(true);
   const [expandedLayerIds, setExpandedLayerIds] = useState<string[]>([]);
 

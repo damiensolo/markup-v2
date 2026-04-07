@@ -1,6 +1,7 @@
 
 
 import React, { useState, useRef, useEffect } from 'react';
+import { MENUS_MODE } from '../utils/showcaseMode';
 import {
   MousePointerIcon, PenIcon, BoxIcon, ArrowIcon, TextIcon,
   CloudIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon,
@@ -58,22 +59,25 @@ const ToolButton: React.FC<ToolButtonProps> = ({
   </Tooltip>
 );
 
-const Toolbar: React.FC<ToolbarProps> = ({
-  activeTool,
-  setActiveTool,
-  activeShape,
-  setActiveShape,
-  activePinType,
-  setActivePinType,
-  markupFillColor,
-  markupStrokeColor,
-  markupColorPanelOpen,
-  onMarkupColorPanelToggle,
-  onMarkupColorPanelClose,
-  toolbarPosition,
-}) => {
-  const [isShapeMenuOpen, setShapeMenuOpen] = useState(false);
-  const [isPinMenuOpen, setPinMenuOpen] = useState(false);
+const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
+  {
+    activeTool,
+    setActiveTool,
+    activeShape,
+    setActiveShape,
+    activePinType,
+    setActivePinType,
+    markupFillColor,
+    markupStrokeColor,
+    markupColorPanelOpen,
+    onMarkupColorPanelToggle,
+    onMarkupColorPanelClose,
+    toolbarPosition,
+  },
+  ref
+) {
+  const [isShapeMenuOpen, setShapeMenuOpen] = useState(MENUS_MODE);
+  const [isPinMenuOpen, setPinMenuOpen] = useState(MENUS_MODE);
   const shapeMenuRef = useRef<HTMLDivElement>(null);
   const pinMenuRef = useRef<HTMLDivElement>(null);
 
@@ -125,6 +129,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      if (MENUS_MODE) return;
       const target = event.target as Node;
       if (shapeMenuRef.current && !shapeMenuRef.current.contains(target)) setShapeMenuOpen(false);
       if (pinMenuRef.current && !pinMenuRef.current.contains(target)) setPinMenuOpen(false);
@@ -303,8 +308,8 @@ const Toolbar: React.FC<ToolbarProps> = ({
             />
         ))}
 
-        {/* Fill / stroke — opens docked panel on canvas */}
-        <div className="relative" data-markup-color-trigger>
+        {/* Fill / stroke — opens docked panel on canvas (ref for anchoring picker above this control) */}
+        <div ref={ref} className="relative" data-markup-color-trigger>
             <Tooltip text="Fill & stroke" position={tooltipPos}>
                 <button
                     type="button"
@@ -339,6 +344,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
       </div>
     </div>
   );
-};
+});
 
 export default Toolbar;
