@@ -8,8 +8,10 @@ interface TooltipProps {
   position?: 'top' | 'bottom' | 'left' | 'right';
 }
 
+const SHOWCASE_MODE = new URLSearchParams(window.location.search).has('tooltips');
+
 const Tooltip: React.FC<TooltipProps> = ({ text, shortcut, children, position = 'top' }) => {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(SHOWCASE_MODE);
 
   const getPositionClasses = () => {
     switch (position) {
@@ -44,9 +46,9 @@ const Tooltip: React.FC<TooltipProps> = ({ text, shortcut, children, position = 
   return (
     <div
       className="relative flex items-center justify-center"
-      onMouseEnter={() => setIsVisible(true)}
-      onMouseLeave={() => setIsVisible(false)}
-      onMouseDown={() => setIsVisible(false)}
+      onMouseEnter={() => { if (!SHOWCASE_MODE) setIsVisible(true); }}
+      onMouseLeave={() => { if (!SHOWCASE_MODE) setIsVisible(false); }}
+      onMouseDown={() => { if (!SHOWCASE_MODE) setIsVisible(false); }}
     >
       {children}
       <AnimatePresence>

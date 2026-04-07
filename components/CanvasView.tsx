@@ -983,40 +983,70 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                 <circle cx={p2.left} cy={p2.top} r="7" fill="white" stroke="#3B82F6" strokeWidth="2" style={{ cursor: 'grab' }} />
                                 <circle cx={p2.left} cy={p2.top} r="3" fill="#3B82F6" style={{ cursor: 'grab' }} />
                               </>}
-                              {/* Label */}
-                              <foreignObject x={lx - 36} y={ly - 12} width="72" height="24" style={{ overflow: 'visible' }}>
+                              {/* Label + delete — foreignObject must be large enough and centered on (lx, ly) */}
+                              <foreignObject
+                                x={lx - 100}
+                                y={ly - 16}
+                                width="200"
+                                height="32"
+                                style={{ overflow: 'visible' }}
+                              >
                                 <div
-                                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                                  xmlns="http://www.w3.org/1999/xhtml"
+                                  style={{
+                                    display: 'flex',
+                                    width: '100%',
+                                    height: '100%',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '6px',
+                                    pointerEvents: 'auto',
+                                  }}
                                 >
-                                  <span style={{
-                                    background: '#1d4ed8',
-                                    color: '#fff',
-                                    fontSize: '11px',
-                                    fontWeight: 600,
-                                    padding: '2px 7px',
-                                    borderRadius: '4px',
-                                    whiteSpace: 'nowrap',
-                                    fontFamily: 'monospace',
-                                    letterSpacing: '0.02em',
-                                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                                  }}>
+                                  <span
+                                    style={{
+                                      background: '#1d4ed8',
+                                      color: '#fff',
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      padding: '3px 8px',
+                                      borderRadius: '4px',
+                                      whiteSpace: 'nowrap',
+                                      fontFamily: 'ui-monospace, monospace',
+                                      letterSpacing: '0.02em',
+                                      lineHeight: 1.25,
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                                    }}
+                                  >
                                     {label}
                                   </span>
                                   {isHovered && activeTool === 'select' && (
                                     <button
+                                      type="button"
                                       data-interactive-ui="true"
-                                      onClick={(e) => { e.stopPropagation(); onMeasurementDelete(m.id); setHoveredMeasId(null); }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onMeasurementDelete(m.id);
+                                        setHoveredMeasId(null);
+                                      }}
                                       style={{
+                                        display: 'flex',
+                                        flexShrink: 0,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        width: '22px',
+                                        height: '22px',
+                                        padding: 0,
                                         background: '#ef4444',
                                         color: '#fff',
                                         border: 'none',
                                         borderRadius: '4px',
-                                        padding: '2px 5px',
                                         cursor: 'pointer',
-                                        fontSize: '11px',
+                                        fontSize: '16px',
                                         fontWeight: 700,
                                         lineHeight: 1,
                                       }}
+                                      aria-label="Delete measurement"
                                     >
                                       ×
                                     </button>
@@ -1046,13 +1076,31 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                               <line x1={p1.left} y1={p1.top} x2={p2.left} y2={p2.top} stroke="#3B82F6" strokeWidth="2" strokeDasharray="6 3" />
                               <circle cx={p1.left} cy={p1.top} r="4" fill="#3B82F6" />
                               <circle cx={p2.left} cy={p2.top} r="4" fill="#3B82F6" />
-                              <foreignObject x={lx - 36} y={ly - 12} width="72" height="24" style={{ overflow: 'visible' }}>
-                                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                                  <span style={{
-                                    background: '#1d4ed8', color: '#fff', fontSize: '11px', fontWeight: 600,
-                                    padding: '2px 7px', borderRadius: '4px', whiteSpace: 'nowrap',
-                                    fontFamily: 'monospace', boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                                  }}>
+                              <foreignObject x={lx - 56} y={ly - 14} width="112" height="28" style={{ overflow: 'visible' }}>
+                                <div
+                                  xmlns="http://www.w3.org/1999/xhtml"
+                                  style={{
+                                    display: 'flex',
+                                    width: '100%',
+                                    height: '100%',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      background: '#1d4ed8',
+                                      color: '#fff',
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      padding: '3px 8px',
+                                      borderRadius: '4px',
+                                      whiteSpace: 'nowrap',
+                                      fontFamily: 'ui-monospace, monospace',
+                                      lineHeight: 1.25,
+                                      boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                                    }}
+                                  >
                                     {label}
                                   </span>
                                 </div>
