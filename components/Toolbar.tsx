@@ -5,7 +5,7 @@ import { MENUS_MODE } from '../utils/showcaseMode';
 import {
   MousePointerIcon, PenIcon, BoxIcon, ArrowIcon, TextIcon,
   CloudIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon,
-  ImageIcon, LocationIcon, MeasurementIcon, PolygonIcon, HighlighterIcon,
+  ImageIcon, LocationIcon, MeasurementIcon, HighlighterIcon,
   CustomPinIcon,
 } from './Icons';
 import { ToolbarPosition } from '../App';
@@ -141,7 +141,6 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
   const mainTools = [
     { id: 'image', label: 'Image', icon: <ImageIcon /> },
     { id: 'location', label: 'Location', icon: <LocationIcon /> },
-    { id: 'polygon', label: 'Polygon', icon: <PolygonIcon /> },
     { id: 'pen', label: 'Pen', icon: <PenIcon /> },
     { id: 'highlighter', label: 'Highlighter', icon: <HighlighterIcon /> },
     { id: 'arrow', label: 'Arrow', icon: <ArrowIcon /> },
