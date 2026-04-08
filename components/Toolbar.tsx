@@ -154,7 +154,7 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
   const shapeTools: { id: ActiveShape; label: string; shortcut?: string; icon: React.ReactNode }[] = [
       { id: 'cloud', label: 'Cloud', icon: <CloudIcon className="w-6 h-6" /> },
       { id: 'box', label: 'Rectangle', shortcut: 'R', icon: <BoxIcon className="w-6 h-6" /> },
-      { id: 'ellipse', label: 'Ellipse', shortcut: 'O', icon: <EllipseIcon className="w-6 h-6" /> },
+      { id: 'ellipse', label: 'Ellipse', shortcut: 'E', icon: <EllipseIcon className="w-6 h-6" /> },
   ];
 
   const pinTools: { id: ActivePinType; label: string; icon: React.ReactNode }[] = [

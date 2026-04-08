@@ -1065,7 +1065,7 @@ const App: React.FC = () => {
                 setActiveShape('box');
                 handleSetActiveTool('shape');
                 break;
-            case 'o':
+            case 'e':
                 e.preventDefault();
                 setActiveShape('ellipse');
                 handleSetActiveTool('shape');
