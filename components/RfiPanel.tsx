@@ -97,7 +97,7 @@ const RfiPanel: React.FC<RfiPanelProps> = ({
         <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="linarc-panel-body custom-scrollbar flex-1 min-h-0">
           {/* Tabs + header actions */}
-          <div className="mb-5 flex items-center justify-between gap-2 border-b border-zinc-200 dark:border-zinc-700">
+          <div className="mb-5 flex items-end justify-between gap-2 border-b border-zinc-200 dark:border-zinc-700">
             <div className="flex gap-1">
               <button
                 type="button"
@@ -110,7 +110,10 @@ const RfiPanel: React.FC<RfiPanelProps> = ({
               >
                 Details
                 {detailTab === 'details' && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-orange-500" aria-hidden />
+                  <span
+                    className="absolute bottom-[-1px] left-0 right-0 z-[1] h-0.5 bg-blue-600 dark:bg-blue-500"
+                    aria-hidden
+                  />
                 )}
               </button>
               <button
@@ -124,11 +127,14 @@ const RfiPanel: React.FC<RfiPanelProps> = ({
               >
                 Email
                 {detailTab === 'email' && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-orange-500" aria-hidden />
+                  <span
+                    className="absolute bottom-[-1px] left-0 right-0 z-[1] h-0.5 bg-blue-600 dark:bg-blue-500"
+                    aria-hidden
+                  />
                 )}
               </button>
             </div>
-            <div className="flex items-center gap-0.5 pb-1">
+            <div className="flex items-center gap-0.5 pb-2.5">
               {onHeaderTrash && (
                 <button
                   type="button"
