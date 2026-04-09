@@ -369,14 +369,28 @@ const MarkupSetSelector: React.FC<MarkupSetSelectorProps> = ({ markupSets, loade
             {isOpen && (
                 <div className="absolute top-full right-0 mt-2 w-80 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
                     <div className="p-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-750">
-                        <input
-                            type="text"
-                            placeholder="Search markups..."
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-white"
-                            autoFocus
-                        />
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Search markups..."
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 pr-7 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-900 dark:text-white"
+                                autoFocus
+                            />
+                            {searchTerm && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors"
+                                    aria-label="Clear search"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
+                            )}
+                        </div>
                     </div>
                     <div className="p-2">
                         <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2 px-2">Available Markups</h4>
@@ -1560,15 +1574,23 @@ const App: React.FC = () => {
 
   const handleToggleMarkupSet = (set: MarkupSet) => {
     if (loadedSetIds.includes(set.id)) {
-        // Unload
+        // Unload — remove all items belonging to this set
         setRectangles(prev => prev.filter(r => r.sourceSetId !== set.id));
         setPins(prev => prev.filter(p => p.sourceSetId !== set.id));
         setLoadedSetIds(prev => prev.filter(id => id !== set.id));
     } else {
-        // Load
-        // Add sourceSetId to items to identify them later
-        const newRects = set.rectangles.map(r => ({ ...r, sourceSetId: set.id }));
-        const newPins = set.pins.map(p => ({ ...p, sourceSetId: set.id }));
+        // Load — deep-clone each item so the source data is never mutated,
+        // guaranteeing locked:true is applied fresh every time the set is re-toggled on.
+        const newRects = set.rectangles.map(r => ({
+            ...JSON.parse(JSON.stringify(r)),
+            sourceSetId: set.id,
+            locked: true,
+        }));
+        const newPins = set.pins.map(p => ({
+            ...JSON.parse(JSON.stringify(p)),
+            sourceSetId: set.id,
+            locked: true,
+        }));
         setRectangles(prev => [...prev, ...newRects]);
         setPins(prev => [...prev, ...newPins]);
         setLoadedSetIds(prev => [...prev, set.id]);
