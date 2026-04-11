@@ -95,6 +95,19 @@ interface CanvasViewProps {
     drawingScaleRecalibrateTick: number;
     /** Called when user confirms "Start Calibrating" — clears drawing scale in parent */
     onBeginScaleRecalibration: () => void;
+    /** When set, renders two overlaid images for compare mode instead of the single imageSrc */
+    compareImages?: {
+        leftSrc: string;
+        rightSrc: string;
+        leftVisible: boolean;
+        rightVisible: boolean;
+    };
+    /** Alignment offset for the right compare image, plus whether alignment drag mode is active */
+    compareAlignment?: {
+        offset: { x: number; y: number };
+        isAligning: boolean;
+        onOffsetChange: (offset: { x: number; y: number }) => void;
+    };
 }
 
 const calibSpinHidden =
@@ -188,7 +201,74 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         handleSubmenuLink, onOpenRfiPanel, onOpenPhotoViewer, mouseDownRef, setSelectedRectIds, getRelativeCoords, setPinDragOffset,
         measurements, drawingScale, onMeasurementAdd, onMeasurementDelete, onMeasurementUpdate, onDrawingScaleSet, onNaturalSizeChange,
         drawingScaleClearTick, drawingScaleRecalibrateTick, onBeginScaleRecalibration,
+        compareImages, compareAlignment,
     } = props;
+
+    // Compare mode: recolored SVG blob URLs (blue for left, red for right)
+    const [compareLeftUrl, setCompareLeftUrl] = useState<string | null>(null);
+    const [compareRightUrl, setCompareRightUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!compareImages) {
+            setCompareLeftUrl(null);
+            setCompareRightUrl(null);
+            return;
+        }
+        let cancelled = false;
+
+        const recolor = (src: string, color: string): Promise<string> =>
+            fetch(src)
+                .then(r => r.text())
+                .then(svg => {
+                    // Replace all dark stroke/fill colors with the target color; keep white background
+                    const colored = svg
+                        .replace(/stroke="#0a0a1a"/g, `stroke="${color}"`)
+                        .replace(/stroke="#888"/g, `stroke="${color}55"`)
+                        .replace(/stroke="#444"/g, `stroke="${color}88"`)
+                        .replace(/stroke="#555"/g, `stroke="${color}66"`)
+                        .replace(/fill="#0a0a1a"/g, `fill="${color}"`)
+                        .replace(/fill="#2a2a4a"/g, `fill="${color}cc"`)
+                        .replace(/fill="#444"/g, `fill="${color}99"`)
+                        .replace(/fill="#666"/g, `fill="${color}88"`)
+                        .replace(/fill="#f0f4ff"/g, 'fill="white"');
+                    const blob = new Blob([colored], { type: 'image/svg+xml' });
+                    return URL.createObjectURL(blob);
+                });
+
+        recolor(compareImages.leftSrc, '#1a6fff').then(url => { if (!cancelled) setCompareLeftUrl(url); });
+        recolor(compareImages.rightSrc, '#e8000a').then(url => { if (!cancelled) setCompareRightUrl(url); });
+
+        return () => {
+            cancelled = true;
+            setCompareLeftUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+            setCompareRightUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+        };
+    }, [compareImages?.leftSrc, compareImages?.rightSrc]);
+
+    // Alignment drag tracking (no re-render needed during drag)
+    const alignDragRef = useRef<{ startX: number; startY: number; startOffsetX: number; startOffsetY: number } | null>(null);
+
+    // Arrow-key nudge for alignment mode
+    useEffect(() => {
+        if (!compareAlignment?.isAligning) return;
+        const handler = (e: KeyboardEvent) => {
+            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+            e.preventDefault();
+            const step = e.shiftKey ? 10 : 1;
+            const delta = {
+                ArrowUp:    { x: 0, y: -step },
+                ArrowDown:  { x: 0, y:  step },
+                ArrowLeft:  { x: -step, y: 0 },
+                ArrowRight: { x:  step, y: 0 },
+            }[e.key]!;
+            compareAlignment.onOffsetChange({
+                x: compareAlignment.offset.x + delta.x,
+                y: compareAlignment.offset.y + delta.y,
+            });
+        };
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [compareAlignment]);
 
     const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
     const [markupColorPanelOpen, setMarkupColorPanelOpen] = useState(MENUS_MODE);
@@ -347,6 +427,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     }, []);
 
     const getCursorClass = () => {
+        if (compareAlignment?.isAligning) return 'cursor-grab';
         if (interaction.type === 'panning' || draggingPinId) return 'cursor-grabbing';
         if (isSpacebarDown) return 'cursor-grab';
         switch (interaction.type) {
@@ -491,6 +572,17 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        // Alignment drag mode — intercept all mouse activity
+        if (compareAlignment?.isAligning) {
+            alignDragRef.current = {
+                startX: e.clientX,
+                startY: e.clientY,
+                startOffsetX: compareAlignment.offset.x,
+                startOffsetY: compareAlignment.offset.y,
+            };
+            e.preventDefault();
+            return;
+        }
         // Endpoint drag: available in both select and measurement tool modes
         if ((activeTool === 'select' || activeTool === 'measurement') && drawingScale !== null && measurements.length > 0) {
             if (!(e.target as HTMLElement).closest('[data-interactive-ui="true"]')) {
@@ -517,6 +609,16 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        // Alignment drag mode
+        if (compareAlignment?.isAligning && alignDragRef.current) {
+            const dx = (e.clientX - alignDragRef.current.startX) / viewTransform.scale;
+            const dy = (e.clientY - alignDragRef.current.startY) / viewTransform.scale;
+            compareAlignment.onOffsetChange({
+                x: alignDragRef.current.startOffsetX + dx,
+                y: alignDragRef.current.startOffsetY + dy,
+            });
+            return;
+        }
         // Endpoint drag runs regardless of active tool
         if (draggingMeasId && draggingMeasEndpoint) {
             const coords = getRelativeCoords(e);
@@ -538,6 +640,11 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+        // Alignment drag mode
+        if (compareAlignment?.isAligning) {
+            alignDragRef.current = null;
+            return;
+        }
         // Endpoint drag runs regardless of active tool
         if (draggingMeasId) {
             setDraggingMeasId(null);
@@ -568,6 +675,10 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseLeave = () => {
+        if (compareAlignment?.isAligning) {
+            alignDragRef.current = null;
+            return;
+        }
         if (draggingMeasId) {
             setDraggingMeasId(null);
             setDraggingMeasEndpoint(null);
@@ -626,7 +737,50 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                             height: `${containerSize.height}px`,
                         }}
                     >
-                         <img ref={imageRef} src={imageSrc} alt="Blueprint" className="w-full h-full object-contain pointer-events-none" onLoad={handleImageLoad} style={{ position: 'absolute', top: 0, left: 0 }} />
+                        {compareImages ? (
+                            <>
+                                {compareImages.leftVisible && compareLeftUrl && (
+                                    <img
+                                        ref={imageRef}
+                                        src={compareLeftUrl}
+                                        alt="Drawing 1"
+                                        className="w-full h-full object-contain pointer-events-none"
+                                        onLoad={handleImageLoad}
+                                        style={{
+                                            position: 'absolute', top: 0, left: 0,
+                                            mixBlendMode: 'multiply',
+                                        }}
+                                    />
+                                )}
+                                {compareImages.rightVisible && compareRightUrl && (
+                                    <img
+                                        ref={compareImages.leftVisible ? undefined : imageRef}
+                                        src={compareRightUrl}
+                                        alt="Drawing 2"
+                                        className="w-full h-full object-contain pointer-events-none"
+                                        onLoad={compareImages.leftVisible ? undefined : handleImageLoad}
+                                        style={{
+                                            position: 'absolute', top: 0, left: 0,
+                                            transform: compareAlignment && (compareAlignment.offset.x !== 0 || compareAlignment.offset.y !== 0)
+                                                ? `translate(${compareAlignment.offset.x}px, ${compareAlignment.offset.y}px)`
+                                                : undefined,
+                                            mixBlendMode: 'multiply',
+                                        }}
+                                    />
+                                )}
+                            </>
+                        ) : (
+                            <img ref={imageRef} src={imageSrc} alt="Blueprint" className="w-full h-full object-contain pointer-events-none" onLoad={handleImageLoad} style={{ position: 'absolute', top: 0, left: 0 }} />
+                        )}
+                        {/* Alignment mode hint banner */}
+                        {compareAlignment?.isAligning && (
+                            <div className="pointer-events-none absolute inset-x-0 top-3 z-30 flex justify-center">
+                                <div className="flex items-center gap-2 rounded-full bg-zinc-900/80 px-4 py-2 text-xs font-medium text-white shadow-lg backdrop-blur-sm">
+                                    <svg className="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a1 1 0 0 1 1 1v1.586l1.293-1.293a1 1 0 1 1 1.414 1.414L9.414 6H11a1 1 0 1 1 0 2H9.414l2.293 2.293a1 1 0 0 1-1.414 1.414L9 10.414V12a1 1 0 1 1-2 0v-1.586l-1.293 1.293a1 1 0 0 1-1.414-1.414L6.586 8H5a1 1 0 0 1 0-2h1.586L4.293 3.707a1 1 0 0 1 1.414-1.414L7 3.586V2a1 1 0 0 1 1-1z"/></svg>
+                                    Drag or use arrow keys to align — hold Shift for larger steps — black lines indicate a match
+                                </div>
+                            </div>
+                        )}
                         {rectangles.filter(r => r.visible).map((rect) => {
                             const normalized = normalizeRect(rect);
                             const isSelected = selectedRectIds.includes(rect.id);
@@ -1387,29 +1541,31 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         );
                     })()}
 
-                    <div data-interactive-ui="true" className={`absolute z-20 ${getToolbarPositionClasses()}`}>
-                         <Toolbar 
-                             activeTool={activeTool} 
-                             setActiveTool={setActiveTool} 
-                             activeShape={activeShape} 
-                             setActiveShape={setActiveShape} 
-                             activePinType={activePinType} 
-                             setActivePinType={setActivePinType} 
-                             markupFillColor={markupFillColor}
-                             markupStrokeColor={markupStrokeColor}
-                             markupColorPanelOpen={markupColorPanelOpen}
-                             onMarkupColorPanelToggle={() => {
-                                 setMarkupColorPanelOpen((o) => {
-                                     const next = !o;
-                                     if (next) setMarkupColorPanelSource('toolbar');
-                                     return next;
-                                 });
-                             }}
-                             onMarkupColorPanelClose={() => setMarkupColorPanelOpen(false)}
-                             toolbarPosition={toolbarPosition}
-                             ref={markupToolbarFillStrokeRef}
-                         />
-                    </div>
+                    {!compareImages && (
+                        <div data-interactive-ui="true" className={`absolute z-20 ${getToolbarPositionClasses()}`}>
+                             <Toolbar
+                                 activeTool={activeTool}
+                                 setActiveTool={setActiveTool}
+                                 activeShape={activeShape}
+                                 setActiveShape={setActiveShape}
+                                 activePinType={activePinType}
+                                 setActivePinType={setActivePinType}
+                                 markupFillColor={markupFillColor}
+                                 markupStrokeColor={markupStrokeColor}
+                                 markupColorPanelOpen={markupColorPanelOpen}
+                                 onMarkupColorPanelToggle={() => {
+                                     setMarkupColorPanelOpen((o) => {
+                                         const next = !o;
+                                         if (next) setMarkupColorPanelSource('toolbar');
+                                         return next;
+                                     });
+                                 }}
+                                 onMarkupColorPanelClose={() => setMarkupColorPanelOpen(false)}
+                                 toolbarPosition={toolbarPosition}
+                                 ref={markupToolbarFillStrokeRef}
+                             />
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -9,6 +9,18 @@ import { MENUS_MODE } from '../utils/showcaseMode';
 
 type LayerItem = (Rectangle & { itemType: 'rect' }) | (Pin & { itemType: 'pin' });
 
+export interface CompareDrawingsInfo {
+    left: { label: string; visible: boolean; onToggle: () => void };
+    right: { label: string; visible: boolean; onToggle: () => void };
+    alignment: {
+        status: 'idle' | 'aligning' | 'aligned';
+        onAlignSheets: () => void;
+        onConfirmAlign: () => void;
+        onCancelAlign: () => void;
+        onResetAlignment: () => void;
+    };
+}
+
 interface LayersPanelProps {
     isOpen: boolean;
     onClose: () => void;
@@ -34,6 +46,7 @@ interface LayersPanelProps {
     drawingScale?: number | null;
     naturalSize?: { width: number; height: number };
     onRecalibrateDrawingScale?: () => void;
+    compareDrawings?: CompareDrawingsInfo;
 }
 
 const ItemIcon = ({ item }: { item: LayerItem }) => {
@@ -78,7 +91,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
     isOpen, onClose, rectangles, pins, selectedRectIds, selectedPinId, expandedIds, onToggleExpand,
     onSelectRect, onSelectPin, onRenameRect, onRenamePin, onDeleteRect, onDeletePin,
     onToggleRectVisibility, onTogglePinVisibility, onOpenRfiPanel, onOpenPhotoViewer, markupSetNames, onToggleBatchVisibility, onToggleLock,
-    drawingScale, naturalSize, onRecalibrateDrawingScale,
+    drawingScale, naturalSize, onRecalibrateDrawingScale, compareDrawings,
 }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
@@ -86,7 +99,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
     const inputRef = useRef<HTMLInputElement>(null);
 
     // Resizing logic
-    const [panelWidth, setPanelWidth] = useState(320);
+    const [panelWidth, setPanelWidth] = useState(256);
     const isResizing = useRef(false);
     const panelRef = useRef<HTMLDivElement>(null);
     const MIN_WIDTH = 256;
@@ -366,6 +379,82 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                         </button>
                     </Tooltip>
                 </div>
+                {compareDrawings && (
+                    <div className="border-b border-gray-200 dark:border-zinc-800 px-3 py-2.5">
+                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-zinc-500">Comparing</p>
+                        <div className="space-y-1.5">
+                            <div className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-gray-50 dark:hover:bg-zinc-800/60">
+                                <div className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-blue-500" />
+                                <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-800 dark:text-zinc-200" title={compareDrawings.left.label}>{compareDrawings.left.label}</span>
+                                <button
+                                    type="button"
+                                    onClick={compareDrawings.left.onToggle}
+                                    className="flex-shrink-0 rounded-full p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+                                    title={compareDrawings.left.visible ? 'Hide drawing 1' : 'Show drawing 1'}
+                                >
+                                    {compareDrawings.left.visible ? <EyeIcon className="h-3.5 w-3.5" /> : <EyeSlashIcon className="h-3.5 w-3.5" />}
+                                </button>
+                            </div>
+                            <div className="flex items-center gap-2 rounded-md px-1.5 py-1 hover:bg-gray-50 dark:hover:bg-zinc-800/60">
+                                <div className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-red-500" />
+                                <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-800 dark:text-zinc-200" title={compareDrawings.right.label}>{compareDrawings.right.label}</span>
+                                <button
+                                    type="button"
+                                    onClick={compareDrawings.right.onToggle}
+                                    className="flex-shrink-0 rounded-full p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"
+                                    title={compareDrawings.right.visible ? 'Hide drawing 2' : 'Show drawing 2'}
+                                >
+                                    {compareDrawings.right.visible ? <EyeIcon className="h-3.5 w-3.5" /> : <EyeSlashIcon className="h-3.5 w-3.5" />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Alignment controls */}
+                        <div className="mt-2.5 pt-2.5 border-t border-gray-100 dark:border-zinc-800">
+                            {compareDrawings.alignment.status === 'idle' && (
+                                <button
+                                    type="button"
+                                    onClick={compareDrawings.alignment.onAlignSheets}
+                                    className="flex w-full items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                                >
+                                    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 8h12M8 2v12" strokeLinecap="round"/><circle cx="8" cy="8" r="3"/></svg>
+                                    Align Sheets
+                                </button>
+                            )}
+                            {compareDrawings.alignment.status === 'aligning' && (
+                                <div className="space-y-1.5">
+                                    <p className="text-[10px] text-gray-400 dark:text-zinc-500 leading-snug">Drag on the canvas to align. Black lines = match.</p>
+                                    <div className="flex gap-1.5">
+                                        <button
+                                            type="button"
+                                            onClick={compareDrawings.alignment.onCancelAlign}
+                                            className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={compareDrawings.alignment.onConfirmAlign}
+                                            className="flex-1 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700"
+                                        >
+                                            Done
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            {compareDrawings.alignment.status === 'aligned' && (
+                                <button
+                                    type="button"
+                                    onClick={compareDrawings.alignment.onResetAlignment}
+                                    className="flex w-full items-center justify-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40"
+                                >
+                                    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 8h3M11 8h3M8 2v3M8 11v3" strokeLinecap="round"/><circle cx="8" cy="8" r="2.5"/></svg>
+                                    Reset Alignment
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
                 {drawingScale != null && (
                     <div className="flex items-start justify-between gap-2 border-b border-gray-200 px-3 py-2 dark:border-zinc-800">
                         <div className="min-w-0 flex flex-col gap-1.5">
@@ -392,22 +481,23 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                         </button>
                     </div>
                 )}
+                {!compareDrawings && (
                 <div className="flex-grow overflow-y-auto custom-scrollbar">
                     {layerItems.length > 0 ? (
                         <div className="flex flex-col">
                             {sortedGroupKeys.map(key => {
                                 const items = groupedItems[key];
-                                if (items.length === 0 && key === 'current') return null; // Skip empty current if other groups exist? Actually show it if needed, but let's hide if empty for cleanness unless it's the only one.
+                                if (items.length === 0 && key === 'current') return null;
                                 if (items.length === 0) return null;
 
                                 const title = key === 'current' ? 'Current Draft' : (markupSetNames[key] || 'Unknown Set');
                                 const areAllVisible = items.every(i => i.visible);
-                                
+
                                 return (
                                     <div key={key}>
                                         <div className="sticky top-0 z-10 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 py-1.5 flex justify-between items-center group/header">
                                             <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{title}</span>
-                                            <button 
+                                            <button
                                                 onClick={() => onToggleBatchVisibility(items.map(i => ({ id: i.id, type: i.itemType === 'rect' ? 'rect' : 'pin' })), !areAllVisible)}
                                                 className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none opacity-0 group-hover/header:opacity-100 transition-opacity"
                                                 title={areAllVisible ? "Hide All" : "Show All"}
@@ -436,6 +526,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                         </div>
                     )}
                 </div>
+                )}
             </div>
 
             {isOpen && (

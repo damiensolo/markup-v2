@@ -7,7 +7,7 @@ import LinkModal from './components/LinkModal';
 import PhotoViewerModal from './components/PhotoViewerModal';
 import ShareModal from './components/ShareModal';
 import DownloadOptionsModal from './components/DownloadOptionsModal';
-import CompareSheetsModal from './components/CompareSheetsModal';
+import CompareSheetsModal, { type CompareSheetChoice } from './components/CompareSheetsModal';
 import PublishWarningModal from './components/PublishWarningModal';
 import RfiPanel from './components/RfiPanel';
 import SafetyPanel from './components/SafetyPanel';
@@ -23,7 +23,7 @@ import {
   resolveRectStrokeColor,
   DEFAULT_MARKUP_FILL,
 } from './utils/markupColors';
-import LayersPanel from './components/LayersPanel';
+import LayersPanel, { type CompareDrawingsInfo } from './components/LayersPanel';
 import { LinarcAppShell } from './components/linarcShell/LinarcAppShell';
 import { FilterIcon, ChevronLeftIcon, ShareIcon, SnapshotIcon, DocumentDuplicateIcon, FolderOpenIcon, SquarePenIcon, PanelLeftIcon, PanelRightIcon } from './components/Icons';
 
@@ -74,35 +74,35 @@ const mockPunches: PunchData[] = [
 ];
 
 const mockDrawings: DrawingData[] = [
-    { 
-        id: 'A-1.0', 
-        title: 'BUILDING DATA', 
+    {
+        id: 'A-1.0',
+        title: 'Floor Plan — Level 1',
         versions: [
-            { id: 'v3', name: 'Revision 3', timestamp: '2024-07-20', thumbnailUrl: 'https://i.imgur.com/gZ3J4f3.png' },
-            { id: 'v2', name: 'Revision 2', timestamp: '2024-07-15', thumbnailUrl: 'https://i.imgur.com/K81f2i2.png' },
-            { id: 'v1', name: 'Initial Release', timestamp: '2024-07-10', thumbnailUrl: 'https://i.imgur.com/I7eA7kR.png' },
+            { id: 'v3', name: 'Revision 3', timestamp: '2024-07-20', thumbnailUrl: '/blueprint-fp-r3.svg' },
+            { id: 'v2', name: 'Revision 2', timestamp: '2024-07-15', thumbnailUrl: '/blueprint-fp-r2.svg' },
+            { id: 'v1', name: 'Initial Release', timestamp: '2024-07-10', thumbnailUrl: '/blueprint-fp-r1.svg' },
         ]
     },
-    { 
-        id: 'A-2.1', 
-        title: 'Architectural Floor Plan - Level 2', 
+    {
+        id: 'A-2.1',
+        title: 'Floor Plan — Level 2',
         versions: [
-            { id: 'v1', name: 'Initial Release', timestamp: '2024-06-01', thumbnailUrl: 'https://i.imgur.com/gZ3J4f3.png' },
-        ] 
-    },
-    { 
-        id: 'S-5.0', 
-        title: 'Structural Details - Column Connections', 
-        versions: [
-            { id: 'v2', name: 'As-Built', timestamp: '2024-08-01', thumbnailUrl: 'https://i.imgur.com/K81f2i2.png' },
-            { id: 'v1', name: 'For Construction', timestamp: '2024-05-20', thumbnailUrl: 'https://i.imgur.com/gZ3J4f3.png' },
+            { id: 'v1', name: 'Initial Release', timestamp: '2024-06-01', thumbnailUrl: '/blueprint-fp-r2.svg' },
         ]
     },
-    { 
-        id: 'A-5.1', 
-        title: 'Building Section A-A', 
+    {
+        id: 'S-5.0',
+        title: 'Structural Details — Column Connections',
         versions: [
-            { id: 'v1', name: 'Initial Release', timestamp: '2024-06-15', thumbnailUrl: 'https://i.imgur.com/I7eA7kR.png' },
+            { id: 'v2', name: 'As-Built', timestamp: '2024-08-01', thumbnailUrl: '/blueprint-structural.svg' },
+            { id: 'v1', name: 'For Construction', timestamp: '2024-05-20', thumbnailUrl: '/blueprint-structural.svg' },
+        ]
+    },
+    {
+        id: 'A-5.1',
+        title: 'Building Section A-A',
+        versions: [
+            { id: 'v1', name: 'Initial Release', timestamp: '2024-06-15', thumbnailUrl: '/blueprint-structural.svg' },
         ]
     },
 ];
@@ -450,29 +450,33 @@ interface HeaderProps {
     loadedSetIds: string[];
     onToggleMarkupSet: (set: MarkupSet) => void;
     onCompare: () => void;
+    compareMode?: { left: CompareSheetChoice; right: CompareSheetChoice } | null;
+    onExitCompare?: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-    onBack, 
-    currentDrawing, 
-    allDrawings, 
-    onDrawingChange, 
-    currentVersion, 
-    onVersionChange, 
-    hasUnsavedChanges, 
-    onSave, 
-    onShare, 
+const Header: React.FC<HeaderProps> = ({
+    onBack,
+    currentDrawing,
+    allDrawings,
+    onDrawingChange,
+    currentVersion,
+    onVersionChange,
+    hasUnsavedChanges,
+    onSave,
+    onShare,
     onDownload,
-    filters, 
-    areFiltersActive, 
-    isFilterMenuOpen, 
-    setIsFilterMenuOpen, 
-    handleFilterChange, 
-    handleToggleAllFilters, 
-    markupSets, 
-    loadedSetIds, 
+    filters,
+    areFiltersActive,
+    isFilterMenuOpen,
+    setIsFilterMenuOpen,
+    handleFilterChange,
+    handleToggleAllFilters,
+    markupSets,
+    loadedSetIds,
     onToggleMarkupSet,
     onCompare,
+    compareMode,
+    onExitCompare,
 }) => {
     const filterMenuRef = useRef<HTMLDivElement>(null);
 
@@ -486,6 +490,41 @@ const Header: React.FC<HeaderProps> = ({
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [setIsFilterMenuOpen]);
+
+    if (compareMode) {
+        return (
+            <div className="flex flex-shrink-0 items-center gap-3 border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900/95">
+                <Tooltip text="Exit compare mode" position="bottom">
+                    <button
+                        type="button"
+                        onClick={onExitCompare}
+                        className="linarc-toolbar-btn-secondary flex flex-shrink-0 items-center gap-1.5 px-3 text-sm font-medium"
+                    >
+                        <ChevronLeftIcon className="h-4 w-4" />
+                        Back
+                    </button>
+                </Tooltip>
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                        <div className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-blue-500" />
+                        <span className="text-sm font-semibold text-gray-800 dark:text-zinc-200 truncate max-w-[14rem]" title={`${compareMode.left.drawing.id} · ${compareMode.left.version.name}`}>
+                            {compareMode.left.drawing.id} <span className="font-normal text-gray-500 dark:text-zinc-400">· {compareMode.left.version.name}</span>
+                        </span>
+                    </div>
+                    <span className="text-xs font-medium text-gray-400 dark:text-zinc-500 flex-shrink-0">vs</span>
+                    <div className="flex items-center gap-1.5">
+                        <div className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-red-500" />
+                        <span className="text-sm font-semibold text-gray-800 dark:text-zinc-200 truncate max-w-[14rem]" title={`${compareMode.right.drawing.id} · ${compareMode.right.version.name}`}>
+                            {compareMode.right.drawing.id} <span className="font-normal text-gray-500 dark:text-zinc-400">· {compareMode.right.version.name}</span>
+                        </span>
+                    </div>
+                    <span className="ml-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 flex-shrink-0">
+                        Compare Mode
+                    </span>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900/95">
@@ -726,6 +765,16 @@ const App: React.FC = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+  const [compareMode, setCompareMode] = useState<{
+    left: CompareSheetChoice;
+    right: CompareSheetChoice;
+    leftVisible: boolean;
+    rightVisible: boolean;
+  } | null>(null);
+  const [compareAlignment, setCompareAlignment] = useState<{
+    offset: { x: number; y: number };
+    status: 'idle' | 'aligning' | 'aligned';
+  }>({ offset: { x: 0, y: 0 }, status: 'idle' });
   const [isPublishWarningOpen, setIsPublishWarningOpen] = useState(false);
   const pendingNavCallback = useRef<(() => void) | null>(null);
 
@@ -1775,6 +1824,8 @@ const App: React.FC = () => {
                     loadedSetIds={loadedSetIds}
                     onToggleMarkupSet={handleToggleMarkupSet}
                     onCompare={() => setIsCompareModalOpen(true)}
+                    compareMode={compareMode ? { left: compareMode.left, right: compareMode.right } : null}
+                    onExitCompare={() => { setCompareMode(null); setCompareAlignment({ offset: { x: 0, y: 0 }, status: 'idle' }); }}
                 />
             <div className="flex min-h-0 min-w-0 flex-1 flex-row items-stretch overflow-hidden">
                 <LayersPanel
@@ -1802,6 +1853,25 @@ const App: React.FC = () => {
                   drawingScale={drawingScale}
                   naturalSize={naturalSize}
                   onRecalibrateDrawingScale={handleRecalibrateDrawingScale}
+                  compareDrawings={compareMode ? {
+                    left: {
+                      label: `${compareMode.left.drawing.id} · ${compareMode.left.version.name}`,
+                      visible: compareMode.leftVisible,
+                      onToggle: () => setCompareMode(prev => prev ? { ...prev, leftVisible: !prev.leftVisible } : null),
+                    },
+                    right: {
+                      label: `${compareMode.right.drawing.id} · ${compareMode.right.version.name}`,
+                      visible: compareMode.rightVisible,
+                      onToggle: () => setCompareMode(prev => prev ? { ...prev, rightVisible: !prev.rightVisible } : null),
+                    },
+                    alignment: {
+                      status: compareAlignment.status,
+                      onAlignSheets: () => setCompareAlignment(prev => ({ ...prev, status: 'aligning' })),
+                      onConfirmAlign: () => setCompareAlignment(prev => ({ ...prev, status: 'aligned' })),
+                      onCancelAlign: () => setCompareAlignment({ offset: { x: 0, y: 0 }, status: 'idle' }),
+                      onResetAlignment: () => setCompareAlignment({ offset: { x: 0, y: 0 }, status: 'idle' }),
+                    },
+                  } : undefined}
                 />
                 <div className="relative min-h-0 min-w-0 flex-1">
                   <CanvasView
@@ -1892,6 +1962,17 @@ const App: React.FC = () => {
                     drawingScaleClearTick={drawingScaleClearTick}
                     drawingScaleRecalibrateTick={drawingScaleRecalibrateTick}
                     onBeginScaleRecalibration={handleBeginScaleRecalibration}
+                    compareImages={compareMode ? {
+                      leftSrc: compareMode.left.version.thumbnailUrl,
+                      rightSrc: compareMode.right.version.thumbnailUrl,
+                      leftVisible: compareMode.leftVisible,
+                      rightVisible: compareMode.rightVisible,
+                    } : undefined}
+                    compareAlignment={compareMode ? {
+                      offset: compareAlignment.offset,
+                      isAligning: compareAlignment.status === 'aligning',
+                      onOffsetChange: (offset) => setCompareAlignment(prev => ({ ...prev, offset })),
+                    } : undefined}
                   />
                   <CanvasSidebarFloatToggles
                     isLayersOpen={isLayersPanelOpen}
@@ -2028,8 +2109,10 @@ const App: React.FC = () => {
         allDrawings={allDrawings}
         currentDrawing={currentDrawing}
         currentVersion={currentVersion}
-        onCompare={() => {
-          /* Demo: overlay compare not implemented — modal closes in CompareSheetsModal */
+        onCompare={(left, right) => {
+          setCompareMode({ left, right, leftVisible: true, rightVisible: true });
+          setCompareAlignment({ offset: { x: 0, y: 0 }, status: 'idle' });
+          setIsCompareModalOpen(false);
         }}
       />
 

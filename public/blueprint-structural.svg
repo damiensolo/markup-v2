@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 680">
+<rect width="900" height="680" fill="white"/>
+
+<!-- ═══ TITLE BLOCK ═══ -->
+<rect x="0" y="600" width="900" height="80" fill="#f1f5f9"/>
+<line x1="0" y1="600" x2="900" y2="600" stroke="#0f172a" stroke-width="2"/>
+<line x1="600" y1="600" x2="600" y2="680" stroke="#94a3b8" stroke-width="1"/>
+<line x1="750" y1="600" x2="750" y2="680" stroke="#94a3b8" stroke-width="1"/>
+<text x="300" y="621" text-anchor="middle" font-family="Arial, sans-serif" font-size="7" letter-spacing="2" fill="#94a3b8">PROJECT</text>
+<text x="300" y="638" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#1e293b">LINARC OFFICE COMPLEX</text>
+<text x="300" y="654" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#64748b">1200 Innovation Blvd, Building A</text>
+<text x="675" y="617" text-anchor="middle" font-family="Arial, sans-serif" font-size="7" letter-spacing="1" fill="#94a3b8">DRAWING TITLE</text>
+<text x="675" y="634" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#1e293b">STRUCTURAL DETAILS — COLUMN CONN.</text>
+<text x="675" y="650" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#64748b">Scale: 3/4" = 1'–0"</text>
+<text x="825" y="617" text-anchor="middle" font-family="Arial, sans-serif" font-size="7" letter-spacing="1" fill="#94a3b8">DRAWING NO.</text>
+<text x="825" y="636" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#0f172a">S-5.0</text>
+<text x="825" y="650" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#64748b">FOR CONSTRUCTION</text>
+<text x="825" y="664" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#94a3b8">DATE: 2024-05-20</text>
+
+<!-- ═══ BORDER ═══ -->
+<rect x="30" y="30" width="840" height="558" fill="none" stroke="#94a3b8" stroke-width="1"/>
+
+<!-- ═══ DETAIL GRID TITLE ═══ -->
+<text x="220" y="65" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#1e293b">DETAIL 1: COLUMN BASE PLATE</text>
+<text x="220" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#64748b">Scale: 3/4"=1'–0"</text>
+<text x="670" y="65" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#1e293b">DETAIL 2: BEAM-COLUMN CONNECTION</text>
+<text x="670" y="80" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#64748b">Scale: 3/4"=1'–0"</text>
+
+<!-- vertical divider between details -->
+<line x1="450" y1="88" x2="450" y2="580" stroke="#94a3b8" stroke-width="1" stroke-dasharray="6,4"/>
+
+<!-- ════════════════════════════════════ -->
+<!--  DETAIL 1: COLUMN BASE PLATE        -->
+<!-- ════════════════════════════════════ -->
+
+<!-- Concrete foundation (hatched) -->
+<rect x="100" y="440" width="240" height="80" fill="none" stroke="#0f172a" stroke-width="2"/>
+<g stroke="#94a3b8" stroke-width="0.8">
+  <line x1="100" y1="456" x2="340" y2="456"/>
+  <line x1="100" y1="472" x2="340" y2="472"/>
+  <line x1="100" y1="488" x2="340" y2="488"/>
+  <line x1="100" y1="504" x2="340" y2="504"/>
+  <line x1="100" y1="520" x2="340" y2="520"/>
+</g>
+<text x="220" y="536" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1e293b">CONC. FOUNDATION</text>
+<text x="220" y="550" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#64748b">f'c = 4,000 PSI</text>
+
+<!-- Grout bed -->
+<rect x="150" y="420" width="140" height="20" fill="none" stroke="#0f172a" stroke-width="2"/>
+<g stroke="#0f172a" stroke-width="0.5">
+  <line x1="160" y1="420" x2="150" y2="440"/><line x1="175" y1="420" x2="160" y2="440"/>
+  <line x1="190" y1="420" x2="175" y2="440"/><line x1="205" y1="420" x2="190" y2="440"/>
+  <line x1="220" y1="420" x2="205" y2="440"/><line x1="235" y1="420" x2="220" y2="440"/>
+  <line x1="250" y1="420" x2="235" y2="440"/><line x1="265" y1="420" x2="250" y2="440"/>
+  <line x1="280" y1="420" x2="265" y2="440"/><line x1="290" y1="420" x2="280" y2="440"/>
+</g>
+<!-- grout label -->
+<line x1="305" y1="430" x2="355" y2="415" stroke="#64748b" stroke-width="0.8"/>
+<text x="360" y="413" font-family="Arial, sans-serif" font-size="9" fill="#64748b">NON-SHRINK GROUT</text>
+
+<!-- Base plate -->
+<rect x="150" y="390" width="140" height="30" fill="none" stroke="#0f172a" stroke-width="3"/>
+<!-- steel hatch on base plate -->
+<g stroke="#0f172a" stroke-width="0.6">
+  <line x1="155" y1="390" x2="150" y2="395"/><line x1="165" y1="390" x2="155" y2="400"/>
+  <line x1="175" y1="390" x2="162" y2="403"/><line x1="185" y1="390" x2="170" y2="405"/>
+  <line x1="195" y1="390" x2="180" y2="405"/><line x1="205" y1="390" x2="190" y2="405"/>
+  <line x1="215" y1="390" x2="200" y2="405"/><line x1="225" y1="390" x2="210" y2="405"/>
+  <line x1="235" y1="390" x2="220" y2="405"/><line x1="245" y1="390" x2="230" y2="405"/>
+  <line x1="255" y1="390" x2="240" y2="405"/><line x1="265" y1="390" x2="252" y2="403"/>
+  <line x1="275" y1="390" x2="264" y2="401"/><line x1="285" y1="390" x2="276" y2="399"/>
+  <line x1="290" y1="391" x2="286" y2="395"/>
+</g>
+<text x="220" y="385" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#64748b">PL 1" × 14" × 14"</text>
+
+<!-- W-shape steel column (section above base plate) -->
+<!-- Flanges -->
+<rect x="172" y="120" width="96" height="8" fill="none" stroke="#0f172a" stroke-width="3"/>
+<rect x="172" y="382" width="96" height="10" fill="none" stroke="#0f172a" stroke-width="3"/>
+<!-- Web -->
+<rect x="212" y="128" width="16" height="254" fill="none" stroke="#0f172a" stroke-width="3"/>
+<!-- steel hatch on flanges and web -->
+<g stroke="#0f172a" stroke-width="0.6">
+  <line x1="175" y1="120" x2="172" y2="123"/><line x1="182" y1="120" x2="175" y2="127"/>
+  <line x1="191" y1="120" x2="183" y2="128"/><line x1="200" y1="120" x2="192" y2="128"/>
+  <line x1="209" y1="120" x2="201" y2="128"/><line x1="218" y1="120" x2="210" y2="128"/>
+  <line x1="227" y1="120" x2="219" y2="128"/><line x1="236" y1="120" x2="228" y2="128"/>
+  <line x1="245" y1="120" x2="237" y2="128"/><line x1="254" y1="120" x2="246" y2="128"/>
+  <line x1="263" y1="120" x2="255" y2="128"/><line x1="265" y1="121" x2="262" y2="124"/>
+</g>
+
+<!-- Anchor bolts -->
+<g stroke="#0f172a" stroke-width="1.5">
+  <line x1="160" y1="420" x2="160" y2="490"/>
+  <line x1="280" y1="420" x2="280" y2="490"/>
+  <circle cx="160" cy="455" r="4" fill="none"/>
+  <circle cx="280" cy="455" r="4" fill="none"/>
+</g>
+<line x1="155" y1="490" x2="165" y2="490" stroke="#0f172a" stroke-width="2"/>
+<line x1="275" y1="490" x2="285" y2="490" stroke="#0f172a" stroke-width="2"/>
+<!-- anchor bolt label -->
+<line x1="295" y1="460" x2="360" y2="448" stroke="#64748b" stroke-width="0.8"/>
+<text x="365" y="446" font-family="Arial, sans-serif" font-size="9" fill="#64748b">(4) 1" Ø ANCHOR BOLTS</text>
+
+<!-- Dimension callout: column height -->
+<g stroke="#64748b" stroke-width="0.75">
+  <line x1="90" y1="120" x2="90" y2="390"/>
+  <line x1="86" y1="120" x2="94" y2="120"/>
+  <line x1="86" y1="390" x2="94" y2="390"/>
+</g>
+<text x="84" y="260" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#64748b" transform="rotate(-90,84,260)">W12×96 COLUMN</text>
+
+<!-- Section mark callout label -->
+<text x="220" y="108" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#1e293b">ELEVATION VIEW</text>
+<circle cx="350" cy="120" r="16" fill="none" stroke="#0f172a" stroke-width="1.5"/>
+<text x="350" y="115" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#0f172a">1</text>
+<line x1="350" y1="120" x2="350" y2="136" stroke="#0f172a" stroke-width="1"/>
+<text x="350" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#64748b">S-5.0</text>
+
+<!-- ════════════════════════════════════ -->
+<!--  DETAIL 2: BEAM-COLUMN CONNECTION   -->
+<!-- ════════════════════════════════════ -->
+
+<!-- Column (vertical W-shape, in section) -->
+<!-- Flanges -->
+<rect x="600" y="100" width="100" height="10" fill="none" stroke="#0f172a" stroke-width="3"/>
+<rect x="600" y="490" width="100" height="10" fill="none" stroke="#0f172a" stroke-width="3"/>
+<!-- Web -->
+<rect x="642" y="110" width="16" height="380" fill="none" stroke="#0f172a" stroke-width="3"/>
+<!-- Hatch -->
+<g stroke="#0f172a" stroke-width="0.6">
+  <line x1="603" y1="100" x2="600" y2="103"/><line x1="610" y1="100" x2="603" y2="107"/>
+  <line x1="618" y1="100" x2="610" y2="108"/><line x1="626" y1="100" x2="618" y2="108"/>
+  <line x1="634" y1="100" x2="626" y2="108"/><line x1="642" y1="100" x2="634" y2="108"/>
+  <line x1="650" y1="100" x2="643" y2="107"/><line x1="658" y1="100" x2="651" y2="107"/>
+  <line x1="666" y1="100" x2="659" y2="107"/><line x1="674" y1="100" x2="667" y2="107"/>
+  <line x1="682" y1="100" x2="675" y2="107"/><line x1="690" y1="100" x2="683" y2="107"/>
+  <line x1="698" y1="100" x2="691" y2="107"/><line x1="700" y1="101" x2="697" y2="104"/>
+</g>
+<text x="650" y="94" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#64748b">W12×96</text>
+
+<!-- Beam (horizontal W-shape) going left from column -->
+<rect x="480" y="270" width="160" height="10" fill="none" stroke="#0f172a" stroke-width="3"/>
+<rect x="480" y="340" width="160" height="10" fill="none" stroke="#0f172a" stroke-width="3"/>
+<rect x="480" y="280" width="10" height="60" fill="none" stroke="#0f172a" stroke-width="3"/>
+<!-- Beam web -->
+<rect x="490" y="280" width="150" height="60" fill="none" stroke="#0f172a" stroke-width="2"/>
+<text x="540" y="265" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#64748b">W18×50 BEAM</text>
+
+<!-- Connection plate -->
+<rect x="600" y="268" width="12" height="84" fill="none" stroke="#0f172a" stroke-width="2.5"/>
+<g stroke="#0f172a" stroke-width="0.6">
+  <line x1="602" y1="268" x2="600" y2="270"/><line x1="606" y1="268" x2="600" y2="274"/>
+  <line x1="610" y1="268" x2="600" y2="278"/><line x1="612" y1="269" x2="601" y2="280"/>
+  <line x1="612" y1="275" x2="603" y2="284"/><line x1="612" y1="281" x2="606" y2="287"/>
+  <line x1="612" y1="287" x2="610" y2="289"/>
+</g>
+
+<!-- Bolts (circles) -->
+<g fill="none" stroke="#0f172a" stroke-width="1.5">
+  <circle cx="606" cy="292" r="5"/>
+  <circle cx="606" cy="308" r="5"/>
+  <circle cx="606" cy="324" r="5"/>
+  <circle cx="606" cy="340" r="5"/>
+</g>
+<line x1="625" y1="308" x2="700" y2="290" stroke="#64748b" stroke-width="0.8"/>
+<text x="704" y="288" font-family="Arial, sans-serif" font-size="9" fill="#64748b">(4) 3/4" Ø A325 BOLTS</text>
+
+<!-- Weld symbol on beam flange to column -->
+<g stroke="#0f172a" stroke-width="1.5">
+  <line x1="600" y1="278" x2="585" y2="265"/>
+  <line x1="600" y1="350" x2="585" y2="363"/>
+</g>
+<!-- weld symbols (triangle = fillet weld) -->
+<polygon points="582,262 594,262 588,271" fill="none" stroke="#0f172a" stroke-width="1"/>
+<polygon points="582,366 594,366 588,357" fill="none" stroke="#0f172a" stroke-width="1"/>
+<text x="572" y="260" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#64748b">3/16</text>
+<text x="572" y="372" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#64748b">3/16</text>
+
+<!-- Stiffener plates -->
+<rect x="642" y="268" width="58" height="8" fill="none" stroke="#0f172a" stroke-width="2"/>
+<rect x="642" y="344" width="58" height="8" fill="none" stroke="#0f172a" stroke-width="2"/>
+<text x="780" y="280" font-family="Arial, sans-serif" font-size="9" fill="#64748b">STIFFENER PL.</text>
+<line x1="700" y1="272" x2="776" y2="279" stroke="#64748b" stroke-width="0.8"/>
+<line x1="700" y1="348" x2="776" y2="355" stroke="#64748b" stroke-width="0.8"/>
+<text x="780" y="356" font-family="Arial, sans-serif" font-size="9" fill="#64748b">PL 3/8"×5"</text>
+
+<!-- Dimension: beam depth -->
+<g stroke="#64748b" stroke-width="0.75">
+  <line x1="465" y1="270" x2="465" y2="350"/>
+  <line x1="461" y1="270" x2="469" y2="270"/>
+  <line x1="461" y1="350" x2="469" y2="350"/>
+</g>
+<text x="458" y="313" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#64748b" transform="rotate(-90,458,313)">18"</text>
+
+<!-- Section mark callout label 2 -->
+<circle cx="800" cy="430" r="16" fill="none" stroke="#0f172a" stroke-width="1.5"/>
+<text x="800" y="425" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" font-weight="bold" fill="#0f172a">2</text>
+<line x1="800" y1="430" x2="800" y2="446" stroke="#0f172a" stroke-width="1"/>
+<text x="800" y="455" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#64748b">S-5.0</text>
+
+<!-- Section label -->
+<text x="650" y="520" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#1e293b">ELEVATION VIEW</text>
+
+<!-- General notes box -->
+<rect x="50" y="90" width="380" height="16" fill="none"/>
+<text x="55" y="102" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="#334155">GENERAL NOTES:</text>
+</svg>
