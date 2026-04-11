@@ -107,6 +107,7 @@ interface CanvasViewProps {
         offset: { x: number; y: number };
         isAligning: boolean;
         onOffsetChange: (offset: { x: number; y: number }) => void;
+        onConfirmAlign?: () => void;
     };
 }
 
@@ -252,6 +253,11 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     useEffect(() => {
         if (!compareAlignment?.isAligning) return;
         const handler = (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                compareAlignment.onConfirmAlign?.();
+                return;
+            }
             if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
             e.preventDefault();
             const step = e.shiftKey ? 10 : 1;

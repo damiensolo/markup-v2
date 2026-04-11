@@ -1972,6 +1972,7 @@ const App: React.FC = () => {
                       offset: compareAlignment.offset,
                       isAligning: compareAlignment.status === 'aligning',
                       onOffsetChange: (offset) => setCompareAlignment(prev => ({ ...prev, offset })),
+                      onConfirmAlign: () => setCompareAlignment(prev => ({ ...prev, status: 'aligned' })),
                     } : undefined}
                   />
                   <CanvasSidebarFloatToggles
