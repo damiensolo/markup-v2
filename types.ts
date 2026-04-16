@@ -257,3 +257,29 @@ export interface LineMarkup {
   photos?: PhotoData[];
   sourceSetId?: string;
 }
+
+/**
+ * Represents a text annotation placed on the blueprint.
+ * x/y are percentages (0-100) relative to the image dimensions — top-left origin of the text.
+ */
+export interface TextMarkup {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  name: string;
+  visible: boolean;
+  locked?: boolean;
+  /** Visual font size in screen pixels at scale=1. Default: 14. */
+  fontSize?: number;
+  fontWeight?: 'normal' | 'bold';
+  fontStyle?: 'normal' | 'italic';
+  /** Hex or rgba color string. Default: '#111827' */
+  color?: string;
+  rfi?: RfiData[];
+  submittals?: SubmittalData[];
+  punches?: PunchData[];
+  drawings?: DrawingData[];
+  photos?: PhotoData[];
+  sourceSetId?: string;
+}

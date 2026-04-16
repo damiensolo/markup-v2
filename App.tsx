@@ -2,7 +2,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { MENUS_MODE } from './utils/showcaseMode';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import type { Rectangle, RfiData, RfiFormState, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet, Measurement, LineMarkup, LineToolType } from './types';
+import type { Rectangle, RfiData, RfiFormState, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet, Measurement, LineMarkup, LineToolType, TextMarkup } from './types';
 import LinkModal from './components/LinkModal';
 import PhotoViewerModal from './components/PhotoViewerModal';
 import ShareModal from './components/ShareModal';
@@ -704,11 +704,14 @@ const CanvasSidebarFloatToggles: React.FC<{
 
 const App: React.FC = () => {
   const isLineMarkup = (id: string, lines: LineMarkup[]) => lines.some((line) => line.id === id);
+  const isTextMarkup = (id: string, texts: TextMarkup[]) => texts.some((t) => t.id === id);
   // Core Data State
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [rectangles, setRectangles] = useState<Rectangle[]>([]);
   const [pins, setPins] = useState<Pin[]>([]);
   const [lineMarkups, setLineMarkups] = useState<LineMarkup[]>([]);
+  const [textMarkups, setTextMarkups] = useState<TextMarkup[]>([]);
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [drawingScale, setDrawingScale] = useState<number | null>(null); // natural img pixels per foot
   /** Bumped when user clears scale from UI so CanvasView resets calibration state */
@@ -838,6 +841,8 @@ const App: React.FC = () => {
         setRectangles([]);
         setPins([]);
         setLineMarkups([]);
+        setTextMarkups([]);
+        setSelectedTextId(null);
         setMeasurements([]);
         setDrawingScale(null);
         setDrawingScaleClearTick((t) => t + 1);
@@ -1168,13 +1173,21 @@ const App: React.FC = () => {
         changed = true;
       }
     }
+    if (selectedTextId) {
+      const text = textMarkups.find(t => t.id === selectedTextId);
+      if (text && !text.locked) {
+        setTextMarkups(prev => prev.filter(t => t.id !== selectedTextId));
+        setSelectedTextId(null);
+        changed = true;
+      }
+    }
     if (changed) setHasUnsavedChanges(true);
-  }, [selectedRectIds, selectedPinId, rectangles, pins, selectedLineId, selectedLinePointIndex, lineMarkups, selectedLineIds]);
+  }, [selectedRectIds, selectedPinId, rectangles, pins, selectedLineId, selectedLinePointIndex, lineMarkups, selectedLineIds, selectedTextId, textMarkups]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         const target = e.target as HTMLElement;
-        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || isLinkModalOpen || isPhotoViewerOpen || isShareModalOpen || isDownloadModalOpen || isCompareModalOpen) {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable || isLinkModalOpen || isPhotoViewerOpen || isShareModalOpen || isDownloadModalOpen || isCompareModalOpen) {
             return;
         }
 
@@ -1196,6 +1209,10 @@ const App: React.FC = () => {
             case 'p':
                 e.preventDefault();
                 handleSetActiveTool('pin');
+                break;
+            case 't':
+                e.preventDefault();
+                handleSetActiveTool('text');
                 break;
             case 'delete':
             case 'backspace':
@@ -1264,11 +1281,11 @@ const App: React.FC = () => {
   
   useEffect(() => {
     setIsMenuVisible(false);
-    if (selectedRectIds.length === 1 || selectedLineIds.length > 0) {
+    if (selectedRectIds.length === 1 || selectedLineIds.length > 0 || selectedTextId) {
       const timer = setTimeout(() => setIsMenuVisible(true), 10);
       return () => clearTimeout(timer);
     }
-  }, [selectedRectIds, selectedLineIds]);
+  }, [selectedRectIds, selectedLineIds, selectedTextId]);
 
   const handleThemeToggle = () => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
@@ -1332,7 +1349,39 @@ const App: React.FC = () => {
 
   const handleSelectLinkItem = (item: any) => {
     if (linkTargetRectId) {
-        if (isLineMarkup(linkTargetRectId, lineMarkups)) {
+        if (isTextMarkup(linkTargetRectId, textMarkups)) {
+          setTextMarkups((prevTexts) => prevTexts.map((t) => {
+            if (t.id !== linkTargetRectId) return t;
+            const updated = { ...t };
+            switch (linkModalConfig?.type) {
+              case 'rfi':
+                if (!updated.rfi) updated.rfi = [];
+                if (!updated.rfi.some((r) => r.id === item.id)) {
+                  const originalRfi = allRfis.find((rfi) => rfi.id === item.id);
+                  if (originalRfi) updated.rfi.push(originalRfi);
+                }
+                break;
+              case 'submittal':
+                if (!updated.submittals) updated.submittals = [];
+                if (!updated.submittals.some((s) => s.id === item.id)) updated.submittals.push(item);
+                break;
+              case 'punch':
+                if (!updated.punches) updated.punches = [];
+                if (!updated.punches.some((p) => p.id === item.id)) updated.punches.push(item);
+                break;
+              case 'drawing':
+                if (!updated.drawings) updated.drawings = [];
+                const fullDrawing = allDrawings.find((d) => d.id === item.id);
+                if (fullDrawing && !updated.drawings.some((d) => d.id === item.id)) updated.drawings.push(fullDrawing);
+                break;
+              case 'photo':
+                if (!updated.photos) updated.photos = [];
+                if (!updated.photos.some((p) => p.id === item.id)) updated.photos.push(item);
+                break;
+            }
+            return updated;
+          }));
+        } else if (isLineMarkup(linkTargetRectId, lineMarkups)) {
           setLineMarkups((prevLines) => prevLines.map((line) => {
             if (line.id !== linkTargetRectId) return line;
             const updated = { ...line };
@@ -1486,8 +1535,16 @@ const App: React.FC = () => {
       // Add to the master list
       setAllRfis(prev => [...prev, newRfiData]);
 
-      // Add to the target rectangle
-      if (isLineMarkup(rfiTargetRectId, lineMarkups)) {
+      // Add to the target rectangle/line/text
+      if (isTextMarkup(rfiTargetRectId, textMarkups)) {
+        setTextMarkups((prevTexts) => prevTexts.map((t) => {
+          if (t.id !== rfiTargetRectId) return t;
+          const updated = { ...t };
+          if (!updated.rfi) updated.rfi = [];
+          updated.rfi.push(newRfiData);
+          return updated;
+        }));
+      } else if (isLineMarkup(rfiTargetRectId, lineMarkups)) {
         setLineMarkups((prevLines) => prevLines.map((line) => {
           if (line.id !== rfiTargetRectId) return line;
           const updated = { ...line };
@@ -1550,6 +1607,22 @@ const App: React.FC = () => {
       setSelectedLineIds(prev => prev.filter((id) => id !== lineId));
       setSelectedLineId(null);
       setSelectedLinePointIndex(null);
+      setHasUnsavedChanges(true);
+  }, []);
+
+  const handleCreateTextMarkup = useCallback((text: TextMarkup) => {
+      setTextMarkups(prev => [...prev, text]);
+      setHasUnsavedChanges(true);
+  }, []);
+
+  const handleUpdateTextMarkup = useCallback((id: string, changes: Partial<TextMarkup>) => {
+      setTextMarkups(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t));
+      setHasUnsavedChanges(true);
+  }, []);
+
+  const handleDeleteTextMarkup = useCallback((id: string) => {
+      setTextMarkups(prev => prev.filter(t => t.id !== id));
+      setSelectedTextId(null);
       setHasUnsavedChanges(true);
   }, []);
 
@@ -1641,7 +1714,15 @@ const App: React.FC = () => {
           const newPhoto: PhotoData = { id: `UPLOAD-${Date.now()}`, title: file.name, url: e.target?.result as string, source: 'upload', markups: [] };
           setAllPhotos(prev => [...prev, newPhoto]);
           if (linkTargetRectId) {
-             if (isLineMarkup(linkTargetRectId, lineMarkups)) {
+             if (isTextMarkup(linkTargetRectId, textMarkups)) {
+                setTextMarkups((prevTexts) => prevTexts.map((t) => {
+                  if (t.id !== linkTargetRectId) return t;
+                  const updated = { ...t };
+                  if (!updated.photos) updated.photos = [];
+                  updated.photos.push(newPhoto);
+                  return updated;
+                }));
+             } else if (isLineMarkup(linkTargetRectId, lineMarkups)) {
                 setLineMarkups((prevLines) => prevLines.map((line) => {
                   if (line.id !== linkTargetRectId) return line;
                   const updated = { ...line };
@@ -1736,6 +1817,8 @@ const App: React.FC = () => {
       setRectangles([]);
       setPins([]);
       setLineMarkups([]);
+      setTextMarkups([]);
+      setSelectedTextId(null);
       setMeasurements([]);
       setDrawingScale(null);
       setDrawingScaleClearTick((t) => t + 1);
@@ -1776,6 +1859,8 @@ const App: React.FC = () => {
       setRectangles([]);
       setPins([]);
       setLineMarkups([]);
+      setTextMarkups([]);
+      setSelectedTextId(null);
       setSelectedRectIds([]);
       setHasUnsavedChanges(false);
       setLoadedSetIds([]);
@@ -2044,6 +2129,12 @@ const App: React.FC = () => {
                     rectangles={rectangles}
                     pins={pins}
                     lineMarkups={lineMarkups}
+                    textMarkups={textMarkups}
+                    selectedTextId={selectedTextId}
+                    setSelectedTextId={setSelectedTextId}
+                    onCreateTextMarkup={handleCreateTextMarkup}
+                    onUpdateTextMarkup={handleUpdateTextMarkup}
+                    onDeleteTextMarkup={handleDeleteTextMarkup}
                     filters={filters}
                     viewTransform={viewTransform}
                     interaction={interaction}

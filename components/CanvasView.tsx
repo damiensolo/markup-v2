@@ -3,7 +3,7 @@
 // Fix: Import 'useCallback' from 'react' to resolve 'Cannot find name' errors.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Palette, ChevronUp, ChevronDown } from 'lucide-react';
-import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle, Measurement, LineMarkup, LineToolType } from '../types';
+import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle, Measurement, LineMarkup, LineToolType, TextMarkup } from '../types';
 import ScaleDialog from './ScaleDialog';
 import { RectangleTagType, ToolbarPosition, ImageGeom } from '../App';
 import { UploadIcon, TrashIcon, LinkIcon, ArrowUpTrayIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowsPointingOutIcon, SunIcon, MoonIcon, SafetyPinIcon, PunchPinIcon, PhotoPinIcon, InformationCircleIcon, FilterIcon, CogIcon } from './Icons';
@@ -26,6 +26,12 @@ interface CanvasViewProps {
     rectangles: Rectangle[];
     pins: Pin[];
     lineMarkups: LineMarkup[];
+    textMarkups: TextMarkup[];
+    selectedTextId: string | null;
+    setSelectedTextId: (id: string | null) => void;
+    onCreateTextMarkup: (text: TextMarkup) => void;
+    onUpdateTextMarkup: (id: string, changes: Partial<TextMarkup>) => void;
+    onDeleteTextMarkup: (id: string) => void;
     filters: Record<FilterCategory, boolean>;
     viewTransform: ViewTransform;
     interaction: InteractionState;
@@ -202,7 +208,7 @@ const CalibStepperField: React.FC<CalibStepperFieldProps> = ({
 
 const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const {
-        imageSrc, rectangles, pins, lineMarkups, filters, viewTransform, interaction, activeTool, hoveredRectId, hoveredLineId, draggingPinId,
+        imageSrc, rectangles, pins, lineMarkups, textMarkups, selectedTextId, setSelectedTextId, onCreateTextMarkup, onUpdateTextMarkup, onDeleteTextMarkup, filters, viewTransform, interaction, activeTool, hoveredRectId, hoveredLineId, draggingPinId,
         selectedRectIds, selectedPinId, selectedLineIds, selectedLineId, selectedLinePointIndex, currentRect, currentLineMarkup, marqueeRect, isMenuVisible, linkMenuRectId, setLinkMenuRectId, openLinkSubmenu,
         theme, toolbarPosition, setToolbarPosition, isSpacebarDown, imageContainerRef, imageGeom, onImageGeomChange,
         handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handleZoom, handleThemeToggle, 
@@ -313,6 +319,18 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     /** Rubber-band preview from last freeline point to cursor while adding points (%, image space). */
     const [freelinePreviewEnd, setFreelinePreviewEnd] = useState<{ x: number; y: number } | null>(null);
 
+    // ── Text markup interaction state ──────────────────────────────────────
+    /** ID of text markup currently being inline-edited. */
+    const [editingTextId, setEditingTextId] = useState<string | null>(null);
+    /** Moving a text markup: tracks start mouse position and text's original x/y. */
+    const [movingTextState, setMovingTextState] = useState<{ textId: string; startMouseX: number; startMouseY: number; startTextX: number; startTextY: number } | null>(null);
+    /** Whether the text color swatch popover is open (keyed to selectedTextId). */
+    const [textColorPopoverOpen, setTextColorPopoverOpen] = useState(false);
+    /** Ref to contenteditable div for committing edits on blur. */
+    const editingTextRef = useRef<HTMLDivElement>(null);
+    /** Pending text content while editing (synced on every input event). */
+    const editingTextContent = useRef<string>('');
+
     const resetMeasurementCalibrationUi = useCallback(() => {
         setIsCalibrating(false);
         setShowCalibInput(false);
@@ -325,6 +343,41 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         setDraggingMeasId(null);
         setDraggingMeasEndpoint(null);
     }, []);
+
+    /** Commit pending edit to the markup store. Clears editingTextId. */
+    const commitTextEdit = useCallback(() => {
+        if (!editingTextId) return;
+        const raw = editingTextContent.current.trim();
+        if (raw) {
+            onUpdateTextMarkup(editingTextId, { text: raw });
+        } else {
+            // Empty text → delete the markup
+            onDeleteTextMarkup(editingTextId);
+            setSelectedTextId(null);
+        }
+        setEditingTextId(null);
+        editingTextContent.current = '';
+    }, [editingTextId, onUpdateTextMarkup, onDeleteTextMarkup, setSelectedTextId]);
+
+    /** Auto-focus the contenteditable when edit mode starts. */
+    useEffect(() => {
+        if (!editingTextId) return;
+        const div = editingTextRef.current;
+        if (!div) return;
+        // Move cursor to end
+        div.focus();
+        const range = document.createRange();
+        range.selectNodeContents(div);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+    }, [editingTextId]);
+
+    /** Close color popover when text selection changes. */
+    useEffect(() => {
+        setTextColorPopoverOpen(false);
+    }, [selectedTextId]);
 
     const prevDrawingScaleClearTick = useRef(0);
     const prevDrawingScaleRecalibrateTick = useRef(0);
@@ -473,6 +526,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                 return 'cursor-crosshair';
         }
         if (activeTool === 'pin') return 'cursor-crosshair';
+        if (activeTool === 'text') return movingTextState ? 'cursor-grabbing' : 'cursor-text';
         if (activeTool === 'pen' || activeTool === 'highlighter') {
             // Show move cursor when hovering over an existing freehand stroke so the
             // user knows they can grab it instead of drawing a new one.
@@ -633,6 +687,16 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        // If a text is being edited, commit on any external click
+        if (editingTextId) {
+            commitTextEdit();
+        }
+        // Clicks on canvas (not intercepted by a text div) clear text selection
+        if (selectedTextId) {
+            setSelectedTextId(null);
+            setTextColorPopoverOpen(false);
+        }
+
         // Alignment drag mode — intercept all mouse activity
         if (compareAlignment?.isAligning) {
             alignDragRef.current = {
@@ -666,10 +730,45 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                 return;
             }
         }
+        if (activeTool === 'text') {
+            if ((e.target as HTMLElement).closest('[data-interactive-ui="true"]')) return;
+            const coords = getRelativeCoords(e);
+            if (!coords) return;
+            const newText: TextMarkup = {
+                id: `text-${Date.now()}`,
+                x: coords.x,
+                y: coords.y,
+                text: '',
+                name: `Text ${textMarkups.length + 1}`,
+                visible: true,
+                fontSize: 14,
+                fontWeight: 'normal',
+                fontStyle: 'normal',
+                color: '#111827',
+            };
+            onCreateTextMarkup(newText);
+            setSelectedTextId(newText.id);
+            editingTextContent.current = '';
+            setEditingTextId(newText.id);
+            return;
+        }
         handleMouseDown(e);
     };
 
     const onCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        // Text markup drag
+        if (movingTextState) {
+            const coords = getRelativeCoords(e);
+            if (coords) {
+                const dx = coords.x - movingTextState.startMouseX;
+                const dy = coords.y - movingTextState.startMouseY;
+                onUpdateTextMarkup(movingTextState.textId, {
+                    x: Math.max(0, Math.min(100, movingTextState.startTextX + dx)),
+                    y: Math.max(0, Math.min(100, movingTextState.startTextY + dy)),
+                });
+            }
+            return;
+        }
         // Alignment drag mode
         if (compareAlignment?.isAligning && alignDragRef.current) {
             const dx = (e.clientX - alignDragRef.current.startX) / viewTransform.scale;
@@ -714,6 +813,11 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+        // Text markup drag end
+        if (movingTextState) {
+            setMovingTextState(null);
+            return;
+        }
         // Alignment drag mode
         if (compareAlignment?.isAligning) {
             alignDragRef.current = null;
@@ -749,6 +853,9 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseLeave = () => {
+        if (movingTextState) {
+            setMovingTextState(null);
+        }
         if (compareAlignment?.isAligning) {
             alignDragRef.current = null;
             return;
@@ -1155,6 +1262,145 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                 );
                             })}
                         </svg>
+
+                        {/* Text Markup Rendering (inside transform div — local coordinate space) */}
+                        {textMarkups.filter(t => t.visible).map(text => {
+                            const local = getLocalPoint(text.x, text.y);
+                            if (!local) return null;
+                            const s = viewTransform.scale;
+                            const isSelected = selectedTextId === text.id;
+                            const isEditing = editingTextId === text.id;
+                            const fontSize = (text.fontSize ?? 14) / s;
+                            const textColor = text.color ?? '#111827';
+                            const content = text.text || (isEditing ? '' : 'Text');
+
+                            return (
+                                <div
+                                    key={text.id}
+                                    data-text-markup-id={text.id}
+                                    style={{
+                                        position: 'absolute',
+                                        left: local.left,
+                                        top: local.top,
+                                        zIndex: isEditing ? 28 : (isSelected ? 25 : 16),
+                                        pointerEvents: 'auto',
+                                        cursor: isEditing ? 'text' : (isSelected ? 'move' : (activeTool === 'text' ? 'move' : 'pointer')),
+                                        userSelect: isEditing ? 'text' : 'none',
+                                    }}
+                                    onMouseDown={(e) => {
+                                        if (isEditing) return; // let browser handle cursor placement
+                                        e.stopPropagation();
+                                        // Clear other selections
+                                        setSelectedRectIds([]);
+                                        setSelectedLineIds([]);
+                                        setSelectedLineId(null);
+                                        setSelectedLinePointIndex(null);
+                                        setSelectedPinId(null);
+                                        setSelectedTextId(text.id);
+                                        if (!text.locked) {
+                                            const coords = getRelativeCoords(e);
+                                            if (coords) {
+                                                setMovingTextState({
+                                                    textId: text.id,
+                                                    startMouseX: coords.x,
+                                                    startMouseY: coords.y,
+                                                    startTextX: text.x,
+                                                    startTextY: text.y,
+                                                });
+                                            }
+                                        }
+                                    }}
+                                    onMouseUp={(e) => {
+                                        if (movingTextState) {
+                                            setMovingTextState(null);
+                                            e.stopPropagation();
+                                        }
+                                    }}
+                                    onDoubleClick={(e) => {
+                                        e.stopPropagation();
+                                        if (!text.locked) {
+                                            setMovingTextState(null);
+                                            editingTextContent.current = text.text;
+                                            setEditingTextId(text.id);
+                                        }
+                                    }}
+                                >
+                                    {isEditing ? (
+                                        <div
+                                            ref={editingTextRef}
+                                            contentEditable
+                                            suppressContentEditableWarning
+                                            data-interactive-ui="true"
+                                            onInput={(e) => {
+                                                editingTextContent.current = (e.currentTarget as HTMLDivElement).innerText;
+                                            }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Escape') {
+                                                    e.stopPropagation();
+                                                    // Cancel: restore original text
+                                                    setEditingTextId(null);
+                                                    editingTextContent.current = '';
+                                                    // If text was empty (newly created), remove it
+                                                    if (!text.text) {
+                                                        onDeleteTextMarkup(text.id);
+                                                        setSelectedTextId(null);
+                                                    }
+                                                }
+                                                // Enter without shift commits
+                                                if (e.key === 'Enter' && !e.shiftKey) {
+                                                    e.preventDefault();
+                                                    commitTextEdit();
+                                                }
+                                            }}
+                                            onBlur={commitTextEdit}
+                                            style={{
+                                                display: 'inline-block',
+                                                minWidth: '2px',
+                                                minHeight: `${fontSize * 1.4}px`,
+                                                outline: 'none',
+                                                whiteSpace: 'pre-wrap',
+                                                wordBreak: 'break-word',
+                                                fontSize: `${fontSize}px`,
+                                                fontWeight: text.fontWeight ?? 'normal',
+                                                fontStyle: text.fontStyle ?? 'normal',
+                                                fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+                                                color: textColor,
+                                                lineHeight: 1.4,
+                                                caretColor: '#3b82f6',
+                                                borderBottom: `${1.5 / s}px dashed #3b82f6`,
+                                                paddingBottom: `${1 / s}px`,
+                                            }}
+                                            dangerouslySetInnerHTML={{ __html: text.text }}
+                                        />
+                                    ) : (
+                                        <span
+                                            style={{
+                                                display: 'inline-block',
+                                                whiteSpace: 'pre-wrap',
+                                                wordBreak: 'break-word',
+                                                fontSize: `${fontSize}px`,
+                                                fontWeight: text.fontWeight ?? 'normal',
+                                                fontStyle: text.fontStyle ?? 'normal',
+                                                fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+                                                color: text.text ? textColor : `${textColor}55`,
+                                                lineHeight: 1.4,
+                                                outline: isSelected
+                                                    ? `${1.5 / s}px solid rgba(59,130,246,0.7)`
+                                                    : 'none',
+                                                outlineOffset: `${3 / s}px`,
+                                                borderRadius: `${2 / s}px`,
+                                                padding: `${2 / s}px ${3 / s}px`,
+                                                boxShadow: isSelected
+                                                    ? `0 0 0 ${3 / s}px rgba(59,130,246,0.15)`
+                                                    : 'none',
+                                            }}
+                                        >
+                                            {content}
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
 
                     {/* Screen-space Overlays */}
@@ -1332,6 +1578,181 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                             </div>
                         </div>
                     )}
+
+                    {/* Text Markup Action Menu */}
+                    {selectedTextId && (() => {
+                        const selectedText = textMarkups.find(t => t.id === selectedTextId);
+                        if (!selectedText || selectedText.locked) return null;
+                        const screenPos = getScreenPoint(selectedText.x, selectedText.y);
+                        if (!screenPos) return null;
+
+                        const FONT_SIZES = [10, 12, 14, 18, 24, 36];
+                        const TEXT_COLORS = [
+                            { hex: '#111827', label: 'Black' },
+                            { hex: '#6b7280', label: 'Gray' },
+                            { hex: '#ef4444', label: 'Red' },
+                            { hex: '#f97316', label: 'Orange' },
+                            { hex: '#eab308', label: 'Yellow' },
+                            { hex: '#22c55e', label: 'Green' },
+                            { hex: '#3b82f6', label: 'Blue' },
+                            { hex: '#a855f7', label: 'Purple' },
+                            { hex: '#ffffff', label: 'White' },
+                        ];
+                        const currentColor = selectedText.color ?? '#111827';
+                        const currentSize = selectedText.fontSize ?? 14;
+                        const isBold = selectedText.fontWeight === 'bold';
+                        const isItalic = selectedText.fontStyle === 'italic';
+
+                        const menuLeft = screenPos.left;
+                        const menuTop = screenPos.top;
+
+                        return (
+                            <div
+                                data-interactive-ui="true"
+                                className={`absolute transition-opacity transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isMenuVisible ? 'opacity-100' : 'opacity-0'}`}
+                                style={{
+                                    left: menuLeft,
+                                    top: menuTop,
+                                    transform: `translate(-50%, calc(-100% - 10px)) scale(${isMenuVisible ? 1 : 0.9})`,
+                                    transformOrigin: 'bottom center',
+                                    pointerEvents: isMenuVisible ? 'auto' : 'none',
+                                    zIndex: 35,
+                                }}
+                            >
+                                <div className="flex items-center gap-0.5 bg-gray-900/90 backdrop-blur-sm p-1.5 rounded-xl shadow-xl text-white border border-white/10">
+                                    {/* Link */}
+                                    <div className="relative">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); handleLinkRect(e, selectedText.id); }}
+                                            title="Attach"
+                                            className={`p-2 rounded-lg transition-colors ${linkMenuRectId === selectedText.id ? 'bg-blue-600 text-white' : 'hover:bg-white/10'}`}
+                                        >
+                                            <LinkIcon className="w-4 h-4" />
+                                        </button>
+                                        {linkMenuRectId === selectedText.id && (
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max" onMouseLeave={() => setOpenLinkSubmenu(null)}>
+                                                <div className="flex flex-col gap-1 bg-gray-900/90 backdrop-blur-sm p-1.5 rounded-xl shadow-lg text-sm border border-white/10">
+                                                    <div className="relative" onMouseEnter={() => setOpenLinkSubmenu('rfi')}>
+                                                        <div className="flex justify-between items-center px-3 py-1.5 text-white rounded-lg hover:bg-blue-600 transition-colors text-left cursor-default">
+                                                            <span>RFI</span>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3 ml-4"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                                                        </div>
+                                                        {openLinkSubmenu === 'rfi' && (
+                                                            <div className="absolute left-full top-0 ml-1 flex flex-col gap-1 bg-gray-900/90 backdrop-blur-sm p-1.5 rounded-xl shadow-lg text-sm w-max border border-white/10">
+                                                                <button onClick={(e) => handleSubmenuLink(e, 'New RFI', selectedText.id)} className="px-3 py-1.5 text-white rounded-lg hover:bg-blue-600 transition-colors text-left whitespace-nowrap">New RFI</button>
+                                                                <button onClick={(e) => handleSubmenuLink(e, 'Link RFI', selectedText.id)} className="px-3 py-1.5 text-white rounded-lg hover:bg-blue-600 transition-colors text-left whitespace-nowrap">Link RFI</button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {['Link Submittal', 'Link Punch', 'Link Drawing', 'Link Photo'].map(type => (
+                                                        <button key={type} onClick={(e) => handleSubmenuLink(e, type, selectedText.id)} className="px-3 py-1.5 text-white rounded-lg hover:bg-blue-600 transition-colors text-left">
+                                                            {type.replace('Link ', '')}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="w-px h-5 bg-white/20 mx-0.5" />
+
+                                    {/* Bold */}
+                                    <button
+                                        onClick={() => onUpdateTextMarkup(selectedText.id, { fontWeight: isBold ? 'normal' : 'bold' })}
+                                        title="Bold"
+                                        className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors ${isBold ? 'bg-blue-600 text-white' : 'hover:bg-white/10'}`}
+                                    >
+                                        B
+                                    </button>
+
+                                    {/* Italic */}
+                                    <button
+                                        onClick={() => onUpdateTextMarkup(selectedText.id, { fontStyle: isItalic ? 'normal' : 'italic' })}
+                                        title="Italic"
+                                        className={`w-8 h-8 rounded-lg text-sm italic transition-colors ${isItalic ? 'bg-blue-600 text-white' : 'hover:bg-white/10'}`}
+                                    >
+                                        I
+                                    </button>
+
+                                    <div className="w-px h-5 bg-white/20 mx-0.5" />
+
+                                    {/* Font size presets */}
+                                    <div className="flex items-center gap-0.5">
+                                        {FONT_SIZES.map(size => (
+                                            <button
+                                                key={size}
+                                                onClick={() => onUpdateTextMarkup(selectedText.id, { fontSize: size })}
+                                                title={`${size}px`}
+                                                className={`h-8 px-1.5 rounded-lg text-xs font-medium transition-colors ${currentSize === size ? 'bg-blue-600 text-white' : 'hover:bg-white/10 text-gray-300'}`}
+                                            >
+                                                {size}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="w-px h-5 bg-white/20 mx-0.5" />
+
+                                    {/* Color swatch button */}
+                                    <div className="relative">
+                                        <button
+                                            title="Text color"
+                                            onClick={(e) => { e.stopPropagation(); setTextColorPopoverOpen(o => !o); }}
+                                            className="w-8 h-8 rounded-lg hover:bg-white/10 transition-colors flex items-center justify-center"
+                                        >
+                                            <span className="text-xs font-bold underline" style={{ color: currentColor === '#ffffff' ? '#d1d5db' : currentColor }}>A</span>
+                                        </button>
+                                        {textColorPopoverOpen && (
+                                            <div
+                                                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 p-2 bg-gray-900/95 backdrop-blur-sm rounded-xl shadow-xl border border-white/10"
+                                                style={{ zIndex: 40 }}
+                                                onMouseDown={(e) => e.stopPropagation()}
+                                            >
+                                                <div className="grid grid-cols-3 gap-1.5">
+                                                    {TEXT_COLORS.map(({ hex, label }) => (
+                                                        <button
+                                                            key={hex}
+                                                            title={label}
+                                                            onClick={() => { onUpdateTextMarkup(selectedText.id, { color: hex }); setTextColorPopoverOpen(false); }}
+                                                            className="w-7 h-7 rounded-lg border-2 transition-all hover:scale-110"
+                                                            style={{
+                                                                backgroundColor: hex,
+                                                                borderColor: currentColor === hex ? '#3b82f6' : hex === '#ffffff' ? '#6b7280' : 'transparent',
+                                                                boxShadow: currentColor === hex ? '0 0 0 1px #3b82f6' : 'none',
+                                                            }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="w-px h-5 bg-white/20 mx-0.5" />
+
+                                    {/* Edit (enter edit mode) */}
+                                    {!editingTextId && (
+                                        <button
+                                            title="Edit text"
+                                            onClick={(e) => { e.stopPropagation(); editingTextContent.current = selectedText.text; setEditingTextId(selectedText.id); }}
+                                            className="p-2 rounded-lg hover:bg-white/10 transition-colors"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" className="w-4 h-4">
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125" />
+                                            </svg>
+                                        </button>
+                                    )}
+
+                                    {/* Delete */}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); onDeleteTextMarkup(selectedText.id); }}
+                                        title="Delete"
+                                        className="p-2 rounded-lg hover:bg-red-500 hover:text-white transition-colors"
+                                    >
+                                        <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {isMultiSelection && multiSelectionScreenRect && (
                         <div data-interactive-ui="true" className="absolute flex items-center" style={{ left: `${multiSelectionScreenRect.left + multiSelectionScreenRect.width / 2}px`, top: `${multiSelectionScreenRect.top}px`, transform: 'translate(-50%, -100%) translateY(-10px)', pointerEvents: 'auto', zIndex: 30 }}>
