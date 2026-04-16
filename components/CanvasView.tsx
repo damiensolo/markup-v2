@@ -31,6 +31,7 @@ interface CanvasViewProps {
     interaction: InteractionState;
     activeTool: ActiveTool;
     hoveredRectId: string | null;
+    hoveredLineId?: string | null;
     draggingPinId: string | null;
     selectedRectIds: string[];
     selectedPinId: string | null;
@@ -201,7 +202,7 @@ const CalibStepperField: React.FC<CalibStepperFieldProps> = ({
 
 const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const {
-        imageSrc, rectangles, pins, lineMarkups, filters, viewTransform, interaction, activeTool, hoveredRectId, draggingPinId,
+        imageSrc, rectangles, pins, lineMarkups, filters, viewTransform, interaction, activeTool, hoveredRectId, hoveredLineId, draggingPinId,
         selectedRectIds, selectedPinId, selectedLineIds, selectedLineId, selectedLinePointIndex, currentRect, currentLineMarkup, marqueeRect, isMenuVisible, linkMenuRectId, setLinkMenuRectId, openLinkSubmenu,
         theme, toolbarPosition, setToolbarPosition, isSpacebarDown, imageContainerRef, imageGeom, onImageGeomChange,
         handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handleZoom, handleThemeToggle, 
@@ -513,12 +514,26 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         const imagePixelY = (y / 100) * imageGeom.height;
         const containerPixelX = imagePixelX + imageGeom.x;
         const containerPixelY = imagePixelY + imageGeom.y;
-        
+
         return {
           left: containerPixelX * viewTransform.scale + viewTransform.translateX,
           top: containerPixelY * viewTransform.scale + viewTransform.translateY,
         };
     }, [viewTransform, imageGeom]);
+
+    /**
+     * Returns coordinates in the LOCAL space of the CSS-transform div (no viewTransform applied).
+     * Use this for SVG elements that live INSIDE the transform div — the CSS transform already
+     * handles zoom/pan, so baking viewTransform in again would double-apply it and cause drift.
+     * Rectangles use the identical formula for their left/top positioning.
+     */
+    const getLocalPoint = useCallback((x: number, y: number): { left: number; top: number } | null => {
+        if (!imageGeom.width) return null;
+        return {
+            left: (x / 100) * imageGeom.width + imageGeom.x,
+            top:  (y / 100) * imageGeom.height + imageGeom.y,
+        };
+    }, [imageGeom]);
 
     const getScreenRect = useCallback((rect: Omit<Rectangle, 'id' | 'name' | 'visible'> | Rectangle): { left: number; top: number; width: number; height: number; } => {
         if (!imageGeom.width) return { left: 0, top: 0, width: 0, height: 0 };
@@ -982,15 +997,23 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                 </marker>
                             </defs>
                             {[...lineMarkups, ...(currentLineMarkup ? [currentLineMarkup] : [])].filter((line) => line.visible).map((line) => {
-                                const screenPoints = line.points.map((point) => getScreenPoint(point.x, point.y)).filter(Boolean) as { left: number; top: number }[];
-                                if (screenPoints.length < 1) return null;
+                                // Use LOCAL coords (no viewTransform) — this SVG is inside the CSS-transform
+                                // div, so the CSS transform already applies zoom/pan. Using screen coords
+                                // here would double-apply the transform and cause drift on zoom/pan.
+                                const localPoints = line.points.map((point) => getLocalPoint(point.x, point.y)).filter(Boolean) as { left: number; top: number }[];
+                                if (localPoints.length < 1) return null;
                                 const isFreehandTool = line.type === 'pen' || line.type === 'highlighter';
                                 const isFreelineOpen = line.type === 'freeline' && !line.closed;
-                                if (screenPoints.length < 2 && !(isFreelineOpen && screenPoints.length >= 1)) return null;
+                                if (localPoints.length < 2 && !(isFreelineOpen && localPoints.length >= 1)) return null;
                                 const isSelectedLine = selectedLineIds.includes(line.id);
                                 const strokeColor = line.strokeColor || markupStrokeColor;
                                 const fillColor = line.fillColor ?? 'transparent';
-                                const strokeWidth = line.strokeWidth ?? 2;
+                                // Divide by scale so stroke widths are visually constant regardless of zoom
+                                // (same approach rectangles use: sw = 2 / viewTransform.scale)
+                                const s = viewTransform.scale;
+                                const strokeWidth = (line.strokeWidth ?? 2) / s;
+                                const handleR = (isSelectedLine ? 6 : 4) / s;
+                                const handleStroke = 2 / s;
                                 const showFreelinePreview =
                                     activeTool === 'freeline' &&
                                     interaction.type === 'none' &&
@@ -999,35 +1022,54 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     line.type === 'freeline' &&
                                     !line.closed &&
                                     line.points.length >= 1;
-                                const previewScreen = showFreelinePreview
-                                    ? getScreenPoint(freelinePreviewEnd.x, freelinePreviewEnd.y)
+                                const previewLocal = showFreelinePreview
+                                    ? getLocalPoint(freelinePreviewEnd.x, freelinePreviewEnd.y)
                                     : null;
-                                const lastScreen = screenPoints[screenPoints.length - 1];
+                                const firstLocal = localPoints[0];
+                                const lastLocal = localPoints[localPoints.length - 1];
 
                                 // Build SVG path — smooth quadratic bezier for pen/highlighter, polyline for others
                                 let pathD = '';
-                                if (screenPoints.length >= 2) {
+                                if (localPoints.length >= 2) {
                                     if (isFreehandTool) {
                                         // Midpoint quadratic bezier: each recorded point is a control point,
                                         // midpoints between consecutive points are the actual curve points.
                                         // This produces very smooth curves matching Figma/Adobe drawing tools.
-                                        pathD = `M ${screenPoints[0].left} ${screenPoints[0].top}`;
-                                        for (let i = 1; i < screenPoints.length - 1; i++) {
-                                            const midX = (screenPoints[i].left + screenPoints[i + 1].left) / 2;
-                                            const midY = (screenPoints[i].top + screenPoints[i + 1].top) / 2;
-                                            pathD += ` Q ${screenPoints[i].left} ${screenPoints[i].top} ${midX} ${midY}`;
+                                        pathD = `M ${localPoints[0].left} ${localPoints[0].top}`;
+                                        for (let i = 1; i < localPoints.length - 1; i++) {
+                                            const midX = (localPoints[i].left + localPoints[i + 1].left) / 2;
+                                            const midY = (localPoints[i].top + localPoints[i + 1].top) / 2;
+                                            pathD += ` Q ${localPoints[i].left} ${localPoints[i].top} ${midX} ${midY}`;
                                         }
-                                        const last = screenPoints[screenPoints.length - 1];
+                                        const last = localPoints[localPoints.length - 1];
                                         pathD += ` L ${last.left} ${last.top}`;
                                     } else {
-                                        pathD = `M ${screenPoints.map((p) => `${p.left} ${p.top}`).join(' L ')}${line.type === 'freeline' && line.closed ? ' Z' : ''}`;
+                                        pathD = `M ${localPoints.map((p) => `${p.left} ${p.top}`).join(' L ')}${line.type === 'freeline' && line.closed ? ' Z' : ''}`;
                                     }
                                 }
 
-                                const dashPreview = `${6 / viewTransform.scale},${4 / viewTransform.scale}`;
+                                // Scale-invariant dashes: divide by CSS scale so they appear constant on screen
+                                const dashPreview = `${6 / s},${4 / s}`;
+                                const isFreehandHovered = isFreehandTool && (hoveredLineId === line.id || isSelectedLine);
+                                // Compare by value not reference since getLocalPoint creates new objects each render
+                                const isOnlyOnePoint = localPoints.length === 1 ||
+                                    (Math.abs(lastLocal.left - firstLocal.left) < 0.01 && Math.abs(lastLocal.top - firstLocal.top) < 0.01);
+
                                 return (
                                     <g key={line.id} opacity={line.type === 'highlighter' ? 0.45 : 1}>
-                                        {screenPoints.length >= 2 && (
+                                        {/* Selection glow: wider semi-transparent path rendered beneath the stroke */}
+                                        {isFreehandTool && isFreehandHovered && localPoints.length >= 2 && (
+                                            <path
+                                                d={pathD}
+                                                fill="none"
+                                                stroke={isSelectedLine ? '#3b82f6' : strokeColor}
+                                                strokeWidth={strokeWidth + (isSelectedLine ? 8 : 6) / s}
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                opacity={isSelectedLine ? 0.25 : 0.15}
+                                            />
+                                        )}
+                                        {localPoints.length >= 2 && (
                                             <path
                                                 d={pathD}
                                                 fill={line.type === 'freeline' && line.closed ? fillColor : 'none'}
@@ -1038,26 +1080,49 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                                 markerEnd={line.type === 'arrow' ? 'url(#canvas-arrow-head)' : undefined}
                                             />
                                         )}
-                                        {showFreelinePreview && previewScreen && lastScreen && (
+                                        {showFreelinePreview && previewLocal && lastLocal && (
                                             <line
-                                                x1={lastScreen.left}
-                                                y1={lastScreen.top}
-                                                x2={previewScreen.left}
-                                                y2={previewScreen.top}
+                                                x1={lastLocal.left}
+                                                y1={lastLocal.top}
+                                                x2={previewLocal.left}
+                                                y2={previewLocal.top}
                                                 stroke={strokeColor}
-                                                strokeWidth={2}
+                                                strokeWidth={2 / s}
                                                 strokeDasharray={dashPreview}
                                                 opacity={0.85}
                                             />
                                         )}
-                                        {/* Point handles — hidden for freehand strokes (too many points) */}
+                                        {/* Freehand strokes: show start + end handles on hover / selection */}
+                                        {isFreehandTool && isFreehandHovered && firstLocal && (
+                                            <circle
+                                                cx={firstLocal.left}
+                                                cy={firstLocal.top}
+                                                r={handleR}
+                                                fill="#ffffff"
+                                                stroke={isSelectedLine ? '#3b82f6' : strokeColor}
+                                                strokeWidth={handleStroke}
+                                                className="pointer-events-none"
+                                            />
+                                        )}
+                                        {isFreehandTool && isFreehandHovered && lastLocal && !isOnlyOnePoint && (
+                                            <circle
+                                                cx={lastLocal.left}
+                                                cy={lastLocal.top}
+                                                r={handleR}
+                                                fill="#ffffff"
+                                                stroke={isSelectedLine ? '#3b82f6' : strokeColor}
+                                                strokeWidth={handleStroke}
+                                                className="pointer-events-none"
+                                            />
+                                        )}
+                                        {/* Point handles for non-freehand strokes (line, arrow, freeline) */}
                                         {!isFreehandTool && line.points.map((point, index) => {
-                                            const screenPoint = getScreenPoint(point.x, point.y);
-                                            if (!screenPoint) return null;
+                                            const localPoint = getLocalPoint(point.x, point.y);
+                                            if (!localPoint) return null;
                                             const isSelectedPoint = isSelectedLine && selectedLinePointIndex === index;
                                             return (
                                                 <g key={`${line.id}-${index}`} className="pointer-events-none" style={{ cursor: line.locked ? 'default' : 'grab' }}>
-                                                    <circle cx={screenPoint.left} cy={screenPoint.top} r={isSelectedPoint ? 6 : 4} fill="#ffffff" stroke={strokeColor} strokeWidth={2} />
+                                                    <circle cx={localPoint.left} cy={localPoint.top} r={(isSelectedPoint ? 6 : 4) / s} fill="#ffffff" stroke={strokeColor} strokeWidth={2 / s} />
                                                 </g>
                                             );
                                         })}

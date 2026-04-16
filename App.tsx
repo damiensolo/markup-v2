@@ -1082,6 +1082,7 @@ const App: React.FC = () => {
     currentRect,
     currentLineMarkup,
     marqueeRect,
+    hoveredLineId,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
@@ -2048,6 +2049,7 @@ const App: React.FC = () => {
                     interaction={interaction}
                     activeTool={activeTool}
                     hoveredRectId={hoveredRectId}
+                    hoveredLineId={hoveredLineId}
                     draggingPinId={draggingPinId}
                     selectedRectIds={selectedRectIds}
                     selectedPinId={selectedPinId}

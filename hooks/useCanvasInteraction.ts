@@ -96,6 +96,7 @@ export const useCanvasInteraction = ({
   const [currentLineMarkup, setCurrentLineMarkup] = useState<LineMarkup | null>(null);
   const [movingLineInitialPoints, setMovingLineInitialPoints] = useState<LineMarkupPoint[] | null>(null);
   const [movingLineId, setMovingLineId] = useState<string | null>(null);
+  const [hoveredLineId, setHoveredLineId] = useState<string | null>(null);
 
   const findNearestLinePoint = useCallback((coords: LineMarkupPoint) => {
     const hitRadius = 1.25;
@@ -463,8 +464,17 @@ export const useCanvasInteraction = ({
     }
 
     const coords = getRelativeCoords(event);
-    if (!coords || interaction.type === 'none' || !interaction.startPoint) return;
-    
+    if (!coords) return;
+
+    // Keep hover state fresh whenever the cursor is idle over the canvas
+    if (interaction.type === 'none') {
+      const nearSeg = findNearestLineSegment(coords);
+      setHoveredLineId(nearSeg ? nearSeg.id : null);
+      return;
+    }
+
+    if (!interaction.startPoint) return;
+
     const dx = coords.x - interaction.startPoint.x;
     const dy = coords.y - interaction.startPoint.y;
 
@@ -668,6 +678,7 @@ export const useCanvasInteraction = ({
   }, [interaction, currentRect, marqueeRect, rectangles, activeTool, activePinType, getRelativeCoords, handleSubmenuLink, draggingPinId, mouseDownRef, activeShape, setHasUnsavedChanges, setRectangles, setSelectedRectIds, markupFillColor, markupStrokeColor, currentLineMarkup, setLineMarkups, setSelectedLineId, setSelectedLineIds, setSelectedLinePointIndex, movingLineId, lineMarkups]);
   
   const handleMouseLeave = useCallback(() => {
+    setHoveredLineId(null);
     if (interaction.type !== 'none' || draggingPinId) {
       handleMouseUp({} as React.MouseEvent<HTMLDivElement>);
     }
@@ -675,7 +686,7 @@ export const useCanvasInteraction = ({
 
   useCanvasInteraction.setState = setInteraction;
 
-  return { interaction, currentRect, marqueeRect, currentLineMarkup, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave };
+  return { interaction, currentRect, marqueeRect, currentLineMarkup, hoveredLineId, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave };
 };
 
 useCanvasInteraction.setState = (state: InteractionState) => {};
