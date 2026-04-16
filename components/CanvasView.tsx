@@ -710,9 +710,19 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const isSingleSelection = selectedRectIds.length === 1;
     const isMultiSelection = selectedRectIds.length > 1;
     const selectedRectangle = isSingleSelection ? rectangles.find(r => r.id === selectedRectIds[0]) : null;
+    const selectedLine = selectedLineId ? lineMarkups.find((line) => line.id === selectedLineId) : null;
     const lastSelectedRectangle = isMultiSelection ? rectangles.find(r => r.id === selectedRectIds[selectedRectIds.length - 1]) : null;
     
     let singleSelectionScreenRect = selectedRectangle ? getScreenRect(selectedRectangle) : null;
+    let selectedLineScreenRect = selectedLine && selectedLine.points.length > 0 ? (() => {
+        const points = selectedLine.points.map((p) => getScreenPoint(p.x, p.y)).filter(Boolean) as { left: number; top: number }[];
+        if (points.length === 0) return null;
+        const minX = Math.min(...points.map((p) => p.left));
+        const maxX = Math.max(...points.map((p) => p.left));
+        const minY = Math.min(...points.map((p) => p.top));
+        const maxY = Math.max(...points.map((p) => p.top));
+        return { left: minX, top: minY, width: Math.max(18, maxX - minX), height: Math.max(18, maxY - minY) };
+    })() : null;
     let multiSelectionScreenRect = lastSelectedRectangle ? getScreenRect(lastSelectedRectangle) : null;
     let marqueeScreenRect = marqueeRect ? getScreenRect(normalizeRect(marqueeRect)) : null;
 
@@ -1092,6 +1102,54 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                             </div>
                         </div>
                       </>
+                    )}
+
+                    {selectedLine && selectedLineScreenRect && !selectedLine.locked && (
+                        <div data-interactive-ui="true" className={`absolute flex transition-opacity transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isMenuVisible ? 'opacity-100' : 'opacity-0'}`} style={{ left: `${selectedLineScreenRect.left + selectedLineScreenRect.width / 2}px`, top: `${selectedLineScreenRect.top}px`, transform: `translate(-50%, -100%) translateY(-10px) scale(${isMenuVisible ? 1 : 0.9})`, transformOrigin: 'bottom center', pointerEvents: isMenuVisible ? 'auto' : 'none', zIndex: 30 }}>
+                            <div className="flex items-center gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white">
+                                <div className="relative">
+                                    <button onClick={(e) => selectedLine && handleLinkRect(e, selectedLine.id)} title="Link" className={`p-2 rounded-md transition-colors ${linkMenuRectId === selectedLine?.id ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}><LinkIcon className="w-5 h-5" /></button>
+                                    {linkMenuRectId === selectedLine?.id && (
+                                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max" onMouseLeave={() => setOpenLinkSubmenu(null)}>
+                                        <div className="flex flex-col gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-sm">
+                                            <div className="relative" onMouseEnter={() => setOpenLinkSubmenu('rfi')}>
+                                                <div className="flex justify-between items-center px-3 py-1.5 text-white rounded-md hover:bg-blue-600 transition-colors text-left cursor-default">
+                                                    <span>RFI</span>
+                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3 ml-4"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                                                </div>
+                                                {openLinkSubmenu === 'rfi' && (
+                                                    <div className="absolute left-full top-0 ml-1 flex flex-col gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-sm w-max">
+                                                        <button onClick={(e) => selectedLine && handleSubmenuLink(e, 'New RFI', selectedLine.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-blue-600 transition-colors text-left whitespace-nowrap">New RFI</button>
+                                                        <button onClick={(e) => selectedLine && handleSubmenuLink(e, 'Link RFI', selectedLine.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-blue-600 transition-colors text-left whitespace-nowrap">Link RFI</button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {['Link Submittal', 'Link Punch', 'Link Drawing', 'Link Photo'].map(type => (<button key={type} onClick={(e) => selectedLine && handleSubmenuLink(e, type, selectedLine.id)} className="px-3 py-1.5 text-white rounded-md hover:bg-blue-600 transition-colors text-left">{type.replace('Link ','')}</button>))}
+                                        </div>
+                                    </div>
+                                    )}
+                                </div>
+                                <div className="relative" data-markup-color-trigger>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setLinkMenuRectId(null);
+                                            setMarkupColorPanelOpen((o) => {
+                                                const next = !o;
+                                                if (next) setMarkupColorPanelSource('selection');
+                                                return next;
+                                            });
+                                        }}
+                                        title="Fill & stroke"
+                                        className={`p-2 rounded-md transition-colors ${markupColorPanelOpen ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
+                                    >
+                                        <Palette className="w-5 h-5" />
+                                    </button>
+                                </div>
+                                <button onClick={(e) => { e.stopPropagation(); onDeleteSelection(); }} title="Delete" className="p-2 rounded-md hover:bg-red-500 hover:text-white transition-colors"><TrashIcon className="w-5 h-5" /></button>
+                            </div>
+                        </div>
                     )}
 
                     {isMultiSelection && multiSelectionScreenRect && (
@@ -1534,7 +1592,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     </div>
 
                     {markupColorPanelOpen && (() => {
-                        const activeSelectionRect = singleSelectionScreenRect || multiSelectionScreenRect;
+                        const activeSelectionRect = singleSelectionScreenRect || selectedLineScreenRect || multiSelectionScreenRect;
                         const PICKER_W = 300;
                         const GAP = 12;
                         let pickerStyle: React.CSSProperties;

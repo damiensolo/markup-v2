@@ -703,6 +703,7 @@ const CanvasSidebarFloatToggles: React.FC<{
 
 
 const App: React.FC = () => {
+  const isLineMarkup = (id: string, lines: LineMarkup[]) => lines.some((line) => line.id === id);
   // Core Data State
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [rectangles, setRectangles] = useState<Rectangle[]>([]);
@@ -1026,9 +1027,12 @@ const App: React.FC = () => {
             : r
         );
       });
-      if (selectedRectIds.length > 0) setHasUnsavedChanges(true);
+      if (selectedLineId) {
+        setLineMarkups((prev) => prev.map((line) => line.id === selectedLineId ? { ...line, ...(mode === 'fill' ? { fillColor: value } : { strokeColor: value }) } : line));
+      }
+      if (selectedRectIds.length > 0 || selectedLineId) setHasUnsavedChanges(true);
     },
-    [selectedRectIds]
+    [selectedRectIds, selectedLineId]
   );
 
   const handleMarkupActiveModeChange = useCallback((mode: 'fill' | 'stroke') => {
@@ -1037,22 +1041,29 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedRectIds.length !== 1) {
+    if (selectedRectIds.length === 0 && !selectedLineId) {
       lastMarkupSyncedRectId.current = null;
       return;
     }
-    const id = selectedRectIds[0];
+    const id = selectedRectIds[0] || selectedLineId;
     if (lastMarkupSyncedRectId.current === id) return;
     lastMarkupSyncedRectId.current = id;
     const r = rectangles.find((x) => x.id === id);
-    if (!r) return;
-    setMarkupFillColor(
-      r.fillColor !== undefined ? r.fillColor : resolveRectFillColor(r, r.shape, true, theme)
-    );
-    setMarkupStrokeColor(
-      r.strokeColor !== undefined ? r.strokeColor : resolveRectStrokeColor(r, false)
-    );
-  }, [selectedRectIds, rectangles, theme]);
+    if (r) {
+      setMarkupFillColor(
+        r.fillColor !== undefined ? r.fillColor : resolveRectFillColor(r, r.shape, true, theme)
+      );
+      setMarkupStrokeColor(
+        r.strokeColor !== undefined ? r.strokeColor : resolveRectStrokeColor(r, false)
+      );
+      return;
+    }
+    const l = lineMarkups.find((x) => x.id === id);
+    if (l) {
+      setMarkupFillColor(l.fillColor ?? 'transparent');
+      setMarkupStrokeColor(l.strokeColor ?? '#EF4444');
+    }
+  }, [selectedRectIds, selectedLineId, rectangles, lineMarkups, theme]);
 
   const handleToggleItemLock = useCallback((id: string, type: 'rect' | 'pin' | 'line') => {
     if (type === 'rect') {
@@ -1308,39 +1319,73 @@ const App: React.FC = () => {
 
   const handleSelectLinkItem = (item: any) => {
     if (linkTargetRectId) {
-        setRectangles(prevRects => prevRects.map(rect => {
-            if (rect.id === linkTargetRectId) {
-                const newRect = { ...rect };
-                switch (linkModalConfig?.type) {
-                    case 'rfi':
-                        if (!newRect.rfi) newRect.rfi = [];
-                        if (!newRect.rfi.some(r => r.id === item.id)) {
-                            const originalRfi = allRfis.find(rfi => rfi.id === item.id);
-                            if(originalRfi) newRect.rfi.push(originalRfi);
-                        }
-                        break;
-                    case 'submittal':
-                        if (!newRect.submittals) newRect.submittals = [];
-                        if (!newRect.submittals.some(s => s.id === item.id)) newRect.submittals.push(item);
-                        break;
-                    case 'punch':
-                        if (!newRect.punches) newRect.punches = [];
-                        if (!newRect.punches.some(p => p.id === item.id)) newRect.punches.push(item);
-                        break;
-                    case 'drawing':
-                        if (!newRect.drawings) newRect.drawings = [];
-                        const fullDrawing = allDrawings.find(d => d.id === item.id);
-                        if (fullDrawing && !newRect.drawings.some(d => d.id === item.id)) newRect.drawings.push(fullDrawing);
-                        break;
-                    case 'photo':
-                        if (!newRect.photos) newRect.photos = [];
-                        if (!newRect.photos.some(p => p.id === item.id)) newRect.photos.push(item);
-                        break;
+        if (isLineMarkup(linkTargetRectId, lineMarkups)) {
+          setLineMarkups((prevLines) => prevLines.map((line) => {
+            if (line.id !== linkTargetRectId) return line;
+            const updated = { ...line };
+            switch (linkModalConfig?.type) {
+              case 'rfi':
+                if (!updated.rfi) updated.rfi = [];
+                if (!updated.rfi.some((r) => r.id === item.id)) {
+                  const originalRfi = allRfis.find((rfi) => rfi.id === item.id);
+                  if (originalRfi) updated.rfi.push(originalRfi);
                 }
-                return newRect;
+                break;
+              case 'submittal':
+                if (!updated.submittals) updated.submittals = [];
+                if (!updated.submittals.some((s) => s.id === item.id)) updated.submittals.push(item);
+                break;
+              case 'punch':
+                if (!updated.punches) updated.punches = [];
+                if (!updated.punches.some((p) => p.id === item.id)) updated.punches.push(item);
+                break;
+              case 'drawing':
+                if (!updated.drawings) updated.drawings = [];
+                const fullDrawing = allDrawings.find((d) => d.id === item.id);
+                if (fullDrawing && !updated.drawings.some((d) => d.id === item.id)) updated.drawings.push(fullDrawing);
+                break;
+              case 'photo':
+                if (!updated.photos) updated.photos = [];
+                if (!updated.photos.some((p) => p.id === item.id)) updated.photos.push(item);
+                break;
             }
-            return rect;
-        }));
+            return updated;
+          }));
+        } else {
+          setRectangles(prevRects => prevRects.map(rect => {
+              if (rect.id === linkTargetRectId) {
+                  const newRect = { ...rect };
+                  switch (linkModalConfig?.type) {
+                      case 'rfi':
+                          if (!newRect.rfi) newRect.rfi = [];
+                          if (!newRect.rfi.some(r => r.id === item.id)) {
+                              const originalRfi = allRfis.find(rfi => rfi.id === item.id);
+                              if(originalRfi) newRect.rfi.push(originalRfi);
+                          }
+                          break;
+                      case 'submittal':
+                          if (!newRect.submittals) newRect.submittals = [];
+                          if (!newRect.submittals.some(s => s.id === item.id)) newRect.submittals.push(item);
+                          break;
+                      case 'punch':
+                          if (!newRect.punches) newRect.punches = [];
+                          if (!newRect.punches.some(p => p.id === item.id)) newRect.punches.push(item);
+                          break;
+                      case 'drawing':
+                          if (!newRect.drawings) newRect.drawings = [];
+                          const fullDrawing = allDrawings.find(d => d.id === item.id);
+                          if (fullDrawing && !newRect.drawings.some(d => d.id === item.id)) newRect.drawings.push(fullDrawing);
+                          break;
+                      case 'photo':
+                          if (!newRect.photos) newRect.photos = [];
+                          if (!newRect.photos.some(p => p.id === item.id)) newRect.photos.push(item);
+                          break;
+                  }
+                  return newRect;
+              }
+              return rect;
+          }));
+        }
         setExpandedLayerIds(prev => [...new Set([...prev, linkTargetRectId])]);
         setHasUnsavedChanges(true);
     } else if (pinTargetCoords && linkModalConfig?.type === 'photo') {
@@ -1429,17 +1474,27 @@ const App: React.FC = () => {
       setAllRfis(prev => [...prev, newRfiData]);
 
       // Add to the target rectangle
-      setRectangles(prevRects =>
-        prevRects.map(rect => {
-          if (rect.id === rfiTargetRectId) {
-            const newRect = { ...rect };
-            if (!newRect.rfi) newRect.rfi = [];
-            newRect.rfi.push(newRfiData);
-            return newRect;
-          }
-          return rect;
-        })
-      );
+      if (isLineMarkup(rfiTargetRectId, lineMarkups)) {
+        setLineMarkups((prevLines) => prevLines.map((line) => {
+          if (line.id !== rfiTargetRectId) return line;
+          const updated = { ...line };
+          if (!updated.rfi) updated.rfi = [];
+          updated.rfi.push(newRfiData);
+          return updated;
+        }));
+      } else {
+        setRectangles(prevRects =>
+          prevRects.map(rect => {
+            if (rect.id === rfiTargetRectId) {
+              const newRect = { ...rect };
+              if (!newRect.rfi) newRect.rfi = [];
+              newRect.rfi.push(newRfiData);
+              return newRect;
+            }
+            return rect;
+          })
+        );
+      }
       setExpandedLayerIds(prev => [...new Set([...prev, rfiTargetRectId])]);
       setHasUnsavedChanges(true);
     }
@@ -1572,15 +1627,25 @@ const App: React.FC = () => {
           const newPhoto: PhotoData = { id: `UPLOAD-${Date.now()}`, title: file.name, url: e.target?.result as string, source: 'upload', markups: [] };
           setAllPhotos(prev => [...prev, newPhoto]);
           if (linkTargetRectId) {
-             setRectangles(prevRects => prevRects.map(rect => {
-                if (rect.id === linkTargetRectId) {
-                    const newRect = {...rect};
-                    if (!newRect.photos) newRect.photos = [];
-                    newRect.photos.push(newPhoto);
-                    return newRect;
-                }
-                return rect;
-             }));
+             if (isLineMarkup(linkTargetRectId, lineMarkups)) {
+                setLineMarkups((prevLines) => prevLines.map((line) => {
+                  if (line.id !== linkTargetRectId) return line;
+                  const updated = { ...line };
+                  if (!updated.photos) updated.photos = [];
+                  updated.photos.push(newPhoto);
+                  return updated;
+                }));
+             } else {
+                setRectangles(prevRects => prevRects.map(rect => {
+                  if (rect.id === linkTargetRectId) {
+                      const newRect = {...rect};
+                      if (!newRect.photos) newRect.photos = [];
+                      newRect.photos.push(newPhoto);
+                      return newRect;
+                  }
+                  return rect;
+                }));
+             }
              setExpandedLayerIds(prev => [...new Set([...prev, linkTargetRectId])]);
              setHasUnsavedChanges(true);
           } else if (pinTargetCoords) {

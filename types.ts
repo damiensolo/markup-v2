@@ -247,5 +247,11 @@ export interface LineMarkup {
   locked?: boolean;
   closed?: boolean;
   strokeColor?: string;
+  fillColor?: string;
+  rfi?: RfiData[];
+  submittals?: SubmittalData[];
+  punches?: PunchData[];
+  drawings?: DrawingData[];
+  photos?: PhotoData[];
   sourceSetId?: string;
 }

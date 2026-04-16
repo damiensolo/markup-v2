@@ -185,6 +185,7 @@ export const useCanvasInteraction = ({
           points: [coords],
           name: `Freeline ${lineMarkups.filter((line: LineMarkup) => line.type === 'freeline').length + 1}`,
           visible: true,
+          fillColor: 'transparent',
           strokeColor: markupStrokeColor,
         };
         setLineMarkups((prev: LineMarkup[]) => [...prev, newFreeline]);
@@ -200,6 +201,7 @@ export const useCanvasInteraction = ({
         points: [coords, coords],
         name: `${activeTool === 'arrow' ? 'Arrow' : 'Line'} ${lineMarkups.filter((line: LineMarkup) => line.type === activeTool).length + 1}`,
         visible: true,
+        fillColor: 'transparent',
         strokeColor: markupStrokeColor,
       };
       setCurrentLineMarkup(newLine);
