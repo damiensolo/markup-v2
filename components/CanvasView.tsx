@@ -309,6 +309,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const [hoveredMeasId, setHoveredMeasId] = useState<string | null>(null);
     const [draggingMeasId, setDraggingMeasId] = useState<string | null>(null);
     const [draggingMeasEndpoint, setDraggingMeasEndpoint] = useState<'p1' | 'p2' | null>(null);
+    /** Rubber-band preview from last freeline point to cursor while adding points (%, image space). */
+    const [freelinePreviewEnd, setFreelinePreviewEnd] = useState<{ x: number; y: number } | null>(null);
 
     const resetMeasurementCalibrationUi = useCallback(() => {
         setIsCalibrating(false);
@@ -368,6 +370,19 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     useEffect(() => {
         if (!markupColorPanelOpen) setMarkupColorPanelSource(null);
     }, [markupColorPanelOpen]);
+
+    useEffect(() => {
+        if (activeTool !== 'freeline') {
+            setFreelinePreviewEnd(null);
+            return;
+        }
+        const fl = selectedLineId
+            ? lineMarkups.find((l) => l.id === selectedLineId && l.type === 'freeline' && !l.closed)
+            : null;
+        if (!fl || fl.points.length < 1) {
+            setFreelinePreviewEnd(null);
+        }
+    }, [activeTool, selectedLineId, lineMarkups]);
 
     useEffect(() => {
         if (!markupColorPanelOpen) return;
@@ -457,8 +472,12 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                 return 'cursor-crosshair';
         }
         if (activeTool === 'pin') return 'cursor-crosshair';
-        if (activeTool === 'line' || activeTool === 'arrow' || activeTool === 'freeline') {
+        if (activeTool === 'line' || activeTool === 'arrow') {
             return selectedLineId ? 'cursor-move' : 'cursor-crosshair';
+        }
+        if (activeTool === 'freeline') {
+            if (interaction.type === 'moving' || interaction.type === 'panning') return 'cursor-grabbing';
+            return 'cursor-crosshair';
         }
         if (draggingMeasId) return 'cursor-grabbing';
         if (activeTool === 'measurement') return 'cursor-crosshair';
@@ -655,6 +674,19 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
             if (coords) setMeasCurrent(coords);
             return;
         }
+        if (activeTool === 'freeline' && interaction.type === 'none') {
+            const fl = selectedLineId
+                ? lineMarkups.find((l) => l.id === selectedLineId && l.type === 'freeline' && !l.closed)
+                : null;
+            if (fl && fl.points.length >= 1) {
+                const coords = getRelativeCoords(e);
+                setFreelinePreviewEnd(coords);
+            } else {
+                setFreelinePreviewEnd(null);
+            }
+        } else {
+            setFreelinePreviewEnd(null);
+        }
         handleMouseMove(e);
     };
 
@@ -706,6 +738,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
             setMeasStart(null);
             setMeasCurrent(null);
         }
+        setFreelinePreviewEnd(null);
         handleMouseLeave();
     };
 
@@ -949,20 +982,52 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                             </defs>
                             {[...lineMarkups, ...(currentLineMarkup ? [currentLineMarkup] : [])].filter((line) => line.visible).map((line) => {
                                 const screenPoints = line.points.map((point) => getScreenPoint(point.x, point.y)).filter(Boolean) as { left: number; top: number }[];
-                                if (screenPoints.length < 2) return null;
-                                const pathD = `M ${screenPoints.map((p) => `${p.left} ${p.top}`).join(' L ')}${line.type === 'freeline' && line.closed ? ' Z' : ''}`;
+                                if (screenPoints.length < 1) return null;
+                                const isFreelineOpen = line.type === 'freeline' && !line.closed;
+                                if (screenPoints.length < 2 && !(isFreelineOpen && screenPoints.length >= 1)) return null;
                                 const isSelectedLine = selectedLineIds.includes(line.id);
                                 const strokeColor = line.strokeColor || markupStrokeColor;
                                 const fillColor = line.fillColor ?? 'transparent';
+                                const showFreelinePreview =
+                                    activeTool === 'freeline' &&
+                                    interaction.type === 'none' &&
+                                    selectedLineId === line.id &&
+                                    freelinePreviewEnd &&
+                                    line.type === 'freeline' &&
+                                    !line.closed &&
+                                    line.points.length >= 1;
+                                const previewScreen = showFreelinePreview
+                                    ? getScreenPoint(freelinePreviewEnd.x, freelinePreviewEnd.y)
+                                    : null;
+                                const lastScreen = screenPoints[screenPoints.length - 1];
+                                const pathD =
+                                    screenPoints.length >= 2
+                                        ? `M ${screenPoints.map((p) => `${p.left} ${p.top}`).join(' L ')}${line.type === 'freeline' && line.closed ? ' Z' : ''}`
+                                        : '';
+                                const dashPreview = `${6 / viewTransform.scale},${4 / viewTransform.scale}`;
                                 return (
                                     <g key={line.id}>
-                                        <path
-                                            d={pathD}
-                                            fill={line.type === 'freeline' && line.closed ? fillColor : 'none'}
-                                            stroke={strokeColor}
-                                            strokeWidth={2}
-                                            markerEnd={line.type === 'arrow' ? 'url(#canvas-arrow-head)' : undefined}
-                                        />
+                                        {screenPoints.length >= 2 && (
+                                            <path
+                                                d={pathD}
+                                                fill={line.type === 'freeline' && line.closed ? fillColor : 'none'}
+                                                stroke={strokeColor}
+                                                strokeWidth={2}
+                                                markerEnd={line.type === 'arrow' ? 'url(#canvas-arrow-head)' : undefined}
+                                            />
+                                        )}
+                                        {showFreelinePreview && previewScreen && lastScreen && (
+                                            <line
+                                                x1={lastScreen.left}
+                                                y1={lastScreen.top}
+                                                x2={previewScreen.left}
+                                                y2={previewScreen.top}
+                                                stroke={strokeColor}
+                                                strokeWidth={2}
+                                                strokeDasharray={dashPreview}
+                                                opacity={0.85}
+                                            />
+                                        )}
                                         {line.points.map((point, index) => {
                                             const screenPoint = getScreenPoint(point.x, point.y);
                                             if (!screenPoint) return null;
