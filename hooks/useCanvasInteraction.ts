@@ -307,6 +307,46 @@ export const useCanvasInteraction = ({
 
     if (activeTool === 'pen' || activeTool === 'highlighter') {
       setSelectedRectIds([]);
+
+      // 1. Hit-test start/end points of existing freehand strokes — same priority as
+      //    the line/arrow tools give to their endpoint handles.
+      const endpointHitRadius = 1.5;
+      for (const line of [...lineMarkups].reverse()) {
+        if (!line.visible || (line.type !== 'pen' && line.type !== 'highlighter')) continue;
+        if (line.points.length < 1) continue;
+        const firstPt = line.points[0];
+        const lastPt = line.points[line.points.length - 1];
+        const hitFirst = Math.hypot(firstPt.x - coords.x, firstPt.y - coords.y) <= endpointHitRadius;
+        const hitLast = line.points.length > 1 && Math.hypot(lastPt.x - coords.x, lastPt.y - coords.y) <= endpointHitRadius;
+        if (hitFirst || hitLast) {
+          const pointIndex = hitFirst ? 0 : line.points.length - 1;
+          setSelectedLineId(line.id);
+          setSelectedLineIds([line.id]);
+          setSelectedLinePointIndex(pointIndex);
+          if (!line.locked) {
+            setMovingLineId(line.id);
+            setMovingLineInitialPoints(null);
+            setInteraction({ type: 'moving', startPoint: coords, initialRects: [] });
+          }
+          return;
+        }
+      }
+
+      // 2. Hit-test the stroke body (segment) — lets users drag the whole stroke.
+      const segHit = findNearestLineSegment(coords);
+      if (segHit && (segHit.type === 'pen' || segHit.type === 'highlighter')) {
+        setSelectedLineId(segHit.id);
+        setSelectedLineIds([segHit.id]);
+        setSelectedLinePointIndex(null);
+        if (!segHit.locked) {
+          setMovingLineInitialPoints(segHit.points.map((p: LineMarkupPoint) => ({ ...p })));
+          setMovingLineId(segHit.id);
+          setInteraction({ type: 'moving', startPoint: coords, initialRects: [] });
+        }
+        return;
+      }
+
+      // 3. No hit on an existing stroke — start drawing a new one.
       setSelectedLineId(null);
       setSelectedLineIds([]);
       setSelectedLinePointIndex(null);

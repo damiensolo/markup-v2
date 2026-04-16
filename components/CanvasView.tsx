@@ -473,7 +473,14 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                 return 'cursor-crosshair';
         }
         if (activeTool === 'pin') return 'cursor-crosshair';
-        if (activeTool === 'pen' || activeTool === 'highlighter') return 'cursor-crosshair';
+        if (activeTool === 'pen' || activeTool === 'highlighter') {
+            // Show move cursor when hovering over an existing freehand stroke so the
+            // user knows they can grab it instead of drawing a new one.
+            if (hoveredLineId && lineMarkups.some((l: LineMarkup) => l.id === hoveredLineId && (l.type === 'pen' || l.type === 'highlighter'))) {
+                return 'cursor-move';
+            }
+            return 'cursor-crosshair';
+        }
         if (activeTool === 'line' || activeTool === 'arrow') {
             return selectedLineId ? 'cursor-move' : 'cursor-crosshair';
         }
@@ -862,6 +869,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         {rectangles.filter(r => r.visible).map((rect) => {
                             const normalized = normalizeRect(rect);
                             const isSelected = selectedRectIds.includes(rect.id);
+                            const isHovered = rect.id === hoveredRectId;
                             const strokeColor = resolveRectStrokeColor(rect, isSelected);
                             const fillColor = resolveRectFillColor(rect, rect.shape, isSelected, theme);
                             const sw = 2 / viewTransform.scale;
@@ -909,7 +917,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                         pointerEvents: 'none',
                                       };
                                       return (
-                                        <div className="relative w-full h-full box-border" style={{ borderWidth: sw, borderStyle: 'solid', borderColor: strokeColor, backgroundColor: fillColor === 'transparent' ? 'transparent' : fillColor }}>
+                                        <div className="relative w-full h-full box-border" style={{ borderWidth: sw, borderStyle: 'solid', borderColor: strokeColor, backgroundColor: fillColor === 'transparent' ? 'transparent' : fillColor, boxShadow: (isSelected || isHovered) ? `0 0 0 ${(isSelected ? 3 : 2) / viewTransform.scale}px rgba(59,130,246,${isSelected ? 0.45 : 0.28})` : undefined }}>
                                           {isSelected && hLabel && (
                                             // Bottom edge — horizontal dimension (length)
                                             <div style={{ ...dimTag, bottom: 0, left: '50%', transform: 'translate(-50%, 50%)' }}>
@@ -963,6 +971,21 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                         return (
                                             <div className="relative w-full h-full">
                                                 <svg width="100%" height="100%" viewBox={`0 0 ${pixelWidth} ${pixelHeight}`} preserveAspectRatio="none" className="overflow-visible">
+                                                    {/* Selection / hover glow — rendered behind the main shape */}
+                                                    {(isSelected || isHovered) && rect.shape === 'ellipse' && (
+                                                        <ellipse cx={pixelWidth / 2} cy={pixelHeight / 2} rx={pixelWidth / 2} ry={pixelHeight / 2}
+                                                            fill="none" stroke="#3b82f6"
+                                                            strokeWidth={(isSelected ? 8 : 5) / viewTransform.scale}
+                                                            opacity={isSelected ? 0.3 : 0.2}
+                                                        />
+                                                    )}
+                                                    {(isSelected || isHovered) && rect.shape === 'cloud' && (
+                                                        <path d={generateCloudPath(pixelWidth, pixelHeight)}
+                                                            fill="none" stroke="#3b82f6"
+                                                            strokeWidth={(isSelected ? 8 : 5) / viewTransform.scale}
+                                                            opacity={isSelected ? 0.3 : 0.2}
+                                                        />
+                                                    )}
                                                     {rect.shape === 'ellipse' && (<ellipse cx={pixelWidth / 2} cy={pixelHeight / 2} rx={pixelWidth / 2} ry={pixelHeight / 2} {...shapeProps} />)}
                                                     {rect.shape === 'cloud' && (<path d={generateCloudPath(pixelWidth, pixelHeight)} {...shapeProps} />)}
                                                 </svg>
@@ -1050,15 +1073,17 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
 
                                 // Scale-invariant dashes: divide by CSS scale so they appear constant on screen
                                 const dashPreview = `${6 / s},${4 / s}`;
-                                const isFreehandHovered = isFreehandTool && (hoveredLineId === line.id || isSelectedLine);
+                                // Show glow on hover OR selection for every line type
+                                const showGlow = isSelectedLine || hoveredLineId === line.id;
+                                const isFreehandHovered = isFreehandTool && showGlow;
                                 // Compare by value not reference since getLocalPoint creates new objects each render
                                 const isOnlyOnePoint = localPoints.length === 1 ||
                                     (Math.abs(lastLocal.left - firstLocal.left) < 0.01 && Math.abs(lastLocal.top - firstLocal.top) < 0.01);
 
                                 return (
                                     <g key={line.id} opacity={line.type === 'highlighter' ? 0.45 : 1}>
-                                        {/* Selection glow: wider semi-transparent path rendered beneath the stroke */}
-                                        {isFreehandTool && isFreehandHovered && localPoints.length >= 2 && (
+                                        {/* Selection / hover glow: wider semi-transparent path rendered beneath the stroke */}
+                                        {showGlow && localPoints.length >= 2 && (
                                             <path
                                                 d={pathD}
                                                 fill="none"
