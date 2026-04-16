@@ -231,7 +231,7 @@ export interface Measurement {
   visible: boolean;
 }
 
-export type LineToolType = 'line' | 'arrow' | 'freeline';
+export type LineToolType = 'line' | 'arrow' | 'freeline' | 'pen' | 'highlighter';
 
 export interface LineMarkupPoint {
   x: number;
@@ -248,6 +248,8 @@ export interface LineMarkup {
   closed?: boolean;
   strokeColor?: string;
   fillColor?: string;
+  /** Override stroke width in image-space pixels. Used by pen (3) and highlighter (16). */
+  strokeWidth?: number;
   rfi?: RfiData[];
   submittals?: SubmittalData[];
   punches?: PunchData[];

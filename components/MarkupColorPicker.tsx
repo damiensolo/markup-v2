@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pipette, X } from 'lucide-react';
 import {
@@ -25,6 +26,8 @@ const PRESETS: { value: string; label: string }[] = [
   { value: '#000000', label: 'Black' },
 ];
 
+const STROKE_PRESETS = PRESETS.filter((p) => p.value !== 'transparent');
+
 const HUE_GRADIENT =
   'linear-gradient(to right,#f00 0%,#ff0 17%,#0f0 33%,#0ff 50%,#00f 67%,#f0f 83%,#f00 100%)';
 
@@ -37,6 +40,11 @@ export interface MarkupColorPickerProps {
   /** Optional dismiss control (e.g. docked panel close). */
   onRequestClose?: () => void;
   className?: string;
+  /**
+   * When true: hide the Fill tab entirely, show only the stroke color picker
+   * with an opacity/see-through slider. Used for line, arrow, pen, highlighter tools.
+   */
+  strokeOnly?: boolean;
 }
 
 function strokeToHex(strokeValue: string): string {
@@ -45,6 +53,12 @@ function strokeToHex(strokeValue: string): string {
   const rgba = parseCssRgb(strokeValue);
   if (rgba) return rgbToHex(rgba.r, rgba.g, rgba.b);
   return '#EF4444';
+}
+
+function parseStrokeOpacity(strokeValue: string): number {
+  const rgba = parseCssRgb(strokeValue);
+  if (rgba) return Math.max(0, Math.min(1, rgba.a));
+  return 1;
 }
 
 function cssColorToOutput(rgb: { r: number; g: number; b: number; a: number }): string {
@@ -61,22 +75,25 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
   onChange,
   onRequestClose,
   className = '',
+  strokeOnly = false,
 }) => {
-  const channelValue = activeMode === 'fill' ? fillValue : strokeValue;
-  /** User chose “No fill” — distinct from rgba(…,0) which still carries a hue. */
+  // When strokeOnly, always operate in stroke mode regardless of activeMode prop
+  const effectiveMode: MarkupColorMode = strokeOnly ? 'stroke' : activeMode;
+
+  const channelValue = effectiveMode === 'fill' ? fillValue : strokeValue;
   const isExplicitNoFill = fillValue === 'transparent';
 
-  const [hsv, setHsv] = useState(() =>
-    activeMode === 'fill'
-      ? (() => {
-          const p = parseFillForPicker(fillValue);
-          return { h: p.h, s: p.s, v: p.v };
-        })()
-      : hexToHsv(strokeToHex(strokeValue))
-  );
+  const [hsv, setHsv] = useState(() => {
+    if (effectiveMode === 'fill') {
+      const p = parseFillForPicker(fillValue);
+      return { h: p.h, s: p.s, v: p.v };
+    }
+    return hexToHsv(strokeToHex(strokeValue));
+  });
   const [fillOpacity, setFillOpacity] = useState(() => parseFillForPicker(fillValue).opacity);
+  const [strokeOpacity, setStrokeOpacity] = useState(() => parseStrokeOpacity(strokeValue));
   const [hexInput, setHexInput] = useState(() => {
-    if (activeMode === 'fill') {
+    if (effectiveMode === 'fill') {
       const p = parseFillForPicker(fillValue);
       return p.opacity < 0.001 ? '' : hsvToHex(p.h, p.s, p.v);
     }
@@ -84,17 +101,19 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
   });
 
   useEffect(() => {
-    if (activeMode === 'fill') {
+    if (effectiveMode === 'fill') {
       const p = parseFillForPicker(fillValue);
       setHsv({ h: p.h, s: p.s, v: p.v });
       setFillOpacity(p.opacity);
       setHexInput(p.opacity < 0.001 ? '' : hsvToHex(p.h, p.s, p.v));
     } else {
       const hex = strokeToHex(strokeValue);
+      const op = parseStrokeOpacity(strokeValue);
       setHsv(hexToHsv(hex));
+      setStrokeOpacity(op);
       setHexInput(hex);
     }
-  }, [activeMode, fillValue, strokeValue]);
+  }, [effectiveMode, fillValue, strokeValue]);
 
   const svAreaRef = useRef<HTMLDivElement>(null);
   const hueRef = useRef<HTMLDivElement>(null);
@@ -107,10 +126,20 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
     (h: number, s: number, v: number, opacity: number) => {
       const { r, g, b } = hsvToRgb(h, s, v);
       const a = Math.round(Math.max(0, Math.min(1, opacity)) * 100) / 100;
-      onChange(
-        'fill',
-        `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${a})`
-      );
+      onChange('fill', `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${a})`);
+    },
+    [onChange]
+  );
+
+  const emitStroke = useCallback(
+    (h: number, s: number, v: number, opacity: number) => {
+      const { r, g, b } = hsvToRgb(h, s, v);
+      const a = Math.round(Math.max(0, Math.min(1, opacity)) * 100) / 100;
+      if (Math.abs(a - 1) < 0.001) {
+        onChange('stroke', rgbToHex(r, g, b));
+      } else {
+        onChange('stroke', `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${a})`);
+      }
     },
     [onChange]
   );
@@ -118,10 +147,14 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
   const applyHsv = useCallback(
     (h: number, s: number, v: number) => {
       setHsv({ h, s, v });
-      if (activeMode === 'stroke') {
+      if (effectiveMode === 'stroke') {
         const hex = hsvToHex(h, s, v);
         setHexInput(hex);
-        onChange('stroke', hex);
+        if (strokeOnly) {
+          emitStroke(h, s, v, strokeOpacity);
+        } else {
+          onChange('stroke', hex);
+        }
       } else {
         let op = fillOpacity;
         if (op <= 0.001 && isExplicitNoFill) {
@@ -132,7 +165,7 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
         emitFill(h, s, v, op);
       }
     },
-    [activeMode, onChange, emitFill, fillOpacity, isExplicitNoFill]
+    [effectiveMode, strokeOnly, onChange, emitFill, emitStroke, fillOpacity, strokeOpacity, isExplicitNoFill]
   );
 
   const applyHexStroke = useCallback(
@@ -149,9 +182,13 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
       setHsv(h);
       const out = rgbToHex(p.r, p.g, p.b);
       setHexInput(out);
-      onChange('stroke', out);
+      if (strokeOnly) {
+        emitStroke(h.h, h.s, h.v, strokeOpacity);
+      } else {
+        onChange('stroke', out);
+      }
     },
-    [onChange]
+    [onChange, emitStroke, strokeOnly, strokeOpacity]
   );
 
   const applyHexFillSolid = useCallback(
@@ -167,8 +204,7 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
       const hv = rgbToHsv(p.r, p.g, p.b);
       setHsv({ h: hv.h, s: hv.s, v: hv.v });
       setHexInput(rgbToHex(p.r, p.g, p.b));
-      const op =
-        fillOpacity > 0.001 ? fillOpacity : DEFAULT_FILL_OPACITY;
+      const op = fillOpacity > 0.001 ? fillOpacity : DEFAULT_FILL_OPACITY;
       setFillOpacity(op);
       emitFill(hv.h, hv.s, hv.v, op);
     },
@@ -204,11 +240,15 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
       if (!el) return;
       const r = el.getBoundingClientRect();
       const x = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
-      const o = x;
-      setFillOpacity(o);
-      emitFill(hsv.h, hsv.s, hsv.v, o);
+      if (effectiveMode === 'fill' && !strokeOnly) {
+        setFillOpacity(x);
+        emitFill(hsv.h, hsv.s, hsv.v, x);
+      } else {
+        setStrokeOpacity(x);
+        emitStroke(hsv.h, hsv.s, hsv.v, x);
+      }
     },
-    [emitFill, hsv.h, hsv.s, hsv.v]
+    [effectiveMode, strokeOnly, emitFill, emitStroke, hsv]
   );
 
   useEffect(() => {
@@ -240,13 +280,16 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
   const svMarkerLeft = `${hsv.s * 100}%`;
   const svMarkerTop = `${(1 - hsv.v) * 100}%`;
   const hueThumbLeft = `${(hsv.h / 360) * 100}%`;
-  const opacityThumbLeft = `${fillOpacity * 100}%`;
+
+  // Which opacity value to show in the slider — fill or stroke depending on mode
+  const shownOpacity = effectiveMode === 'fill' && !strokeOnly ? fillOpacity : strokeOpacity;
+  const opacityThumbLeft = `${shownOpacity * 100}%`;
 
   const handleHexBlur = () => {
-    if (activeMode === 'fill' && isExplicitNoFill) return;
+    if (effectiveMode === 'fill' && isExplicitNoFill) return;
     const raw = hexInput.trim();
     const withHash = raw.startsWith('#') ? raw : `#${raw}`;
-    if (activeMode === 'stroke') {
+    if (effectiveMode === 'stroke') {
       if (parseHex6(withHash) || parseCssRgb(raw)) applyHexStroke(raw);
       else setHexInput(strokeToHex(strokeValue));
     } else {
@@ -255,21 +298,14 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
         const { h, s, v } = rgbToHsv(rgba.r, rgba.g, rgba.b);
         setHsv({ h, s, v });
         setFillOpacity(Math.max(0, Math.min(1, rgba.a)));
-        const out = cssColorToOutput({
-          r: rgba.r,
-          g: rgba.g,
-          b: rgba.b,
-          a: rgba.a,
-        });
+        const out = cssColorToOutput({ r: rgba.r, g: rgba.g, b: rgba.b, a: rgba.a });
         if (rgba.a <= 0.001) onChange('fill', 'transparent');
         else onChange('fill', out);
         setHexInput(rgba.a <= 0.001 ? '' : hsvToHex(h, s, v));
       } else if (parseHex6(withHash)) {
         applyHexFillSolid(raw);
       } else {
-        setHexInput(
-          isExplicitNoFill ? '' : hsvToHex(hsv.h, hsv.s, hsv.v)
-        );
+        setHexInput(isExplicitNoFill ? '' : hsvToHex(hsv.h, hsv.s, hsv.v));
       }
     }
   };
@@ -296,11 +332,14 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
       const { h, s, v } = rgbToHsv(p.r, p.g, p.b);
       setHsv({ h, s, v });
       setHexInput(rgbToHex(p.r, p.g, p.b));
-      if (activeMode === 'stroke') {
-        onChange('stroke', rgbToHex(p.r, p.g, p.b));
+      if (effectiveMode === 'stroke') {
+        if (strokeOnly) {
+          emitStroke(h, s, v, strokeOpacity);
+        } else {
+          onChange('stroke', rgbToHex(p.r, p.g, p.b));
+        }
       } else {
-        const op =
-          fillOpacity > 0.001 ? fillOpacity : DEFAULT_FILL_OPACITY;
+        const op = fillOpacity > 0.001 ? fillOpacity : DEFAULT_FILL_OPACITY;
         setFillOpacity(op);
         emitFill(h, s, v, op);
       }
@@ -310,19 +349,23 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
   };
 
   const presetOpacity = fillOpacity > 0.001 ? fillOpacity : DEFAULT_FILL_OPACITY;
+  const activePresets = strokeOnly ? STROKE_PRESETS : PRESETS;
 
   return (
     <div
       className={`w-full min-w-0 select-none rounded-2xl border border-zinc-200/90 bg-white p-4 text-zinc-900 shadow-xl ring-1 ring-black/5 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100 dark:ring-white/10 ${className}`}
     >
+      {/* Header */}
       <div className="mb-4 flex gap-2">
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Area highlight
+            {strokeOnly ? 'Outline color' : 'Area highlight'}
           </h3>
-          <p className="mt-0.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-            Adjust on the canvas — this panel stays out of the way.
-          </p>
+          {!strokeOnly && (
+            <p className="mt-0.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+              Adjust on the canvas — this panel stays out of the way.
+            </p>
+          )}
         </div>
         {onRequestClose && (
           <button
@@ -336,39 +379,43 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
         )}
       </div>
 
-      <div className="mb-4 flex rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800/80">
-        <button
-          type="button"
-          onClick={() => onActiveModeChange('fill')}
-          className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
-            activeMode === 'fill'
-              ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white'
-              : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
-          }`}
-        >
-          Fill
-        </button>
-        <button
-          type="button"
-          onClick={() => onActiveModeChange('stroke')}
-          className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
-            activeMode === 'stroke'
-              ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white'
-              : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
-          }`}
-        >
-          Outline
-        </button>
-      </div>
+      {/* Fill / Stroke tab switcher — hidden in strokeOnly mode */}
+      {!strokeOnly && (
+        <div className="mb-4 flex rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800/80">
+          <button
+            type="button"
+            onClick={() => onActiveModeChange('fill')}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
+              effectiveMode === 'fill'
+                ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white'
+                : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+            }`}
+          >
+            Fill
+          </button>
+          <button
+            type="button"
+            onClick={() => onActiveModeChange('stroke')}
+            className={`flex-1 rounded-lg py-2 text-sm font-medium transition-all ${
+              effectiveMode === 'stroke'
+                ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white'
+                : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
+            }`}
+          >
+            Outline
+          </button>
+        </div>
+      )}
 
-      {activeMode === 'fill' && (
+      {/* Opacity slider — fill opacity in full mode, stroke opacity in strokeOnly mode */}
+      {(effectiveMode === 'fill' || strokeOnly) && (
         <div className="mb-4">
           <div className="mb-1.5 flex items-baseline justify-between gap-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-              See-through
+              {effectiveMode === 'fill' ? 'See-through' : 'Opacity'}
             </span>
             <span className="font-mono text-xs tabular-nums text-zinc-700 dark:text-zinc-300">
-              {Math.round(fillOpacity * 100)}%
+              {Math.round(shownOpacity * 100)}%
             </span>
           </div>
           <div
@@ -399,16 +446,11 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
         </div>
       )}
 
-      {activeMode === 'stroke' && (
-        <p className="mb-4 text-xs text-zinc-500 dark:text-zinc-400">
-          Outline stays solid so edges stay crisp on the drawing.
-        </p>
-      )}
-
+      {/* Color presets */}
       <div className="mb-3 grid grid-cols-8 gap-1.5">
-        {PRESETS.map((p) => {
+        {activePresets.map((p) => {
           const active =
-            activeMode === 'fill'
+            effectiveMode === 'fill'
               ? p.value === 'transparent'
                 ? isExplicitNoFill
                 : (() => {
@@ -422,18 +464,24 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
                       Math.abs(ph.b - q.b) < 2
                     );
                   })()
-              : channelValue.toUpperCase() === p.value.toUpperCase();
+              : channelValue.replace(/\s/g, '').toLowerCase().includes(p.value.toLowerCase().slice(1))
+                || channelValue.toUpperCase() === p.value.toUpperCase();
           return (
             <button
               key={p.value}
               type="button"
               title={p.label}
               onClick={() => {
-                if (activeMode === 'stroke') {
+                if (effectiveMode === 'stroke') {
                   if (p.value === 'transparent') return;
-                  onChange('stroke', p.value);
+                  const { h, s, v } = hexToHsv(p.value);
+                  setHsv({ h, s, v });
                   setHexInput(p.value);
-                  setHsv(hexToHsv(p.value));
+                  if (strokeOnly) {
+                    emitStroke(h, s, v, strokeOpacity);
+                  } else {
+                    onChange('stroke', p.value);
+                  }
                   return;
                 }
                 if (p.value === 'transparent') {
@@ -456,7 +504,7 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
               style={
                 p.value === 'transparent'
                   ? { background: '#fff' }
-                  : activeMode === 'fill' && p.value !== 'transparent'
+                  : effectiveMode === 'fill' && p.value !== 'transparent'
                     ? {
                         backgroundColor: p.value,
                         opacity: Math.max(0.35, 0.25 + presetOpacity * 0.5),
@@ -478,8 +526,9 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
         })}
       </div>
 
+      {/* Hex input */}
       <div className="mb-1 text-xs font-semibold text-zinc-600 dark:text-zinc-400">
-        {activeMode === 'fill' ? 'Color' : 'Hex'}
+        {effectiveMode === 'fill' ? 'Color' : 'Hex'}
       </div>
       <div className="mb-3 flex items-center gap-2">
         {eyeDropperSupported && (
@@ -494,20 +543,17 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
         )}
         <input
           type="text"
-          disabled={activeMode === 'fill' && isExplicitNoFill}
-          value={
-            activeMode === 'fill' && isExplicitNoFill
-              ? 'No fill'
-              : hexInput
-          }
+          disabled={effectiveMode === 'fill' && isExplicitNoFill}
+          value={effectiveMode === 'fill' && isExplicitNoFill ? 'No fill' : hexInput}
           onChange={(e) => setHexInput(e.target.value)}
           onBlur={handleHexBlur}
           onKeyDown={(e) => e.key === 'Enter' && handleHexBlur()}
           className="min-w-0 flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm font-mono outline-none transition-shadow focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-950 dark:focus:border-blue-400 dark:disabled:bg-zinc-800/80"
-          placeholder={activeMode === 'fill' ? '#RRGGBB' : '#EF4444'}
+          placeholder={effectiveMode === 'fill' ? '#RRGGBB' : '#EF4444'}
         />
       </div>
 
+      {/* SV color area */}
       <div
         ref={svAreaRef}
         className="relative mb-3 h-[140px] w-full cursor-crosshair overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-600"
@@ -534,6 +580,7 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
         />
       </div>
 
+      {/* Hue slider */}
       <div
         ref={hueRef}
         className="relative h-3 w-full cursor-pointer rounded-full border border-zinc-200 dark:border-zinc-600"

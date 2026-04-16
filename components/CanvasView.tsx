@@ -472,6 +472,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                 return 'cursor-crosshair';
         }
         if (activeTool === 'pin') return 'cursor-crosshair';
+        if (activeTool === 'pen' || activeTool === 'highlighter') return 'cursor-crosshair';
         if (activeTool === 'line' || activeTool === 'arrow') {
             return selectedLineId ? 'cursor-move' : 'cursor-crosshair';
         }
@@ -977,17 +978,19 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         <svg className="absolute left-0 top-0 h-full w-full overflow-visible pointer-events-none" style={{ zIndex: 16 }}>
                             <defs>
                                 <marker id="canvas-arrow-head" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
-                                    <polygon points="0 0, 10 3.5, 0 7" fill="#EF4444" />
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="context-stroke" />
                                 </marker>
                             </defs>
                             {[...lineMarkups, ...(currentLineMarkup ? [currentLineMarkup] : [])].filter((line) => line.visible).map((line) => {
                                 const screenPoints = line.points.map((point) => getScreenPoint(point.x, point.y)).filter(Boolean) as { left: number; top: number }[];
                                 if (screenPoints.length < 1) return null;
+                                const isFreehandTool = line.type === 'pen' || line.type === 'highlighter';
                                 const isFreelineOpen = line.type === 'freeline' && !line.closed;
                                 if (screenPoints.length < 2 && !(isFreelineOpen && screenPoints.length >= 1)) return null;
                                 const isSelectedLine = selectedLineIds.includes(line.id);
                                 const strokeColor = line.strokeColor || markupStrokeColor;
                                 const fillColor = line.fillColor ?? 'transparent';
+                                const strokeWidth = line.strokeWidth ?? 2;
                                 const showFreelinePreview =
                                     activeTool === 'freeline' &&
                                     interaction.type === 'none' &&
@@ -1000,19 +1003,38 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     ? getScreenPoint(freelinePreviewEnd.x, freelinePreviewEnd.y)
                                     : null;
                                 const lastScreen = screenPoints[screenPoints.length - 1];
-                                const pathD =
-                                    screenPoints.length >= 2
-                                        ? `M ${screenPoints.map((p) => `${p.left} ${p.top}`).join(' L ')}${line.type === 'freeline' && line.closed ? ' Z' : ''}`
-                                        : '';
+
+                                // Build SVG path — smooth quadratic bezier for pen/highlighter, polyline for others
+                                let pathD = '';
+                                if (screenPoints.length >= 2) {
+                                    if (isFreehandTool) {
+                                        // Midpoint quadratic bezier: each recorded point is a control point,
+                                        // midpoints between consecutive points are the actual curve points.
+                                        // This produces very smooth curves matching Figma/Adobe drawing tools.
+                                        pathD = `M ${screenPoints[0].left} ${screenPoints[0].top}`;
+                                        for (let i = 1; i < screenPoints.length - 1; i++) {
+                                            const midX = (screenPoints[i].left + screenPoints[i + 1].left) / 2;
+                                            const midY = (screenPoints[i].top + screenPoints[i + 1].top) / 2;
+                                            pathD += ` Q ${screenPoints[i].left} ${screenPoints[i].top} ${midX} ${midY}`;
+                                        }
+                                        const last = screenPoints[screenPoints.length - 1];
+                                        pathD += ` L ${last.left} ${last.top}`;
+                                    } else {
+                                        pathD = `M ${screenPoints.map((p) => `${p.left} ${p.top}`).join(' L ')}${line.type === 'freeline' && line.closed ? ' Z' : ''}`;
+                                    }
+                                }
+
                                 const dashPreview = `${6 / viewTransform.scale},${4 / viewTransform.scale}`;
                                 return (
-                                    <g key={line.id}>
+                                    <g key={line.id} opacity={line.type === 'highlighter' ? 0.45 : 1}>
                                         {screenPoints.length >= 2 && (
                                             <path
                                                 d={pathD}
                                                 fill={line.type === 'freeline' && line.closed ? fillColor : 'none'}
                                                 stroke={strokeColor}
-                                                strokeWidth={2}
+                                                strokeWidth={strokeWidth}
+                                                strokeLinecap={isFreehandTool ? 'round' : 'butt'}
+                                                strokeLinejoin={isFreehandTool ? 'round' : 'miter'}
                                                 markerEnd={line.type === 'arrow' ? 'url(#canvas-arrow-head)' : undefined}
                                             />
                                         )}
@@ -1028,7 +1050,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                                 opacity={0.85}
                                             />
                                         )}
-                                        {line.points.map((point, index) => {
+                                        {/* Point handles — hidden for freehand strokes (too many points) */}
+                                        {!isFreehandTool && line.points.map((point, index) => {
                                             const screenPoint = getScreenPoint(point.x, point.y);
                                             if (!screenPoint) return null;
                                             const isSelectedPoint = isSelectedLine && selectedLinePointIndex === index;
@@ -1776,6 +1799,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     strokeValue={markupStrokeColor}
                                     onChange={onMarkupColorChange}
                                     onRequestClose={() => setMarkupColorPanelOpen(false)}
+                                    strokeOnly={activeTool === 'line' || activeTool === 'arrow' || activeTool === 'pen' || activeTool === 'highlighter'}
                                 />
                             </div>
                         );

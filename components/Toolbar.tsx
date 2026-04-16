@@ -162,10 +162,10 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
   }, []);
 
   const mainTools = [
-    { id: 'image', label: 'Image', icon: <ImageIcon /> },
-    { id: 'location', label: 'Location', icon: <LocationIcon /> },
     { id: 'pen', label: 'Pen', icon: <PenIcon /> },
     { id: 'highlighter', label: 'Highlighter', icon: <HighlighterIcon /> },
+    { id: 'location', label: 'Location', icon: <LocationIcon /> },
+    { id: 'image', label: 'Image', icon: <ImageIcon /> },
     { id: 'text', label: 'Text', icon: <TextIcon /> },
   ];
   

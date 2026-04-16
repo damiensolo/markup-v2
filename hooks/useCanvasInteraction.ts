@@ -20,6 +20,30 @@ const normalizeRect = (rect: Omit<Rectangle, 'id' | 'name' | 'visible'> | Rectan
   return newRect;
 };
 
+// Ramer-Douglas-Peucker path simplification (coordinates are percentages).
+const rdpSimplify = (points: LineMarkupPoint[], epsilon: number): LineMarkupPoint[] => {
+  if (points.length <= 2) return points;
+  const first = points[0];
+  const last = points[points.length - 1];
+  const abx = last.x - first.x;
+  const aby = last.y - first.y;
+  const abLen = Math.hypot(abx, aby);
+  let maxDist = 0;
+  let maxIdx = 0;
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = abLen === 0
+      ? Math.hypot(points[i].x - first.x, points[i].y - first.y)
+      : Math.abs(aby * points[i].x - abx * points[i].y + last.x * first.y - last.y * first.x) / abLen;
+    if (d > maxDist) { maxDist = d; maxIdx = i; }
+  }
+  if (maxDist > epsilon) {
+    const left = rdpSimplify(points.slice(0, maxIdx + 1), epsilon);
+    const right = rdpSimplify(points.slice(maxIdx), epsilon);
+    return [...left.slice(0, -1), ...right];
+  }
+  return [first, last];
+};
+
 const lineSegmentsIntersect = (a1: LineMarkupPoint, a2: LineMarkupPoint, b1: LineMarkupPoint, b2: LineMarkupPoint) => {
   const orient = (p: LineMarkupPoint, q: LineMarkupPoint, r: LineMarkupPoint) =>
     (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
@@ -280,6 +304,27 @@ export const useCanvasInteraction = ({
       return;
     }
 
+    if (activeTool === 'pen' || activeTool === 'highlighter') {
+      setSelectedRectIds([]);
+      setSelectedLineId(null);
+      setSelectedLineIds([]);
+      setSelectedLinePointIndex(null);
+      const isPen = activeTool === 'pen';
+      const newStroke: LineMarkup = {
+        id: `line-${Date.now()}`,
+        type: activeTool,
+        points: [coords],
+        name: `${isPen ? 'Pen' : 'Highlight'} ${lineMarkups.filter((l: LineMarkup) => l.type === activeTool).length + 1}`,
+        visible: true,
+        strokeColor: markupStrokeColor,
+        fillColor: 'transparent',
+        strokeWidth: isPen ? 3 : 16,
+      };
+      setCurrentLineMarkup(newStroke);
+      setInteraction({ type: 'drawing', startPoint: coords });
+      return;
+    }
+
     setSelectedLineId(null);
     setSelectedLineIds([]);
     setSelectedLinePointIndex(null);
@@ -427,7 +472,17 @@ export const useCanvasInteraction = ({
       case 'drawing':
       case 'marquee': {
         if (currentLineMarkup) {
-          setCurrentLineMarkup(prev => prev ? ({ ...prev, points: [prev.points[0], coords] }) : prev);
+          if (currentLineMarkup.type === 'pen' || currentLineMarkup.type === 'highlighter') {
+            // Continuous freehand: append point if cursor moved far enough
+            setCurrentLineMarkup(prev => {
+              if (!prev) return prev;
+              const last = prev.points[prev.points.length - 1];
+              if (Math.hypot(coords.x - last.x, coords.y - last.y) < 0.05) return prev;
+              return { ...prev, points: [...prev.points, coords] };
+            });
+          } else {
+            setCurrentLineMarkup(prev => prev ? ({ ...prev, points: [prev.points[0], coords] }) : prev);
+          }
           break;
         }
         const baseRect = { x: interaction.startPoint.x, y: interaction.startPoint.y, width: dx, height: dy };
@@ -504,9 +559,15 @@ export const useCanvasInteraction = ({
     if (interaction.type === 'drawing' && currentLineMarkup) {
       const pointCount = currentLineMarkup.points.length;
       if (pointCount >= 2) {
-        setLineMarkups((prev: LineMarkup[]) => [...prev, currentLineMarkup]);
-        setSelectedLineId(currentLineMarkup.id);
-        setSelectedLineIds([currentLineMarkup.id]);
+        let toCommit = currentLineMarkup;
+        if (currentLineMarkup.type === 'pen' || currentLineMarkup.type === 'highlighter') {
+          // Simplify the path to reduce stored points while preserving visual quality
+          const simplified = rdpSimplify(currentLineMarkup.points, 0.12);
+          toCommit = { ...currentLineMarkup, points: simplified.length >= 2 ? simplified : currentLineMarkup.points };
+        }
+        setLineMarkups((prev: LineMarkup[]) => [...prev, toCommit]);
+        setSelectedLineId(toCommit.id);
+        setSelectedLineIds([toCommit.id]);
         setSelectedLinePointIndex(null);
         setHasUnsavedChanges(true);
       }
