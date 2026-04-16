@@ -724,6 +724,7 @@ const App: React.FC = () => {
   // Selection & Interaction State
   const [selectedRectIds, setSelectedRectIds] = useState<string[]>(MENUS_MODE ? ['rect-101'] : []);
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [selectedLineIds, setSelectedLineIds] = useState<string[]>([]);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [selectedLinePointIndex, setSelectedLinePointIndex] = useState<number | null>(null);
   const [hoveredRectId, setHoveredRectId] = useState<string | null>(null);
@@ -1027,12 +1028,12 @@ const App: React.FC = () => {
             : r
         );
       });
-      if (selectedLineId) {
-        setLineMarkups((prev) => prev.map((line) => line.id === selectedLineId ? { ...line, ...(mode === 'fill' ? { fillColor: value } : { strokeColor: value }) } : line));
+      if (selectedLineIds.length > 0) {
+        setLineMarkups((prev) => prev.map((line) => selectedLineIds.includes(line.id) ? { ...line, ...(mode === 'fill' ? { fillColor: value } : { strokeColor: value }) } : line));
       }
-      if (selectedRectIds.length > 0 || selectedLineId) setHasUnsavedChanges(true);
+      if (selectedRectIds.length > 0 || selectedLineIds.length > 0) setHasUnsavedChanges(true);
     },
-    [selectedRectIds, selectedLineId]
+    [selectedRectIds, selectedLineIds]
   );
 
   const handleMarkupActiveModeChange = useCallback((mode: 'fill' | 'stroke') => {
@@ -1041,11 +1042,11 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (selectedRectIds.length === 0 && !selectedLineId) {
+    if (selectedRectIds.length === 0 && selectedLineIds.length === 0) {
       lastMarkupSyncedRectId.current = null;
       return;
     }
-    const id = selectedRectIds[0] || selectedLineId;
+    const id = selectedRectIds[0] || selectedLineIds[0];
     if (lastMarkupSyncedRectId.current === id) return;
     lastMarkupSyncedRectId.current = id;
     const r = rectangles.find((x) => x.id === id);
@@ -1063,7 +1064,7 @@ const App: React.FC = () => {
       setMarkupFillColor(l.fillColor ?? 'transparent');
       setMarkupStrokeColor(l.strokeColor ?? '#EF4444');
     }
-  }, [selectedRectIds, selectedLineId, rectangles, lineMarkups, theme]);
+  }, [selectedRectIds, selectedLineIds, rectangles, lineMarkups, theme]);
 
   const handleToggleItemLock = useCallback((id: string, type: 'rect' | 'pin' | 'line') => {
     if (type === 'rect') {
@@ -1096,6 +1097,7 @@ const App: React.FC = () => {
     setLinkMenuRectId,
     draggingPinId, setDraggingPinId,
     lineMarkups, setLineMarkups,
+    selectedLineIds, setSelectedLineIds,
     selectedLineId, setSelectedLineId,
     selectedLinePointIndex, setSelectedLinePointIndex,
     getRelativeCoords,
@@ -1155,8 +1157,18 @@ const App: React.FC = () => {
       }
       changed = true;
     }
+    if (selectedLineIds.length > 1) {
+      const unlockedLineIds = selectedLineIds.filter((id) => !lineMarkups.find((line) => line.id === id)?.locked);
+      if (unlockedLineIds.length > 0) {
+        setLineMarkups((prev) => prev.filter((line) => !unlockedLineIds.includes(line.id)));
+        setSelectedLineIds([]);
+        setSelectedLineId(null);
+        setSelectedLinePointIndex(null);
+        changed = true;
+      }
+    }
     if (changed) setHasUnsavedChanges(true);
-  }, [selectedRectIds, selectedPinId, rectangles, pins, selectedLineId, selectedLinePointIndex, lineMarkups]);
+  }, [selectedRectIds, selectedPinId, rectangles, pins, selectedLineId, selectedLinePointIndex, lineMarkups, selectedLineIds]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1251,11 +1263,11 @@ const App: React.FC = () => {
   
   useEffect(() => {
     setIsMenuVisible(false);
-    if (selectedRectIds.length === 1) {
+    if (selectedRectIds.length === 1 || selectedLineIds.length > 0) {
       const timer = setTimeout(() => setIsMenuVisible(true), 10);
       return () => clearTimeout(timer);
     }
-  }, [selectedRectIds]);
+  }, [selectedRectIds, selectedLineIds]);
 
   const handleThemeToggle = () => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
@@ -1534,6 +1546,7 @@ const App: React.FC = () => {
 
   const handleDeleteLine = useCallback((lineId: string) => {
       setLineMarkups(prev => prev.filter(l => l.id !== lineId));
+      setSelectedLineIds(prev => prev.filter((id) => id !== lineId));
       setSelectedLineId(null);
       setSelectedLinePointIndex(null);
       setHasUnsavedChanges(true);
@@ -1853,6 +1866,7 @@ const App: React.FC = () => {
 
   const handleSelectRect = useCallback((id: string, e: React.MouseEvent) => {
     setSelectedPinId(null);
+    setSelectedLineIds([]);
     setSelectedLineId(null);
     setSelectedLinePointIndex(null);
     if (e.shiftKey) {
@@ -1883,6 +1897,7 @@ const App: React.FC = () => {
   
   const handleSelectPin = useCallback((id: string, e: React.MouseEvent) => {
     setSelectedRectIds([]);
+    setSelectedLineIds([]);
     setSelectedLineId(null);
     setSelectedLinePointIndex(null);
     setSelectedPinId(prev => (prev === id ? null : id));
@@ -1891,7 +1906,13 @@ const App: React.FC = () => {
   const handleSelectLine = useCallback((id: string, e: React.MouseEvent) => {
     setSelectedRectIds([]);
     setSelectedPinId(null);
-    setSelectedLineId(prev => (prev === id ? null : id));
+    setSelectedLineIds(prev => {
+      if (e.shiftKey) {
+        return prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      }
+      return [id];
+    });
+    setSelectedLineId(id);
     setSelectedLinePointIndex(null);
     handleSetActiveTool('select');
   }, [handleSetActiveTool]);
@@ -1972,6 +1993,7 @@ const App: React.FC = () => {
                   lineMarkups={lineMarkups}
                   selectedRectIds={selectedRectIds}
                   selectedPinId={selectedPinId}
+                  selectedLineIds={selectedLineIds}
                   selectedLineId={selectedLineId}
                   expandedIds={expandedLayerIds}
                   onToggleExpand={toggleLayerExpand}
@@ -2029,6 +2051,7 @@ const App: React.FC = () => {
                     draggingPinId={draggingPinId}
                     selectedRectIds={selectedRectIds}
                     selectedPinId={selectedPinId}
+                    selectedLineIds={selectedLineIds}
                     selectedLineId={selectedLineId}
                     selectedLinePointIndex={selectedLinePointIndex}
                     currentRect={currentRect}
@@ -2069,6 +2092,7 @@ const App: React.FC = () => {
                     onMarkupActiveModeChange={handleMarkupActiveModeChange}
                     setDraggingPinId={setDraggingPinId}
                     setSelectedPinId={setSelectedPinId}
+                    setSelectedLineIds={setSelectedLineIds}
                     setSelectedLineId={setSelectedLineId}
                     setSelectedLinePointIndex={setSelectedLinePointIndex}
                     handlePinDetails={handlePinDetails}

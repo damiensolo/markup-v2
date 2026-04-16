@@ -34,6 +34,7 @@ interface CanvasViewProps {
     draggingPinId: string | null;
     selectedRectIds: string[];
     selectedPinId: string | null;
+    selectedLineIds: string[];
     selectedLineId: string | null;
     selectedLinePointIndex: number | null;
     currentRect: Omit<Rectangle, 'id' | 'name' | 'visible'> | null;
@@ -71,6 +72,7 @@ interface CanvasViewProps {
     onMarkupActiveModeChange: (mode: ActiveColor) => void;
     setDraggingPinId: (id: string | null) => void;
     setSelectedPinId: (id: string | null) => void;
+    setSelectedLineIds: (ids: string[]) => void;
     setSelectedLineId: (id: string | null) => void;
     setSelectedLinePointIndex: (index: number | null) => void;
     handlePinDetails: (pin: Pin) => void;
@@ -200,12 +202,12 @@ const CalibStepperField: React.FC<CalibStepperFieldProps> = ({
 const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const {
         imageSrc, rectangles, pins, lineMarkups, filters, viewTransform, interaction, activeTool, hoveredRectId, draggingPinId,
-        selectedRectIds, selectedPinId, selectedLineId, selectedLinePointIndex, currentRect, currentLineMarkup, marqueeRect, isMenuVisible, linkMenuRectId, setLinkMenuRectId, openLinkSubmenu,
+        selectedRectIds, selectedPinId, selectedLineIds, selectedLineId, selectedLinePointIndex, currentRect, currentLineMarkup, marqueeRect, isMenuVisible, linkMenuRectId, setLinkMenuRectId, openLinkSubmenu,
         theme, toolbarPosition, setToolbarPosition, isSpacebarDown, imageContainerRef, imageGeom, onImageGeomChange,
         handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handleZoom, handleThemeToggle, 
         setHoveredRectId, setActiveTool, activeLineTool, setActiveLineTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor,
         markupFillColor, markupStrokeColor, onMarkupColorChange, onMarkupActiveModeChange,
-        setDraggingPinId, setSelectedPinId, setSelectedLineId, setSelectedLinePointIndex, handlePinDetails, handleDeletePin, setHoveredItem,
+        setDraggingPinId, setSelectedPinId, setSelectedLineIds, setSelectedLineId, setSelectedLinePointIndex, handlePinDetails, handleDeletePin, setHoveredItem,
         hidePopupTimer, showPopupTimer, handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
         handleSubmenuLink, onOpenRfiPanel, onOpenPhotoViewer, mouseDownRef, setSelectedRectIds, getRelativeCoords, setPinDragOffset,
         measurements, drawingScale, onMeasurementAdd, onMeasurementDelete, onMeasurementUpdate, onDrawingScaleSet, onNaturalSizeChange,
@@ -949,13 +951,14 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                 const screenPoints = line.points.map((point) => getScreenPoint(point.x, point.y)).filter(Boolean) as { left: number; top: number }[];
                                 if (screenPoints.length < 2) return null;
                                 const pathD = `M ${screenPoints.map((p) => `${p.left} ${p.top}`).join(' L ')}${line.type === 'freeline' && line.closed ? ' Z' : ''}`;
-                                const isSelectedLine = selectedLineId === line.id;
+                                const isSelectedLine = selectedLineIds.includes(line.id);
                                 const strokeColor = line.strokeColor || markupStrokeColor;
+                                const fillColor = line.fillColor ?? 'transparent';
                                 return (
                                     <g key={line.id}>
                                         <path
                                             d={pathD}
-                                            fill={line.type === 'freeline' && line.closed ? `${strokeColor}22` : 'none'}
+                                            fill={line.type === 'freeline' && line.closed ? fillColor : 'none'}
                                             stroke={strokeColor}
                                             strokeWidth={2}
                                             markerEnd={line.type === 'arrow' ? 'url(#canvas-arrow-head)' : undefined}
@@ -1555,6 +1558,65 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                 {rect.punches?.map(punch => renderTag('punch', punch, punch.id))}
                                 {rect.drawings?.map(drawing => renderTag('drawing', drawing, drawing.id))}
                                 {rect.photos?.map(photo => renderTag('photo', photo, photo.id))}
+                            </React.Fragment>
+                        );
+                    })}
+
+                    {/* Line Markup Tags */}
+                    {lineMarkups.filter(line => line.visible).map(line => {
+                        const screenPoints = line.points.map((p) => getScreenPoint(p.x, p.y)).filter(Boolean) as { left: number; top: number }[];
+                        if (screenPoints.length === 0) return null;
+                        const minX = Math.min(...screenPoints.map((p) => p.left));
+                        const maxX = Math.max(...screenPoints.map((p) => p.left));
+                        const minY = Math.min(...screenPoints.map((p) => p.top));
+                        const maxY = Math.max(...screenPoints.map((p) => p.top));
+                        const centerY = (minY + maxY) / 2;
+                        const TAG_W = 132;
+                        const TAG_H = 22;
+                        const TAG_GAP = 24;
+                        const rightRoom = containerSize.width - (maxX + 5);
+                        const leftRoom = minX - 5;
+                        const placeRight = rightRoom >= TAG_W || rightRoom >= leftRoom;
+                        const baseLeft = placeRight
+                            ? Math.min(maxX + 5, Math.max(6, containerSize.width - TAG_W - 6))
+                            : Math.max(6, minX - TAG_W - 5);
+                        const baseTop = Math.max(6, Math.min(centerY - TAG_H / 2, containerSize.height - TAG_H - 6));
+                        let tagCount = 0;
+                        const renderLineTag = (type: RectangleTagType, item: any, text: string) => {
+                            if (!filters[type]) return null;
+                            const tagColorClasses = { rfi: 'bg-blue-600/85 hover:bg-blue-500/85', submittal: 'bg-slate-600/85 hover:bg-slate-500/85', punch: 'bg-orange-600/90 hover:bg-orange-500/90', drawing: 'bg-indigo-600/85 hover:bg-indigo-500/85', photo: 'bg-sky-600/85 hover:bg-sky-500/85' };
+                            const positionIndex = tagCount++;
+                            const nextTop = Math.max(6, Math.min(baseTop + positionIndex * TAG_GAP, containerSize.height - TAG_H - 6));
+                            return (
+                                <div
+                                    key={`${type}-line-tag-${line.id}-${item.id}`}
+                                    className={`absolute text-white text-xs font-bold px-1.5 py-0.5 rounded-sm shadow-md cursor-pointer transition-colors ${tagColorClasses[type]}`}
+                                    style={{ left: `${baseLeft}px`, top: `${nextTop}px`, maxWidth: `${TAG_W}px`, pointerEvents: 'auto', zIndex: 25 }}
+                                    onClick={(e) => { e.stopPropagation(); if(type === 'rfi') onOpenRfiPanel(line.id, item.id); if(type === 'photo') { onOpenPhotoViewer({ rectId: line.id, photoId: item.id }); } }}
+                                    onMouseEnter={(e) => {
+                                        if (hidePopupTimer.current) { clearTimeout(hidePopupTimer.current); hidePopupTimer.current = null; }
+                                        const tagRect = e.currentTarget.getBoundingClientRect();
+                                        const hoverInfo = { type: type, rectId: line.id, itemId: item.id, position: { top: tagRect.top + tagRect.height / 2, left: tagRect.right } };
+                                        if (showPopupTimer.current) clearTimeout(showPopupTimer.current);
+                                        showPopupTimer.current = window.setTimeout(() => setHoveredItem(hoverInfo), 180);
+                                    }}
+                                    onMouseLeave={() => {
+                                        if (showPopupTimer.current) { clearTimeout(showPopupTimer.current); showPopupTimer.current = null; }
+                                        hidePopupTimer.current = window.setTimeout(() => setHoveredItem(null), 500);
+                                    }}
+                                >
+                                    <span className="block truncate">{text}</span>
+                                </div>
+                            );
+                        };
+
+                        return (
+                            <React.Fragment key={`line-tags-for-${line.id}`}>
+                                {line.rfi?.map(rfi => renderLineTag('rfi', rfi, `RFI-${rfi.id}`))}
+                                {line.submittals?.map(sub => renderLineTag('submittal', sub, sub.id))}
+                                {line.punches?.map(punch => renderLineTag('punch', punch, punch.id))}
+                                {line.drawings?.map(drawing => renderLineTag('drawing', drawing, drawing.id))}
+                                {line.photos?.map(photo => renderLineTag('photo', photo, photo.id))}
                             </React.Fragment>
                         );
                     })}

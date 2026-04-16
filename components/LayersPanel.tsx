@@ -29,6 +29,7 @@ interface LayersPanelProps {
     lineMarkups: LineMarkup[];
     selectedRectIds: string[];
     selectedPinId: string | null;
+    selectedLineIds: string[];
     selectedLineId: string | null;
     expandedIds: string[];
     onToggleExpand: (id: string) => void;
@@ -100,7 +101,7 @@ const MeasurementChip: React.FC<{ label: string; value: string; emphasized?: boo
 );
 
 const LayersPanel: React.FC<LayersPanelProps> = ({
-    isOpen, onClose, rectangles, pins, lineMarkups, selectedRectIds, selectedPinId, selectedLineId, expandedIds, onToggleExpand,
+    isOpen, onClose, rectangles, pins, lineMarkups, selectedRectIds, selectedPinId, selectedLineIds, selectedLineId, expandedIds, onToggleExpand,
     onSelectRect, onSelectPin, onSelectLine, onRenameRect, onRenamePin, onRenameLine, onDeleteRect, onDeletePin, onDeleteLine,
     onToggleRectVisibility, onTogglePinVisibility, onToggleLineVisibility, onOpenRfiPanel, onOpenPhotoViewer, markupSetNames, onToggleBatchVisibility, onToggleLock,
     drawingScale, naturalSize, onRecalibrateDrawingScale, compareDrawings,
@@ -271,7 +272,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
     };
 
     const renderItem = (item: LayerItem) => {
-        const isSelected = item.itemType === 'rect' ? selectedRectIds.includes(item.id) : item.itemType === 'pin' ? selectedPinId === item.id : selectedLineId === item.id;
+        const isSelected = item.itemType === 'rect' ? selectedRectIds.includes(item.id) : item.itemType === 'pin' ? selectedPinId === item.id : selectedLineIds.includes(item.id);
         const isExpanded = expandedIds.includes(item.id);
         const hasChildren = item.itemType === 'rect' && (
             (item.rfi?.length || 0) > 0 ||
