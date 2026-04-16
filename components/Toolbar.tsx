@@ -189,7 +189,21 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
   const lineTools: { id: ActiveLineTool; label: string; icon: React.ReactNode }[] = [
     { id: 'arrow', label: 'Arrow', icon: <ArrowIcon className="w-6 h-6" /> },
     { id: 'line', label: 'Line', icon: <svg viewBox="0 0 24 24" className="w-6 h-6"><path d="M4 20L20 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" /></svg> },
-    { id: 'freeline', label: 'Freeline', icon: <svg viewBox="0 0 24 24" className="w-6 h-6"><path d="M3 16C6 8 9 18 12 10C14 4 17 15 21 8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" fill="none" /></svg> },
+    {
+      id: 'freeline',
+      label: 'Freeline',
+      icon: (
+        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="m10.586 5.414-5.172 5.172" />
+          <path d="m18.586 13.414-5.172 5.172" />
+          <path d="M6 12h12" />
+          <circle cx="12" cy="20" r="2" />
+          <circle cx="12" cy="4" r="2" />
+          <circle cx="20" cy="12" r="2" />
+          <circle cx="4" cy="12" r="2" />
+        </svg>
+      ),
+    },
   ];
   const currentLineTool = lineTools.find(l => l.id === activeLineTool) || lineTools[0];
   const currentPinTool = pinTools.find(p => p.id === activePinType) || pinTools[1];

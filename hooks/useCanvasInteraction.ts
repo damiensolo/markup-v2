@@ -297,6 +297,7 @@ export const useCanvasInteraction = ({
         const line = lineMarkups.find((l: LineMarkup) => l.id === linePointHit.lineId);
         setSelectedRectIds([]);
         setSelectedLineId(linePointHit.lineId);
+        setSelectedLineIds([linePointHit.lineId]);
         setSelectedLinePointIndex(linePointHit.pointIndex);
         if (!line?.locked) {
           setMovingLineId(linePointHit.lineId);
@@ -308,6 +309,7 @@ export const useCanvasInteraction = ({
       if (lineSegmentHit) {
         setSelectedRectIds([]);
         setSelectedLineId(lineSegmentHit.id);
+        setSelectedLineIds([lineSegmentHit.id]);
         setSelectedLinePointIndex(null);
         if (!lineSegmentHit.locked) {
           setMovingLineInitialPoints(lineSegmentHit.points.map((p) => ({ ...p })));
@@ -320,6 +322,7 @@ export const useCanvasInteraction = ({
       if (lineFillHit) {
         setSelectedRectIds([]);
         setSelectedLineId(lineFillHit.id);
+        setSelectedLineIds([lineFillHit.id]);
         setSelectedLinePointIndex(null);
         setMovingLineInitialPoints(lineFillHit.points.map((p) => ({ ...p })));
         setMovingLineId(lineFillHit.id);
@@ -345,6 +348,7 @@ export const useCanvasInteraction = ({
             setInteraction({ type: 'panning', startPoint: { x: event.clientX, y: event.clientY }, initialTransform: viewTransform });
         } else {
             setSelectedRectIds([]);
+            setSelectedLineIds([]);
             setInteraction({ type: 'marquee', startPoint: coords });
             setMarqueeRect({ x: coords.x, y: coords.y, width: 0, height: 0, shape: 'box' });
         }
@@ -364,7 +368,7 @@ export const useCanvasInteraction = ({
         setCurrentRect({ x: coords.x, y: coords.y, width: 0, height: 0, shape: activeShape });
       }
     }
-  }, [getRelativeCoords, interaction.type, rectangles, activeTool, activeShape, selectedRectIds, viewTransform, isRfiPanelOpen, handleRfiCancel, draggingPinId, setInteraction, setCurrentRect, setMarqueeRect, setSelectedRectIds, setSelectedPinId, setLinkMenuRectId, mouseDownRef, isSpacebarDown, lineMarkups, selectedLineId, findNearestLinePoint, findNearestLineSegment, findClosedFreelineByFillHit, markupStrokeColor, setLineMarkups, setHasUnsavedChanges]);
+  }, [getRelativeCoords, interaction.type, rectangles, activeTool, activeShape, selectedRectIds, viewTransform, isRfiPanelOpen, handleRfiCancel, draggingPinId, setInteraction, setCurrentRect, setMarqueeRect, setSelectedRectIds, setSelectedPinId, setLinkMenuRectId, mouseDownRef, isSpacebarDown, lineMarkups, selectedLineId, findNearestLinePoint, findNearestLineSegment, findClosedFreelineByFillHit, markupStrokeColor, setLineMarkups, setHasUnsavedChanges, setSelectedLineIds]);
   
   const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (draggingPinId) {
@@ -393,11 +397,13 @@ export const useCanvasInteraction = ({
       if (!coords) return;
       const dx = coords.x - interaction.startPoint.x;
       const dy = coords.y - interaction.startPoint.y;
+      const movingIds = selectedLineIds.length > 1 && selectedLineIds.includes(movingLineId) ? selectedLineIds : [movingLineId];
       setLineMarkups((prev: LineMarkup[]) => prev.map((line) => {
-        if (line.id !== movingLineId) return line;
+        if (!movingIds.includes(line.id)) return line;
+        const basePoints = line.id === movingLineId ? movingLineInitialPoints : line.points;
         return {
           ...line,
-          points: movingLineInitialPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+          points: basePoints.map((p) => ({ x: p.x + dx, y: p.y + dy })),
         };
       }));
       return;
@@ -449,7 +455,7 @@ export const useCanvasInteraction = ({
         break;
       }
     }
-  }, [getRelativeCoords, interaction, activeShape, draggingPinId, setPins, setViewTransform, setRectangles, setCurrentRect, setMarqueeRect, pinDragOffset, selectedLinePointIndex, setLineMarkups, currentLineMarkup, movingLineInitialPoints, movingLineId]);
+  }, [getRelativeCoords, interaction, activeShape, draggingPinId, setPins, setViewTransform, setRectangles, setCurrentRect, setMarqueeRect, pinDragOffset, selectedLinePointIndex, setLineMarkups, currentLineMarkup, movingLineInitialPoints, movingLineId, selectedLineIds]);
 
   const handleMouseUp = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const isClick = mouseDownRef.current && Math.abs(event.clientX - mouseDownRef.current.x) < 5 && Math.abs(event.clientY - mouseDownRef.current.y) < 5;
@@ -500,6 +506,7 @@ export const useCanvasInteraction = ({
       if (pointCount >= 2) {
         setLineMarkups((prev: LineMarkup[]) => [...prev, currentLineMarkup]);
         setSelectedLineId(currentLineMarkup.id);
+        setSelectedLineIds([currentLineMarkup.id]);
         setSelectedLinePointIndex(null);
         setHasUnsavedChanges(true);
       }
@@ -562,9 +569,12 @@ export const useCanvasInteraction = ({
         return false;
       });
       if (selectedLines.length > 0) {
-        setSelectedLineId(selectedLines[selectedLines.length - 1].id);
+        const ids = selectedLines.map((line) => line.id);
+        setSelectedLineIds(ids);
+        setSelectedLineId(ids[ids.length - 1]);
         setSelectedLinePointIndex(null);
       } else {
+        setSelectedLineIds([]);
         setSelectedLineId(null);
         setSelectedLinePointIndex(null);
       }
@@ -594,7 +604,7 @@ export const useCanvasInteraction = ({
     setCurrentLineMarkup(null);
     setMovingLineInitialPoints(null);
     setMovingLineId(null);
-  }, [interaction, currentRect, marqueeRect, rectangles, activeTool, activePinType, getRelativeCoords, handleSubmenuLink, draggingPinId, mouseDownRef, activeShape, setHasUnsavedChanges, setRectangles, setSelectedRectIds, markupFillColor, markupStrokeColor, currentLineMarkup, setLineMarkups, setSelectedLineId, setSelectedLinePointIndex, movingLineId, lineMarkups]);
+  }, [interaction, currentRect, marqueeRect, rectangles, activeTool, activePinType, getRelativeCoords, handleSubmenuLink, draggingPinId, mouseDownRef, activeShape, setHasUnsavedChanges, setRectangles, setSelectedRectIds, markupFillColor, markupStrokeColor, currentLineMarkup, setLineMarkups, setSelectedLineId, setSelectedLineIds, setSelectedLinePointIndex, movingLineId, lineMarkups]);
   
   const handleMouseLeave = useCallback(() => {
     if (interaction.type !== 'none' || draggingPinId) {
