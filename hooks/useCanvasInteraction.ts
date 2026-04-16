@@ -1,9 +1,9 @@
 
 
 import React, { useState, useCallback } from 'react';
-import type { Rectangle, Pin, InteractionState, SafetyIssueData, PunchData } from '../types';
+import type { Rectangle, Pin, InteractionState, SafetyIssueData, PunchData, LineMarkup, LineMarkupPoint } from '../types';
 
-type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
+type ActiveTool = 'select' | 'shape' | 'pen' | 'line' | 'arrow' | 'freeline' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
 type ActivePinType = 'photo' | 'safety' | 'punch';
 
@@ -31,6 +31,9 @@ export const useCanvasInteraction = ({
   isRfiPanelOpen, handleRfiCancel,
   setLinkMenuRectId,
   draggingPinId, setDraggingPinId,
+  lineMarkups, setLineMarkups,
+  selectedLineId, setSelectedLineId,
+  selectedLinePointIndex, setSelectedLinePointIndex,
   getRelativeCoords,
   handleSubmenuLink,
   setPinTargetCoords,
@@ -45,6 +48,50 @@ export const useCanvasInteraction = ({
   const [interaction, setInteraction] = useState<InteractionState>({ type: 'none' });
   const [currentRect, setCurrentRect] = useState<Omit<Rectangle, 'id' | 'name' | 'visible'> | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<Omit<Rectangle, 'id' | 'name' | 'visible'> | null>(null);
+  const [currentLineMarkup, setCurrentLineMarkup] = useState<LineMarkup | null>(null);
+  const [movingLineInitialPoints, setMovingLineInitialPoints] = useState<LineMarkupPoint[] | null>(null);
+  const [movingLineId, setMovingLineId] = useState<string | null>(null);
+
+  const findNearestLinePoint = useCallback((coords: LineMarkupPoint) => {
+    const hitRadius = 1.25;
+    for (const line of [...lineMarkups].reverse()) {
+      if (!line.visible) continue;
+      for (let i = 0; i < line.points.length; i++) {
+        const p = line.points[i];
+        if (Math.hypot(p.x - coords.x, p.y - coords.y) <= hitRadius) {
+          return { lineId: line.id, pointIndex: i };
+        }
+      }
+    }
+    return null;
+  }, [lineMarkups]);
+
+  const distanceToSegment = (point: LineMarkupPoint, a: LineMarkupPoint, b: LineMarkupPoint) => {
+    const abx = b.x - a.x;
+    const aby = b.y - a.y;
+    const apx = point.x - a.x;
+    const apy = point.y - a.y;
+    const abLenSq = abx * abx + aby * aby;
+    if (abLenSq === 0) return Math.hypot(apx, apy);
+    const t = Math.max(0, Math.min(1, (apx * abx + apy * aby) / abLenSq));
+    const cx = a.x + t * abx;
+    const cy = a.y + t * aby;
+    return Math.hypot(point.x - cx, point.y - cy);
+  };
+
+  const findNearestLineSegment = useCallback((coords: LineMarkupPoint) => {
+    const hitRadius = 0.9;
+    for (const line of [...lineMarkups].reverse()) {
+      if (!line.visible || line.points.length < 2) continue;
+      for (let i = 0; i < line.points.length - 1; i++) {
+        const d = distanceToSegment(coords, line.points[i], line.points[i + 1]);
+        if (d <= hitRadius) {
+          return line;
+        }
+      }
+    }
+    return null;
+  }, [lineMarkups]);
 
   const handleMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (isSpacebarDown && event.button === 0) {
@@ -67,7 +114,101 @@ export const useCanvasInteraction = ({
     const coords = getRelativeCoords(event);
     if (!coords) return;
     
+    const previouslySelectedLineId = selectedLineId;
     setSelectedPinId(null);
+
+    if (activeTool === 'line' || activeTool === 'arrow' || activeTool === 'freeline') {
+      setSelectedRectIds([]);
+      if (activeTool === 'freeline' && previouslySelectedLineId) {
+        const selected = lineMarkups.find((line: LineMarkup) => line.id === previouslySelectedLineId && line.type === 'freeline');
+        if (selected && !selected.closed && selected.points.length >= 3) {
+          const firstPoint = selected.points[0];
+          if (firstPoint && Math.hypot(firstPoint.x - coords.x, firstPoint.y - coords.y) <= 1.25) {
+            setLineMarkups((prev: LineMarkup[]) => prev.map((line) => (
+              line.id === selected.id ? { ...line, closed: true } : line
+            )));
+            setSelectedLineId(selected.id);
+            setSelectedLinePointIndex(0);
+            setHasUnsavedChanges(true);
+            return;
+          }
+        }
+      }
+      const hit = findNearestLinePoint(coords);
+      if (hit) {
+        const line = lineMarkups.find((l: LineMarkup) => l.id === hit.lineId);
+        if (line?.locked) {
+          setSelectedLineId(hit.lineId);
+          setSelectedLinePointIndex(hit.pointIndex);
+          return;
+        }
+        setSelectedLineId(hit.lineId);
+        setSelectedLinePointIndex(hit.pointIndex);
+        setInteraction({ type: 'moving', startPoint: coords, initialRects: [] });
+        setMovingLineInitialPoints(null);
+        setMovingLineId(hit.lineId);
+        return;
+      }
+
+      const segmentHit = findNearestLineSegment(coords);
+      if (segmentHit) {
+        if (segmentHit.locked) {
+          setSelectedLineId(segmentHit.id);
+          setSelectedLinePointIndex(null);
+          return;
+        }
+        setSelectedLineId(segmentHit.id);
+        setSelectedLinePointIndex(null);
+        setMovingLineInitialPoints(segmentHit.points.map((p) => ({ ...p })));
+        setMovingLineId(segmentHit.id);
+        setInteraction({ type: 'moving', startPoint: coords, initialRects: [] });
+        return;
+      }
+
+      if (activeTool === 'freeline') {
+        if (previouslySelectedLineId) {
+          const selected = lineMarkups.find((line: LineMarkup) => line.id === previouslySelectedLineId && line.type === 'freeline');
+          if (selected) {
+            if (selected.closed) return;
+            setLineMarkups((prev: LineMarkup[]) => prev.map((line) => {
+              if (line.id !== selected.id) return line;
+              return { ...line, points: [...line.points, coords] };
+            }));
+            setSelectedLinePointIndex(selected.points.length);
+            setHasUnsavedChanges(true);
+            return;
+          }
+        }
+        const newFreeline: LineMarkup = {
+          id: `line-${Date.now()}`,
+          type: 'freeline',
+          points: [coords],
+          name: `Freeline ${lineMarkups.filter((line: LineMarkup) => line.type === 'freeline').length + 1}`,
+          visible: true,
+          strokeColor: markupStrokeColor,
+        };
+        setLineMarkups((prev: LineMarkup[]) => [...prev, newFreeline]);
+        setSelectedLineId(newFreeline.id);
+        setSelectedLinePointIndex(0);
+        setHasUnsavedChanges(true);
+        return;
+      }
+
+      const newLine: LineMarkup = {
+        id: `line-${Date.now()}`,
+        type: activeTool,
+        points: [coords, coords],
+        name: `${activeTool === 'arrow' ? 'Arrow' : 'Line'} ${lineMarkups.filter((line: LineMarkup) => line.type === activeTool).length + 1}`,
+        visible: true,
+        strokeColor: markupStrokeColor,
+      };
+      setCurrentLineMarkup(newLine);
+      setInteraction({ type: 'drawing', startPoint: coords });
+      return;
+    }
+
+    setSelectedLineId(null);
+    setSelectedLinePointIndex(null);
 
     const clickedRect = [...rectangles].reverse().find(rect => {
       const normalized = normalizeRect(rect, activeShape);
@@ -77,6 +218,30 @@ export const useCanvasInteraction = ({
 
     if (activeTool === 'select') {
       setLinkMenuRectId(null);
+      const linePointHit = findNearestLinePoint(coords);
+      if (linePointHit) {
+        const line = lineMarkups.find((l: LineMarkup) => l.id === linePointHit.lineId);
+        setSelectedRectIds([]);
+        setSelectedLineId(linePointHit.lineId);
+        setSelectedLinePointIndex(linePointHit.pointIndex);
+        if (!line?.locked) {
+          setMovingLineId(linePointHit.lineId);
+          setInteraction({ type: 'moving', startPoint: coords, initialRects: [] });
+        }
+        return;
+      }
+      const lineSegmentHit = findNearestLineSegment(coords);
+      if (lineSegmentHit) {
+        setSelectedRectIds([]);
+        setSelectedLineId(lineSegmentHit.id);
+        setSelectedLinePointIndex(null);
+        if (!lineSegmentHit.locked) {
+          setMovingLineInitialPoints(lineSegmentHit.points.map((p) => ({ ...p })));
+          setMovingLineId(lineSegmentHit.id);
+          setInteraction({ type: 'moving', startPoint: coords, initialRects: [] });
+        }
+        return;
+      }
       if (clickedRect) {
         const isSelected = selectedRectIds.includes(clickedRect.id);
         let newSelectedIds = isSelected
@@ -115,7 +280,7 @@ export const useCanvasInteraction = ({
         setCurrentRect({ x: coords.x, y: coords.y, width: 0, height: 0, shape: activeShape });
       }
     }
-  }, [getRelativeCoords, interaction.type, rectangles, activeTool, activeShape, selectedRectIds, viewTransform, isRfiPanelOpen, handleRfiCancel, draggingPinId, setInteraction, setCurrentRect, setMarqueeRect, setSelectedRectIds, setSelectedPinId, setLinkMenuRectId, mouseDownRef, isSpacebarDown]);
+  }, [getRelativeCoords, interaction.type, rectangles, activeTool, activeShape, selectedRectIds, viewTransform, isRfiPanelOpen, handleRfiCancel, draggingPinId, setInteraction, setCurrentRect, setMarqueeRect, setSelectedRectIds, setSelectedPinId, setLinkMenuRectId, mouseDownRef, isSpacebarDown, lineMarkups, selectedLineId, findNearestLinePoint, findNearestLineSegment, markupStrokeColor, setLineMarkups, setHasUnsavedChanges]);
   
   const handleMouseMove = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (draggingPinId) {
@@ -125,6 +290,32 @@ export const useCanvasInteraction = ({
         const offsetY = pinDragOffset ? pinDragOffset.y : 0;
         setPins((prevPins: Pin[]) => prevPins.map(p => p.id === draggingPinId ? { ...p, x: coords.x - offsetX, y: coords.y - offsetY } : p));
       }
+      return;
+    }
+    
+    if (movingLineId && selectedLinePointIndex !== null && interaction.type === 'moving') {
+      const coords = getRelativeCoords(event);
+      if (!coords) return;
+      setLineMarkups((prev: LineMarkup[]) => prev.map(line => {
+        if (line.id !== movingLineId) return line;
+        const nextPoints = line.points.map((p, idx) => idx === selectedLinePointIndex ? coords : p);
+        return { ...line, points: nextPoints };
+      }));
+      return;
+    }
+    
+    if (movingLineId && selectedLinePointIndex === null && interaction.type === 'moving' && movingLineInitialPoints && interaction.startPoint) {
+      const coords = getRelativeCoords(event);
+      if (!coords) return;
+      const dx = coords.x - interaction.startPoint.x;
+      const dy = coords.y - interaction.startPoint.y;
+      setLineMarkups((prev: LineMarkup[]) => prev.map((line) => {
+        if (line.id !== movingLineId) return line;
+        return {
+          ...line,
+          points: movingLineInitialPoints.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+        };
+      }));
       return;
     }
 
@@ -145,6 +336,10 @@ export const useCanvasInteraction = ({
     switch (interaction.type) {
       case 'drawing':
       case 'marquee': {
+        if (currentLineMarkup) {
+          setCurrentLineMarkup(prev => prev ? ({ ...prev, points: [prev.points[0], coords] }) : prev);
+          break;
+        }
         const baseRect = { x: interaction.startPoint.x, y: interaction.startPoint.y, width: dx, height: dy };
         if (interaction.type === 'drawing') setCurrentRect({ ...baseRect, shape: activeShape });
         else setMarqueeRect({ ...baseRect, shape: 'box' });
@@ -170,7 +365,7 @@ export const useCanvasInteraction = ({
         break;
       }
     }
-  }, [getRelativeCoords, interaction, activeShape, draggingPinId, setPins, setViewTransform, setRectangles, setCurrentRect, setMarqueeRect, pinDragOffset]);
+  }, [getRelativeCoords, interaction, activeShape, draggingPinId, setPins, setViewTransform, setRectangles, setCurrentRect, setMarqueeRect, pinDragOffset, selectedLinePointIndex, setLineMarkups, currentLineMarkup, movingLineInitialPoints, movingLineId]);
 
   const handleMouseUp = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     const isClick = mouseDownRef.current && Math.abs(event.clientX - mouseDownRef.current.x) < 5 && Math.abs(event.clientY - mouseDownRef.current.y) < 5;
@@ -179,6 +374,14 @@ export const useCanvasInteraction = ({
     if (draggingPinId) {
       setDraggingPinId(null);
       setHasUnsavedChanges(true);
+    }
+    
+    if (movingLineId && interaction.type === 'moving') {
+      setHasUnsavedChanges(true);
+      setInteraction({ type: 'none' });
+      setMovingLineInitialPoints(null);
+      setMovingLineId(null);
+      return;
     }
 
     if (activeTool === 'pin' && isClick && interaction.type === 'none') {
@@ -208,7 +411,15 @@ export const useCanvasInteraction = ({
 
     if (interaction.type === 'none') return;
   
-    if (interaction.type === 'drawing' && currentRect) {
+    if (interaction.type === 'drawing' && currentLineMarkup) {
+      const pointCount = currentLineMarkup.points.length;
+      if (pointCount >= 2) {
+        setLineMarkups((prev: LineMarkup[]) => [...prev, currentLineMarkup]);
+        setSelectedLineId(currentLineMarkup.id);
+        setSelectedLinePointIndex(null);
+        setHasUnsavedChanges(true);
+      }
+    } else if (interaction.type === 'drawing' && currentRect) {
       const normalized = normalizeRect(currentRect, activeShape);
       if (Math.abs(normalized.width) > 1 && Math.abs(normalized.height) > 1) {
         const shapeName = normalized.shape === 'box' ? 'Rectangle' : normalized.shape.charAt(0).toUpperCase() + normalized.shape.slice(1);
@@ -258,7 +469,10 @@ export const useCanvasInteraction = ({
     setInteraction({ type: 'none' });
     setCurrentRect(null);
     setMarqueeRect(null);
-  }, [interaction, currentRect, marqueeRect, rectangles, activeTool, activePinType, getRelativeCoords, handleSubmenuLink, draggingPinId, mouseDownRef, activeShape, setHasUnsavedChanges, setRectangles, setSelectedRectIds, markupFillColor, markupStrokeColor]);
+    setCurrentLineMarkup(null);
+    setMovingLineInitialPoints(null);
+    setMovingLineId(null);
+  }, [interaction, currentRect, marqueeRect, rectangles, activeTool, activePinType, getRelativeCoords, handleSubmenuLink, draggingPinId, mouseDownRef, activeShape, setHasUnsavedChanges, setRectangles, setSelectedRectIds, markupFillColor, markupStrokeColor, currentLineMarkup, setLineMarkups, setSelectedLineId, setSelectedLinePointIndex, movingLineId]);
   
   const handleMouseLeave = useCallback(() => {
     if (interaction.type !== 'none' || draggingPinId) {
@@ -268,7 +482,7 @@ export const useCanvasInteraction = ({
 
   useCanvasInteraction.setState = setInteraction;
 
-  return { interaction, currentRect, marqueeRect, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave };
+  return { interaction, currentRect, marqueeRect, currentLineMarkup, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave };
 };
 
 useCanvasInteraction.setState = (state: InteractionState) => {};

@@ -230,3 +230,22 @@ export interface Measurement {
   y2: number;
   visible: boolean;
 }
+
+export type LineToolType = 'line' | 'arrow' | 'freeline';
+
+export interface LineMarkupPoint {
+  x: number;
+  y: number;
+}
+
+export interface LineMarkup {
+  id: string;
+  type: LineToolType;
+  points: LineMarkupPoint[];
+  name: string;
+  visible: boolean;
+  locked?: boolean;
+  closed?: boolean;
+  strokeColor?: string;
+  sourceSetId?: string;
+}

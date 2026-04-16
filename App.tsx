@@ -2,7 +2,7 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { MENUS_MODE } from './utils/showcaseMode';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import type { Rectangle, RfiData, RfiFormState, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet, Measurement } from './types';
+import type { Rectangle, RfiData, RfiFormState, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet, Measurement, LineMarkup, LineToolType } from './types';
 import LinkModal from './components/LinkModal';
 import PhotoViewerModal from './components/PhotoViewerModal';
 import ShareModal from './components/ShareModal';
@@ -29,7 +29,7 @@ import { FilterIcon, ChevronLeftIcon, ShareIcon, SnapshotIcon, DocumentDuplicate
 
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 export type RectangleTagType = Exclude<FilterCategory, 'safety'>;
-type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
+type ActiveTool = 'select' | 'shape' | 'pen' | 'line' | 'arrow' | 'freeline' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 export type ToolbarPosition = 'bottom' | 'top' | 'left' | 'right';
 export interface ImageGeom {
     width: number;
@@ -707,6 +707,7 @@ const App: React.FC = () => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [rectangles, setRectangles] = useState<Rectangle[]>([]);
   const [pins, setPins] = useState<Pin[]>([]);
+  const [lineMarkups, setLineMarkups] = useState<LineMarkup[]>([]);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [drawingScale, setDrawingScale] = useState<number | null>(null); // natural img pixels per foot
   /** Bumped when user clears scale from UI so CanvasView resets calibration state */
@@ -722,6 +723,8 @@ const App: React.FC = () => {
   // Selection & Interaction State
   const [selectedRectIds, setSelectedRectIds] = useState<string[]>(MENUS_MODE ? ['rect-101'] : []);
   const [selectedPinId, setSelectedPinId] = useState<string | null>(null);
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
+  const [selectedLinePointIndex, setSelectedLinePointIndex] = useState<number | null>(null);
   const [hoveredRectId, setHoveredRectId] = useState<string | null>(null);
   const [linkMenuRectId, setLinkMenuRectId] = useState<string | null>(MENUS_MODE ? 'rect-101' : null);
   const [draggingPinId, setDraggingPinId] = useState<string | null>(null);
@@ -733,6 +736,7 @@ const App: React.FC = () => {
 
   // Tool State
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
+  const [activeLineTool, setActiveLineTool] = useState<LineToolType>('arrow');
   const [activeShape, setActiveShape] = useState<'cloud' | 'box' | 'ellipse'>('box');
   const [activePinType, setActivePinType] = useState<'photo' | 'safety' | 'punch'>('safety');
   const [activeColor, setActiveColor] = useState<'fill' | 'stroke'>('fill');
@@ -831,11 +835,14 @@ const App: React.FC = () => {
         setImageSrc(latestVersion.thumbnailUrl);
         setRectangles([]);
         setPins([]);
+        setLineMarkups([]);
         setMeasurements([]);
         setDrawingScale(null);
         setDrawingScaleClearTick((t) => t + 1);
         setNaturalSize({ width: 0, height: 0 });
         setSelectedRectIds([]);
+        setSelectedLineId(null);
+        setSelectedLinePointIndex(null);
         setHoveredRectId(null);
         setLinkMenuRectId(null);
         setViewTransform({ scale: 1, translateX: 0, translateY: 0 });
@@ -990,6 +997,9 @@ const App: React.FC = () => {
 
   const handleSetActiveTool = useCallback((tool: ActiveTool) => {
     setActiveTool(tool);
+    if (tool === 'line' || tool === 'arrow' || tool === 'freeline') {
+      setActiveLineTool(tool);
+    }
     setActivePanel(null);
   }, []);
 
@@ -1044,11 +1054,13 @@ const App: React.FC = () => {
     );
   }, [selectedRectIds, rectangles, theme]);
 
-  const handleToggleItemLock = useCallback((id: string, type: 'rect' | 'pin') => {
+  const handleToggleItemLock = useCallback((id: string, type: 'rect' | 'pin' | 'line') => {
     if (type === 'rect') {
         setRectangles(prev => prev.map(r => r.id === id ? { ...r, locked: !r.locked } : r));
-    } else {
+    } else if (type === 'pin') {
         setPins(prev => prev.map(p => p.id === id ? { ...p, locked: !p.locked } : p));
+    } else {
+        setLineMarkups(prev => prev.map(l => l.id === id ? { ...l, locked: !l.locked } : l));
     }
     setHasUnsavedChanges(true);
   }, []);
@@ -1056,6 +1068,7 @@ const App: React.FC = () => {
   const {
     interaction,
     currentRect,
+    currentLineMarkup,
     marqueeRect,
     handleMouseDown,
     handleMouseMove,
@@ -1071,6 +1084,9 @@ const App: React.FC = () => {
     isRfiPanelOpen: activePanel === 'rfi', handleRfiCancel,
     setLinkMenuRectId,
     draggingPinId, setDraggingPinId,
+    lineMarkups, setLineMarkups,
+    selectedLineId, setSelectedLineId,
+    selectedLinePointIndex, setSelectedLinePointIndex,
     getRelativeCoords,
     handleSubmenuLink,
     setPinTargetCoords,
@@ -1108,8 +1124,28 @@ const App: React.FC = () => {
             changed = true;
         }
     }
+    if (selectedLineId) {
+      const selectedLine = lineMarkups.find((line) => line.id === selectedLineId);
+      if (selectedLine?.locked) {
+        return;
+      }
+      if (selectedLinePointIndex === null) {
+        setLineMarkups((prev) => prev.filter((line) => line.id !== selectedLineId));
+        setSelectedLineId(null);
+      } else {
+        setLineMarkups((prev) => prev.map((line) => {
+          if (line.id !== selectedLineId) return line;
+          return {
+            ...line,
+            points: line.points.filter((_, idx) => idx !== selectedLinePointIndex),
+          };
+        }).filter((line) => line.points.length >= 2));
+        setSelectedLinePointIndex(null);
+      }
+      changed = true;
+    }
     if (changed) setHasUnsavedChanges(true);
-  }, [selectedRectIds, selectedPinId, rectangles, pins]);
+  }, [selectedRectIds, selectedPinId, rectangles, pins, selectedLineId, selectedLinePointIndex, lineMarkups]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1221,6 +1257,7 @@ const App: React.FC = () => {
     const resetState = (src: string) => {
         setRectangles([]);
         setPins([]);
+        setLineMarkups([]);
         setSelectedRectIds([]);
         setHoveredRectId(null);
         setLinkMenuRectId(null);
@@ -1440,6 +1477,13 @@ const App: React.FC = () => {
       setHasUnsavedChanges(true);
   };
 
+  const handleDeleteLine = useCallback((lineId: string) => {
+      setLineMarkups(prev => prev.filter(l => l.id !== lineId));
+      setSelectedLineId(null);
+      setSelectedLinePointIndex(null);
+      setHasUnsavedChanges(true);
+  }, []);
+
   const handleSafetyPanelCancel = () => {
       setActivePanel(null);
       setSafetyTargetPinId(null);
@@ -1612,6 +1656,7 @@ const App: React.FC = () => {
       setImageSrc(version.thumbnailUrl);
       setRectangles([]);
       setPins([]);
+      setLineMarkups([]);
       setMeasurements([]);
       setDrawingScale(null);
       setDrawingScaleClearTick((t) => t + 1);
@@ -1651,6 +1696,7 @@ const App: React.FC = () => {
       setCurrentDrawing(null);
       setRectangles([]);
       setPins([]);
+      setLineMarkups([]);
       setSelectedRectIds([]);
       setHasUnsavedChanges(false);
       setLoadedSetIds([]);
@@ -1742,6 +1788,8 @@ const App: React.FC = () => {
 
   const handleSelectRect = useCallback((id: string, e: React.MouseEvent) => {
     setSelectedPinId(null);
+    setSelectedLineId(null);
+    setSelectedLinePointIndex(null);
     if (e.shiftKey) {
         setSelectedRectIds(prev => prev.includes(id) ? prev.filter(pId => pId !== id) : [...prev, id]);
     } else {
@@ -1754,15 +1802,34 @@ const App: React.FC = () => {
     setHasUnsavedChanges(true);
   }, []);
 
+  const handleRenameLine = useCallback((id: string, newName: string) => {
+    setLineMarkups(prev => prev.map(l => l.id === id ? { ...l, name: newName } : l));
+    setHasUnsavedChanges(true);
+  }, []);
+
   const handleTogglePinVisibility = useCallback((id: string) => {
     setPins(prev => prev.map(p => p.id === id ? { ...p, visible: !p.visible } : p));
     // Not considered a "savable" change
   }, []);
   
+  const handleToggleLineVisibility = useCallback((id: string) => {
+    setLineMarkups(prev => prev.map(l => l.id === id ? { ...l, visible: !l.visible } : l));
+  }, []);
+  
   const handleSelectPin = useCallback((id: string, e: React.MouseEvent) => {
     setSelectedRectIds([]);
+    setSelectedLineId(null);
+    setSelectedLinePointIndex(null);
     setSelectedPinId(prev => (prev === id ? null : id));
   }, []);
+
+  const handleSelectLine = useCallback((id: string, e: React.MouseEvent) => {
+    setSelectedRectIds([]);
+    setSelectedPinId(null);
+    setSelectedLineId(prev => (prev === id ? null : id));
+    setSelectedLinePointIndex(null);
+    handleSetActiveTool('select');
+  }, [handleSetActiveTool]);
 
   const handleOpenPhotoViewerFromLayer = useCallback((photoId: string) => {
     setPhotoViewerConfig({ photoId });
@@ -1782,15 +1849,19 @@ const App: React.FC = () => {
     return names;
   }, [allMarkupSets]);
 
-  const handleToggleBatchVisibility = useCallback((items: { id: string; type: 'rect' | 'pin' }[], visible: boolean) => {
+  const handleToggleBatchVisibility = useCallback((items: { id: string; type: 'rect' | 'pin' | 'line' }[], visible: boolean) => {
     const rectIds = new Set(items.filter(i => i.type === 'rect').map(i => i.id));
     const pinIds = new Set(items.filter(i => i.type === 'pin').map(i => i.id));
+    const lineIds = new Set(items.filter(i => i.type === 'line').map(i => i.id));
 
     if (rectIds.size > 0) {
         setRectangles(prev => prev.map(r => rectIds.has(r.id) ? { ...r, visible } : r));
     }
     if (pinIds.size > 0) {
         setPins(prev => prev.map(p => pinIds.has(p.id) ? { ...p, visible } : p));
+    }
+    if (lineIds.size > 0) {
+        setLineMarkups(prev => prev.map(l => lineIds.has(l.id) ? { ...l, visible } : l));
     }
   }, []);
 
@@ -1833,18 +1904,24 @@ const App: React.FC = () => {
                   onClose={() => setIsLayersPanelOpen(false)}
                   rectangles={rectangles}
                   pins={pins}
+                  lineMarkups={lineMarkups}
                   selectedRectIds={selectedRectIds}
                   selectedPinId={selectedPinId}
+                  selectedLineId={selectedLineId}
                   expandedIds={expandedLayerIds}
                   onToggleExpand={toggleLayerExpand}
                   onSelectRect={handleSelectRect}
                   onSelectPin={handleSelectPin}
+                  onSelectLine={handleSelectLine}
                   onRenameRect={handleRenameRect}
                   onRenamePin={handleRenamePin}
+                  onRenameLine={handleRenameLine}
                   onDeleteRect={handleDeleteRect}
                   onDeletePin={handleDeletePin}
+                  onDeleteLine={handleDeleteLine}
                   onToggleRectVisibility={handleToggleRectVisibility}
                   onTogglePinVisibility={handleTogglePinVisibility}
+                  onToggleLineVisibility={handleToggleLineVisibility}
                   onOpenRfiPanel={handleOpenRfiPanel}
                   onOpenPhotoViewer={handleOpenPhotoViewerFromLayer}
                   markupSetNames={markupSetNames}
@@ -1878,6 +1955,7 @@ const App: React.FC = () => {
                     imageSrc={imageSrc || ''}
                     rectangles={rectangles}
                     pins={pins}
+                    lineMarkups={lineMarkups}
                     filters={filters}
                     viewTransform={viewTransform}
                     interaction={interaction}
@@ -1886,7 +1964,10 @@ const App: React.FC = () => {
                     draggingPinId={draggingPinId}
                     selectedRectIds={selectedRectIds}
                     selectedPinId={selectedPinId}
+                    selectedLineId={selectedLineId}
+                    selectedLinePointIndex={selectedLinePointIndex}
                     currentRect={currentRect}
+                    currentLineMarkup={currentLineMarkup}
                     marqueeRect={marqueeRect}
                     isMenuVisible={isMenuVisible}
                     linkMenuRectId={linkMenuRectId}
@@ -1907,6 +1988,11 @@ const App: React.FC = () => {
                     handleThemeToggle={handleThemeToggle}
                     setHoveredRectId={setHoveredRectId}
                     setActiveTool={handleSetActiveTool}
+                    activeLineTool={activeLineTool}
+                    setActiveLineTool={(tool) => {
+                      setActiveLineTool(tool);
+                      handleSetActiveTool(tool);
+                    }}
                     activeShape={activeShape}
                     setActiveShape={setActiveShape}
                     activePinType={activePinType}
@@ -1918,6 +2004,8 @@ const App: React.FC = () => {
                     onMarkupActiveModeChange={handleMarkupActiveModeChange}
                     setDraggingPinId={setDraggingPinId}
                     setSelectedPinId={setSelectedPinId}
+                    setSelectedLineId={setSelectedLineId}
+                    setSelectedLinePointIndex={setSelectedLinePointIndex}
                     handlePinDetails={handlePinDetails}
                     handleDeletePin={handleDeletePin}
                     setHoveredItem={setHoveredItem}

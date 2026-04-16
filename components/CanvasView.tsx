@@ -3,7 +3,7 @@
 // Fix: Import 'useCallback' from 'react' to resolve 'Cannot find name' errors.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Palette, ChevronUp, ChevronDown } from 'lucide-react';
-import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle, Measurement } from '../types';
+import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle, Measurement, LineMarkup, LineToolType } from '../types';
 import ScaleDialog from './ScaleDialog';
 import { RectangleTagType, ToolbarPosition, ImageGeom } from '../App';
 import { UploadIcon, TrashIcon, LinkIcon, ArrowUpTrayIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowsPointingOutIcon, SunIcon, MoonIcon, SafetyPinIcon, PunchPinIcon, PhotoPinIcon, InformationCircleIcon, FilterIcon, CogIcon } from './Icons';
@@ -14,7 +14,7 @@ import { resolveRectFillColor, resolveRectStrokeColor } from '../utils/markupCol
 import { getRectDimensions, formatFt, formatArea } from '../utils/measurementUtils';
 import { MENUS_MODE } from '../utils/showcaseMode';
 
-type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
+type ActiveTool = 'select' | 'shape' | 'pen' | 'line' | 'arrow' | 'freeline' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
 type ActivePinType = 'photo' | 'safety' | 'punch';
 type ActiveColor = 'fill' | 'stroke';
@@ -25,6 +25,7 @@ interface CanvasViewProps {
     imageSrc: string;
     rectangles: Rectangle[];
     pins: Pin[];
+    lineMarkups: LineMarkup[];
     filters: Record<FilterCategory, boolean>;
     viewTransform: ViewTransform;
     interaction: InteractionState;
@@ -33,7 +34,10 @@ interface CanvasViewProps {
     draggingPinId: string | null;
     selectedRectIds: string[];
     selectedPinId: string | null;
+    selectedLineId: string | null;
+    selectedLinePointIndex: number | null;
     currentRect: Omit<Rectangle, 'id' | 'name' | 'visible'> | null;
+    currentLineMarkup?: LineMarkup | null;
     marqueeRect: Omit<Rectangle, 'id' | 'name' | 'visible'> | null;
     isMenuVisible: boolean;
     linkMenuRectId: string | null;
@@ -54,6 +58,8 @@ interface CanvasViewProps {
     handleThemeToggle: () => void;
     setHoveredRectId: (id: string | null) => void;
     setActiveTool: (tool: ActiveTool) => void;
+    activeLineTool: LineToolType;
+    setActiveLineTool: (tool: LineToolType) => void;
     activeShape: ActiveShape;
     setActiveShape: (shape: ActiveShape) => void;
     activePinType: ActivePinType;
@@ -65,6 +71,8 @@ interface CanvasViewProps {
     onMarkupActiveModeChange: (mode: ActiveColor) => void;
     setDraggingPinId: (id: string | null) => void;
     setSelectedPinId: (id: string | null) => void;
+    setSelectedLineId: (id: string | null) => void;
+    setSelectedLinePointIndex: (index: number | null) => void;
     handlePinDetails: (pin: Pin) => void;
     handleDeletePin: (pinId: string) => void;
     setHoveredItem: (item: HoveredItemInfo | null) => void;
@@ -191,13 +199,13 @@ const CalibStepperField: React.FC<CalibStepperFieldProps> = ({
 
 const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const {
-        imageSrc, rectangles, pins, filters, viewTransform, interaction, activeTool, hoveredRectId, draggingPinId,
-        selectedRectIds, selectedPinId, currentRect, marqueeRect, isMenuVisible, linkMenuRectId, setLinkMenuRectId, openLinkSubmenu,
+        imageSrc, rectangles, pins, lineMarkups, filters, viewTransform, interaction, activeTool, hoveredRectId, draggingPinId,
+        selectedRectIds, selectedPinId, selectedLineId, selectedLinePointIndex, currentRect, currentLineMarkup, marqueeRect, isMenuVisible, linkMenuRectId, setLinkMenuRectId, openLinkSubmenu,
         theme, toolbarPosition, setToolbarPosition, isSpacebarDown, imageContainerRef, imageGeom, onImageGeomChange,
         handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handleZoom, handleThemeToggle, 
-        setHoveredRectId, setActiveTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor,
+        setHoveredRectId, setActiveTool, activeLineTool, setActiveLineTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor,
         markupFillColor, markupStrokeColor, onMarkupColorChange, onMarkupActiveModeChange,
-        setDraggingPinId, setSelectedPinId, handlePinDetails, handleDeletePin, setHoveredItem,
+        setDraggingPinId, setSelectedPinId, setSelectedLineId, setSelectedLinePointIndex, handlePinDetails, handleDeletePin, setHoveredItem,
         hidePopupTimer, showPopupTimer, handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
         handleSubmenuLink, onOpenRfiPanel, onOpenPhotoViewer, mouseDownRef, setSelectedRectIds, getRelativeCoords, setPinDragOffset,
         measurements, drawingScale, onMeasurementAdd, onMeasurementDelete, onMeasurementUpdate, onDrawingScaleSet, onNaturalSizeChange,
@@ -447,6 +455,9 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                 return 'cursor-crosshair';
         }
         if (activeTool === 'pin') return 'cursor-crosshair';
+        if (activeTool === 'line' || activeTool === 'arrow' || activeTool === 'freeline') {
+            return selectedLineId ? 'cursor-move' : 'cursor-crosshair';
+        }
         if (draggingMeasId) return 'cursor-grabbing';
         if (activeTool === 'measurement') return 'cursor-crosshair';
         if (activeTool === 'shape') {
@@ -917,6 +928,42 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                 </div>
                             );
                         })}
+
+                        <svg className="absolute left-0 top-0 h-full w-full overflow-visible pointer-events-none" style={{ zIndex: 16 }}>
+                            <defs>
+                                <marker id="canvas-arrow-head" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#EF4444" />
+                                </marker>
+                            </defs>
+                            {[...lineMarkups, ...(currentLineMarkup ? [currentLineMarkup] : [])].filter((line) => line.visible).map((line) => {
+                                const screenPoints = line.points.map((point) => getScreenPoint(point.x, point.y)).filter(Boolean) as { left: number; top: number }[];
+                                if (screenPoints.length < 2) return null;
+                                const pathD = `M ${screenPoints.map((p) => `${p.left} ${p.top}`).join(' L ')}${line.type === 'freeline' && line.closed ? ' Z' : ''}`;
+                                const isSelectedLine = selectedLineId === line.id;
+                                const strokeColor = line.strokeColor || markupStrokeColor;
+                                return (
+                                    <g key={line.id}>
+                                        <path
+                                            d={pathD}
+                                            fill={line.type === 'freeline' && line.closed ? `${strokeColor}22` : 'none'}
+                                            stroke={strokeColor}
+                                            strokeWidth={2}
+                                            markerEnd={line.type === 'arrow' ? 'url(#canvas-arrow-head)' : undefined}
+                                        />
+                                        {line.points.map((point, index) => {
+                                            const screenPoint = getScreenPoint(point.x, point.y);
+                                            if (!screenPoint) return null;
+                                            const isSelectedPoint = isSelectedLine && selectedLinePointIndex === index;
+                                            return (
+                                                <g key={`${line.id}-${index}`} className="pointer-events-none" style={{ cursor: line.locked ? 'default' : 'grab' }}>
+                                                    <circle cx={screenPoint.left} cy={screenPoint.top} r={isSelectedPoint ? 6 : 4} fill="#ffffff" stroke={strokeColor} strokeWidth={2} />
+                                                </g>
+                                            );
+                                        })}
+                                    </g>
+                                );
+                            })}
+                        </svg>
                     </div>
 
                     {/* Screen-space Overlays */}
@@ -1552,6 +1599,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                              <Toolbar
                                  activeTool={activeTool}
                                  setActiveTool={setActiveTool}
+                                 activeLineTool={activeLineTool}
+                                 setActiveLineTool={setActiveLineTool}
                                  activeShape={activeShape}
                                  setActiveShape={setActiveShape}
                                  activePinType={activePinType}

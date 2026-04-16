@@ -11,13 +11,16 @@ import {
 import { ToolbarPosition } from '../App';
 import Tooltip from './Tooltip';
 
-type ActiveTool = 'select' | 'shape' | 'pen' | 'arrow' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
+type ActiveTool = 'select' | 'shape' | 'pen' | 'line' | 'arrow' | 'freeline' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
+type ActiveLineTool = 'line' | 'arrow' | 'freeline';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
 type ActivePinType = 'photo' | 'safety' | 'punch';
 
 interface ToolbarProps {
   activeTool: ActiveTool;
   setActiveTool: (tool: ActiveTool) => void;
+  activeLineTool: ActiveLineTool;
+  setActiveLineTool: (tool: ActiveLineTool) => void;
   activeShape: ActiveShape;
   setActiveShape: (shape: ActiveShape) => void;
   activePinType: ActivePinType;
@@ -63,6 +66,8 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
   {
     activeTool,
     setActiveTool,
+    activeLineTool,
+    setActiveLineTool,
     activeShape,
     setActiveShape,
     activePinType,
@@ -77,8 +82,10 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
   ref
 ) {
   const [isShapeMenuOpen, setShapeMenuOpen] = useState(MENUS_MODE);
+  const [isLineMenuOpen, setLineMenuOpen] = useState(MENUS_MODE);
   const [isPinMenuOpen, setPinMenuOpen] = useState(MENUS_MODE);
   const shapeMenuRef = useRef<HTMLDivElement>(null);
+  const lineMenuRef = useRef<HTMLDivElement>(null);
   const pinMenuRef = useRef<HTMLDivElement>(null);
 
   const getTooltipPosition = (): 'top' | 'bottom' | 'left' | 'right' => {
@@ -96,14 +103,22 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
     setActiveTool(tool);
     if (tool === 'shape') {
         setShapeMenuOpen(prev => !prev);
+        setLineMenuOpen(false);
+        setPinMenuOpen(false);
+        onMarkupColorPanelClose();
+    } else if (tool === 'arrow') {
+        setLineMenuOpen(prev => !prev);
+        setShapeMenuOpen(false);
         setPinMenuOpen(false);
         onMarkupColorPanelClose();
     } else if (tool === 'pin') {
         setPinMenuOpen(prev => !prev);
         setShapeMenuOpen(false);
+        setLineMenuOpen(false);
         onMarkupColorPanelClose();
     } else {
         setShapeMenuOpen(false);
+        setLineMenuOpen(false);
         setPinMenuOpen(false);
         onMarkupColorPanelClose();
     }
@@ -112,6 +127,7 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
   const handleColorButtonClick = () => {
     onMarkupColorPanelToggle();
     setShapeMenuOpen(false);
+    setLineMenuOpen(false);
     setPinMenuOpen(false);
   }
   
@@ -126,12 +142,19 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
       setActiveTool('pin');
       setPinMenuOpen(false);
   }
+  
+  const handleLineToolClick = (tool: ActiveLineTool) => {
+    setActiveLineTool(tool);
+    setActiveTool(tool);
+    setLineMenuOpen(false);
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (MENUS_MODE) return;
       const target = event.target as Node;
       if (shapeMenuRef.current && !shapeMenuRef.current.contains(target)) setShapeMenuOpen(false);
+      if (lineMenuRef.current && !lineMenuRef.current.contains(target)) setLineMenuOpen(false);
       if (pinMenuRef.current && !pinMenuRef.current.contains(target)) setPinMenuOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -143,7 +166,6 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
     { id: 'location', label: 'Location', icon: <LocationIcon /> },
     { id: 'pen', label: 'Pen', icon: <PenIcon /> },
     { id: 'highlighter', label: 'Highlighter', icon: <HighlighterIcon /> },
-    { id: 'arrow', label: 'Arrow', icon: <ArrowIcon /> },
     { id: 'text', label: 'Text', icon: <TextIcon /> },
   ];
   
@@ -164,6 +186,12 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
   ];
 
   const currentShapeTool = shapeTools.find(s => s.id === activeShape) || shapeTools[1];
+  const lineTools: { id: ActiveLineTool; label: string; icon: React.ReactNode }[] = [
+    { id: 'arrow', label: 'Arrow', icon: <ArrowIcon className="w-6 h-6" /> },
+    { id: 'line', label: 'Line', icon: <svg viewBox="0 0 24 24" className="w-6 h-6"><path d="M4 20L20 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" /></svg> },
+    { id: 'freeline', label: 'Freeline', icon: <svg viewBox="0 0 24 24" className="w-6 h-6"><path d="M3 16C6 8 9 18 12 10C14 4 17 15 21 8" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" fill="none" /></svg> },
+  ];
+  const currentLineTool = lineTools.find(l => l.id === activeLineTool) || lineTools[0];
   const currentPinTool = pinTools.find(p => p.id === activePinType) || pinTools[1];
 
   const getFlyoutPositionClasses = () => {
@@ -268,6 +296,42 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
                             >
                                 {pin.icon}
                                 <span className="text-xs mt-1">{pin.label}</span>
+                            </button>
+                        </Tooltip>
+                    ))}
+                </div>
+            )}
+        </div>
+
+        <div ref={lineMenuRef} className="relative">
+            <Tooltip text={currentLineTool.label} position={tooltipPos}>
+                <button
+                    onClick={() => handleToolClick('arrow')}
+                    className={`relative p-2.5 rounded-lg transition-colors duration-200 text-white ${
+                        activeTool === 'line' || activeTool === 'arrow' || activeTool === 'freeline' ? 'bg-blue-600' : 'hover:bg-gray-700'
+                    }`}
+                >
+                    <div className="w-6 h-6">{currentLineTool.icon}</div>
+                    <div className="absolute bottom-1 right-1 pointer-events-none">
+                        <svg viewBox="0 0 6 6" className="w-1.5 h-1.5 text-gray-300">
+                            <path d="M6 6L0 6L6 0Z" fill="currentColor" />
+                        </svg>
+                    </div>
+                </button>
+            </Tooltip>
+            {isLineMenuOpen && (
+                <div className={`absolute flex gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white ${getFlyoutPositionClasses()} ${isVertical ? 'flex-col' : 'flex-row'}`}>
+                    {lineTools.map(line => (
+                        <Tooltip key={line.id} text={line.label} position={isVertical ? (toolbarPosition === 'left' ? 'right' : 'left') : 'top'}>
+                            <button
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onClick={(e) => { e.stopPropagation(); handleLineToolClick(line.id); }}
+                                className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors duration-200 w-20 ${
+                                    activeLineTool === line.id && (activeTool === 'line' || activeTool === 'arrow' || activeTool === 'freeline') ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'
+                                }`}
+                            >
+                                {line.icon}
+                                <span className="text-xs mt-1">{line.label}</span>
                             </button>
                         </Tooltip>
                     ))}

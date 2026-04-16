@@ -1,13 +1,13 @@
 
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, PhotoData } from '../types';
+import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, PhotoData, LineMarkup } from '../types';
 import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, PhotoIcon, LockClosedIcon, LockOpenIcon, XMarkIcon } from './Icons';
 import Tooltip from './Tooltip';
 import { getRectDimensions, getEllipseDimensions, formatFt, formatArea } from '../utils/measurementUtils';
 import { MENUS_MODE } from '../utils/showcaseMode';
 
-type LayerItem = (Rectangle & { itemType: 'rect' }) | (Pin & { itemType: 'pin' });
+type LayerItem = (Rectangle & { itemType: 'rect' }) | (Pin & { itemType: 'pin' }) | (LineMarkup & { itemType: 'line' });
 
 export interface CompareDrawingsInfo {
     left: { label: string; visible: boolean; onToggle: () => void };
@@ -26,23 +26,29 @@ interface LayersPanelProps {
     onClose: () => void;
     rectangles: Rectangle[];
     pins: Pin[];
+    lineMarkups: LineMarkup[];
     selectedRectIds: string[];
     selectedPinId: string | null;
+    selectedLineId: string | null;
     expandedIds: string[];
     onToggleExpand: (id: string) => void;
     onSelectRect: (id: string, e: React.MouseEvent) => void;
     onSelectPin: (id: string, e: React.MouseEvent) => void;
+    onSelectLine: (id: string, e: React.MouseEvent) => void;
     onRenameRect: (id: string, newName: string) => void;
     onRenamePin: (id: string, newName: string) => void;
+    onRenameLine: (id: string, newName: string) => void;
     onDeleteRect: (id: string) => void;
     onDeletePin: (id: string) => void;
+    onDeleteLine: (id: string) => void;
     onToggleRectVisibility: (id: string) => void;
     onTogglePinVisibility: (id: string) => void;
+    onToggleLineVisibility: (id: string) => void;
     onOpenRfiPanel: (rectId: string, rfiId: number) => void;
     onOpenPhotoViewer: (photoId: string) => void;
     markupSetNames: Record<string, string>;
-    onToggleBatchVisibility: (items: { id: string; type: 'rect' | 'pin' }[], visible: boolean) => void;
-    onToggleLock: (id: string, type: 'rect' | 'pin') => void;
+    onToggleBatchVisibility: (items: { id: string; type: 'rect' | 'pin' | 'line' }[], visible: boolean) => void;
+    onToggleLock: (id: string, type: 'rect' | 'pin' | 'line') => void;
     drawingScale?: number | null;
     naturalSize?: { width: number; height: number };
     onRecalibrateDrawingScale?: () => void;
@@ -55,7 +61,13 @@ const ItemIcon = ({ item }: { item: LayerItem }) => {
         if (item.shape === 'cloud') return <CloudIcon className={iconClass} />;
         if (item.shape === 'ellipse') return <EllipseIcon className={iconClass} />;
         return <BoxIcon className={iconClass} />;
-    } else {
+    }
+    if (item.itemType === 'line') {
+        if (item.type === 'arrow') return <span className={iconClass}><svg viewBox="0 0 24 24"><path d="M4 20L20 4M20 4H12M20 4V12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" fill="none" /></svg></span>;
+        if (item.type === 'freeline') return <span className={iconClass}><svg viewBox="0 0 24 24"><path d="M3 16C6 8 9 18 12 10C14 4 17 15 21 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" /></svg></span>;
+        return <span className={iconClass}><svg viewBox="0 0 24 24"><path d="M4 20L20 4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" fill="none" /></svg></span>;
+    }
+    else {
         if (item.type === 'photo') return <PhotoPinIcon className={iconClass} />;
         if (item.type === 'safety') return <SafetyPinIcon className={iconClass} />;
         return <PunchPinIcon className={iconClass} />;
@@ -88,9 +100,9 @@ const MeasurementChip: React.FC<{ label: string; value: string; emphasized?: boo
 );
 
 const LayersPanel: React.FC<LayersPanelProps> = ({
-    isOpen, onClose, rectangles, pins, selectedRectIds, selectedPinId, expandedIds, onToggleExpand,
-    onSelectRect, onSelectPin, onRenameRect, onRenamePin, onDeleteRect, onDeletePin,
-    onToggleRectVisibility, onTogglePinVisibility, onOpenRfiPanel, onOpenPhotoViewer, markupSetNames, onToggleBatchVisibility, onToggleLock,
+    isOpen, onClose, rectangles, pins, lineMarkups, selectedRectIds, selectedPinId, selectedLineId, expandedIds, onToggleExpand,
+    onSelectRect, onSelectPin, onSelectLine, onRenameRect, onRenamePin, onRenameLine, onDeleteRect, onDeletePin, onDeleteLine,
+    onToggleRectVisibility, onTogglePinVisibility, onToggleLineVisibility, onOpenRfiPanel, onOpenPhotoViewer, markupSetNames, onToggleBatchVisibility, onToggleLock,
     drawingScale, naturalSize, onRecalibrateDrawingScale, compareDrawings,
 }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -137,7 +149,8 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
 
     const layerItems: LayerItem[] = [
         ...rectangles.map(r => ({ ...r, itemType: 'rect' as const })),
-        ...pins.map(p => ({ ...p, itemType: 'pin' as const }))
+        ...pins.map(p => ({ ...p, itemType: 'pin' as const })),
+        ...lineMarkups.map(l => ({ ...l, itemType: 'line' as const })),
     ];
     
     // Group items by sourceSetId
@@ -201,6 +214,8 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
             onRenameRect(editingId, editingName.trim());
         } else if (item?.itemType === 'pin') {
             onRenamePin(editingId, editingName.trim());
+        } else if (item?.itemType === 'line') {
+            onRenameLine(editingId, editingName.trim());
         }
         handleCancelEdit();
     };
@@ -256,7 +271,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
     };
 
     const renderItem = (item: LayerItem) => {
-        const isSelected = item.itemType === 'rect' ? selectedRectIds.includes(item.id) : selectedPinId === item.id;
+        const isSelected = item.itemType === 'rect' ? selectedRectIds.includes(item.id) : item.itemType === 'pin' ? selectedPinId === item.id : selectedLineId === item.id;
         const isExpanded = expandedIds.includes(item.id);
         const hasChildren = item.itemType === 'rect' && (
             (item.rfi?.length || 0) > 0 ||
@@ -272,7 +287,8 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                     onClick={(e) => {
                         if (editingId !== item.id) {
                             if (item.itemType === 'rect') onSelectRect(item.id, e);
-                            else onSelectPin(item.id, e);
+                            else if (item.itemType === 'pin') onSelectPin(item.id, e);
+                            else onSelectLine(item.id, e);
                         }
                     }}
                     className={`flex flex-col px-1.5 py-1.5 cursor-pointer group transition-colors ${isSelected ? 'bg-blue-50 dark:bg-blue-950/40' : 'hover:bg-gray-100 dark:hover:bg-zinc-700/50'}`}
@@ -307,13 +323,13 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                             </span>
                         )}
                         <div className="ml-1 flex flex-shrink-0 items-center">
-                            <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onDeleteRect(item.id) : onDeletePin(item.id); }} className={`p-1 rounded-full hover:bg-red-500 hover:text-white text-gray-500 dark:text-gray-400 ${MENUS_MODE ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'} transition-opacity`}>
+                            <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onDeleteRect(item.id) : item.itemType === 'pin' ? onDeletePin(item.id) : onDeleteLine(item.id); }} className={`p-1 rounded-full hover:bg-red-500 hover:text-white text-gray-500 dark:text-gray-400 ${MENUS_MODE ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'} transition-opacity`}>
                                 <TrashIcon className="w-4 h-4" />
                             </button>
                             <button onClick={(e) => { e.stopPropagation(); onToggleLock(item.id, item.itemType); }} className={`p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 ${item.locked ? 'opacity-100' : MENUS_MODE ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'} transition-opacity`}>
                                 {item.locked ? <LockClosedIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : <LockOpenIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onToggleRectVisibility(item.id) : onTogglePinVisibility(item.id); }} className={`p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 ${MENUS_MODE ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'} transition-opacity`}>
+                            <button onClick={(e) => { e.stopPropagation(); item.itemType === 'rect' ? onToggleRectVisibility(item.id) : item.itemType === 'pin' ? onTogglePinVisibility(item.id) : onToggleLineVisibility(item.id); }} className={`p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 ${MENUS_MODE ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'} transition-opacity`}>
                                 {item.visible ? <EyeIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" /> : <EyeSlashIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
                             </button>
                         </div>
@@ -498,7 +514,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                                         <div className="sticky top-0 z-10 bg-gray-100 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 py-1.5 flex justify-between items-center group/header">
                                             <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">{title}</span>
                                             <button
-                                                onClick={() => onToggleBatchVisibility(items.map(i => ({ id: i.id, type: i.itemType === 'rect' ? 'rect' : 'pin' })), !areAllVisible)}
+                                                onClick={() => onToggleBatchVisibility(items.map(i => ({ id: i.id, type: i.itemType })), !areAllVisible)}
                                                 className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none opacity-0 group-hover/header:opacity-100 transition-opacity"
                                                 title={areAllVisible ? "Hide All" : "Show All"}
                                             >
