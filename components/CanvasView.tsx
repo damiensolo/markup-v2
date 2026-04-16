@@ -1656,6 +1656,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     {markupColorPanelOpen && (() => {
                         const activeSelectionRect = singleSelectionScreenRect || selectedLineScreenRect || multiSelectionScreenRect;
                         const PICKER_W = 300;
+                        const PICKER_H = 520;
                         const GAP = 12;
                         let pickerStyle: React.CSSProperties;
                         const containerEl = imageContainerRef.current;
@@ -1686,7 +1687,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                             } else {
                                 left = toolbarPosition === 'right' ? 12 : containerSize.width - PICKER_W - 12;
                             }
-                            const top = Math.max(8, activeSelectionRect.top - 8);
+                            const preferredTop = activeSelectionRect.top - 8;
+                            const top = Math.max(8, Math.min(preferredTop, Math.max(8, containerSize.height - PICKER_H - 8)));
                             pickerStyle = { left: `${left}px`, top: `${top}px` };
                         } else {
                             pickerStyle = toolbarPosition === 'right'
