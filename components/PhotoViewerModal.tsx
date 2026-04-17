@@ -449,29 +449,39 @@ const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
         return path;
     };
 
-    // ── Link submenu dropdown (rendered near the link button) ─────────────────
+    // ── Link submenu — matches main canvas exactly (hover-based RFI flyout) ─────
 
     const LinkSubMenu: React.FC<{ markupId: string }> = ({ markupId }) => (
-        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 z-40 bg-gray-900/95 backdrop-blur-sm text-white text-sm rounded-lg shadow-xl p-1 min-w-[130px] flex flex-col gap-0.5">
-            <div className="relative group/rfi">
-                <button
-                    onClick={(e) => { e.stopPropagation(); setOpenLinkSubmenu(openLinkSubmenu === 'rfi' ? null : 'rfi'); }}
-                    className="w-full text-left px-3 py-1.5 rounded-md hover:bg-gray-700 transition-colors flex items-center justify-between gap-2"
-                >
-                    <span>RFI</span>
+        <div
+            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max z-50"
+            onMouseLeave={() => setOpenLinkSubmenu(null)}
+        >
+            <div className="flex flex-col gap-1 bg-gray-900/90 backdrop-blur-sm p-1.5 rounded-xl shadow-lg text-sm border border-white/10">
+                {/* RFI row with hover flyout */}
+                <div className="relative" onMouseEnter={() => setOpenLinkSubmenu('rfi')}>
+                    <div className="flex justify-between items-center px-3 py-1.5 text-white rounded-lg hover:bg-blue-600 transition-colors text-left cursor-default">
+                        <span>RFI</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={3} stroke="currentColor" className="w-3 h-3 ml-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
+                    </div>
                     {openLinkSubmenu === 'rfi' && (
-                        <div className="absolute left-full top-0 ml-1 bg-gray-900/95 backdrop-blur-sm rounded-lg shadow-xl p-1 min-w-[110px] flex flex-col gap-0.5">
-                            <button onClick={(e) => { e.stopPropagation(); openLinkModal(markupId, 'rfi'); }} className="px-3 py-1.5 rounded-md hover:bg-blue-600 text-left whitespace-nowrap transition-colors">Link RFI</button>
+                        <div className="absolute left-full top-0 ml-1 flex flex-col gap-1 bg-gray-900/90 backdrop-blur-sm p-1.5 rounded-xl shadow-lg text-sm w-max border border-white/10">
+                            <button onClick={(e) => { e.stopPropagation(); openLinkModal(markupId, 'rfi'); }}
+                                className="px-3 py-1.5 text-white rounded-lg hover:bg-blue-600 transition-colors text-left whitespace-nowrap">
+                                Link RFI
+                            </button>
                         </div>
                     )}
-                </button>
+                </div>
+                {/* Submittal / Punch / Drawing */}
+                {(['submittal', 'punch', 'drawing'] as const).map(type => (
+                    <button key={type} onClick={(e) => { e.stopPropagation(); openLinkModal(markupId, type); }}
+                        className="px-3 py-1.5 text-white rounded-lg hover:bg-blue-600 transition-colors text-left capitalize">
+                        {type}
+                    </button>
+                ))}
             </div>
-            {(['submittal', 'punch', 'drawing'] as const).map(type => (
-                <button key={type} onClick={(e) => { e.stopPropagation(); openLinkModal(markupId, type); }}
-                    className="w-full text-left px-3 py-1.5 rounded-md hover:bg-gray-700 transition-colors capitalize">
-                    {type}
-                </button>
-            ))}
         </div>
     );
 
@@ -509,6 +519,28 @@ const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
         if (activeTool === 'select') return 'cursor-default';
         if (isTexting || activeTool === 'text') return 'cursor-text';
         return 'cursor-crosshair';
+    };
+
+    /** Returns the CSS left/top anchor (% strings) for the unified action menu,
+     *  positioned at the top-center of the selected markup — same logic as the
+     *  main canvas `singleSelectionScreenRect` centre-top placement. */
+    const getMenuAnchor = (m: PhotoMarkup): { left: string; top: string } => {
+        if (m.type === 'shape') {
+            const n = normalizeShape(m as ShapePhotoMarkup);
+            return { left: `${n.x + n.width / 2}%`, top: `${n.y}%` };
+        }
+        if (m.type === 'text') {
+            return { left: `${m.x}%`, top: `${m.y}%` };
+        }
+        if (m.type === 'pen' || m.type === 'highlighter') {
+            const pts = (m as PenPhotoMarkup | HighlighterPhotoMarkup).points;
+            const xs = pts.map(p => p.x);
+            const ys = pts.map(p => p.y);
+            return { left: `${(Math.min(...xs) + Math.max(...xs)) / 2}%`, top: `${Math.min(...ys)}%` };
+        }
+        // line or arrow
+        const lm = m as LinePhotoMarkup | ArrowPhotoMarkup;
+        return { left: `${(lm.start.x + lm.end.x) / 2}%`, top: `${Math.min(lm.start.y, lm.end.y)}%` };
     };
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -623,12 +655,11 @@ const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
                                 const n = normalizeShape(markup as ShapePhotoMarkup);
                                 const pixW = photoContainerRef.current ? (n.width  / 100) * photoContainerRef.current.clientWidth  : 0;
                                 const pixH = photoContainerRef.current ? (n.height / 100) * photoContainerRef.current.clientHeight : 0;
-                                const fill = color + '33'; // 20% opacity
-                                const showLinkMenu = linkMenuMarkupId === markup.id;
+                                const fill = color + '33';
                                 return (
-                                    <div key={markup.id} className="absolute group"
+                                    <div key={markup.id} className="absolute"
                                         style={{ left: `${n.x}%`, top: `${n.y}%`, width: `${n.width}%`, height: `${n.height}%`, outline: isSelected ? '2px solid #3b82f6' : undefined, outlineOffset: 2 }}
-                                        onMouseDown={(e) => { e.stopPropagation(); setSelectedMarkupId(markup.id); setLinkMenuMarkupId(null); }}
+                                        onMouseDown={(e) => { e.stopPropagation(); setSelectedMarkupId(markup.id); setLinkMenuMarkupId(null); setOpenLinkSubmenu(null); }}
                                     >
                                         {markup.shape === 'box' && (
                                             <div className="w-full h-full" style={{ border: `2px solid ${color}`, backgroundColor: fill }} />
@@ -643,32 +674,9 @@ const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
                                                 <path d={generateCloudPath(pixW, pixH)} stroke={color} strokeWidth={2} fill={fill} />
                                             </svg>
                                         )}
-
                                         {/* Linked record tag pills */}
-                                        <div className="absolute left-full top-0 ml-1 flex flex-col gap-0.5">
+                                        <div className="absolute left-full top-0 ml-1 flex flex-col gap-0.5 pointer-events-none">
                                             <TagPills markup={markup} />
-                                        </div>
-
-                                        {/* Action buttons — visible on hover or when selected */}
-                                        <div className={`absolute -top-2 -right-2 flex gap-1 z-10 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                                            {/* Link to record */}
-                                            <div className="relative">
-                                                <button
-                                                    onClick={(e) => handleLinkClick(e, markup.id)}
-                                                    className={`w-6 h-6 rounded-full flex items-center justify-center shadow transition-colors ${showLinkMenu ? 'bg-blue-600 text-white' : 'bg-gray-800 text-white hover:bg-blue-600'}`}
-                                                    title="Link to record"
-                                                >
-                                                    <LinkIcon className="w-3.5 h-3.5" />
-                                                </button>
-                                                {showLinkMenu && <LinkSubMenu markupId={markup.id} />}
-                                            </div>
-                                            {/* Delete */}
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); deleteMarkup(markup.id); }}
-                                                className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow"
-                                            >
-                                                <XMarkIcon className="w-3 h-3" />
-                                            </button>
                                         </div>
                                     </div>
                                 );
@@ -676,17 +684,11 @@ const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
 
                             if (markup.type === 'text') {
                                 return (
-                                    <div key={markup.id} className="absolute group"
+                                    <div key={markup.id} className="absolute"
                                         style={{ left: `${markup.x}%`, top: `${markup.y}%`, transform: 'translateY(-100%)', outline: isSelected ? '2px solid #3b82f6' : undefined, outlineOffset: 2 }}
-                                        onMouseDown={(e) => { e.stopPropagation(); setSelectedMarkupId(markup.id); setLinkMenuMarkupId(null); }}
+                                        onMouseDown={(e) => { e.stopPropagation(); setSelectedMarkupId(markup.id); setLinkMenuMarkupId(null); setOpenLinkSubmenu(null); }}
                                     >
                                         <p style={{ color }} className="whitespace-pre-wrap text-lg bg-white/50 dark:bg-black/50 px-1 rounded-sm">{markup.text}</p>
-                                        <div className={`absolute -top-2 -right-2 flex gap-1 z-10 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                                            <button onClick={(e) => { e.stopPropagation(); deleteMarkup(markup.id); }}
-                                                className="w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors shadow">
-                                                <XMarkIcon className="w-3 h-3" />
-                                            </button>
-                                        </div>
                                     </div>
                                 );
                             }
@@ -828,41 +830,48 @@ const PhotoViewerModal: React.FC<PhotoViewerModalProps> = ({
                             );
                         })()}
 
-                        {/* ── Floating action menu for selected stroke markup ── */}
+                        {/* ── Unified action menu — identical to main canvas: appears above any
+                            selected markup with spring animation, Link + Delete buttons ── */}
                         {selectedMarkupId && (() => {
                             const m = markups.find(x => x.id === selectedMarkupId);
-                            if (!m || m.type === 'shape' || m.type === 'text') return null;
-
-                            let ax = 50, ay = 50;
-                            if (m.type === 'pen' || m.type === 'highlighter') {
-                                ax = m.points[0].x; ay = m.points[0].y;
-                            } else {
-                                ax = (m.start.x + m.end.x) / 2;
-                                ay = Math.min(m.start.y, m.end.y);
-                            }
-                            const pos = toPixelPos(ax, ay);
+                            if (!m) return null;
+                            const anchor = getMenuAnchor(m);
                             const showLinkMenu = linkMenuMarkupId === m.id;
 
                             return (
-                                <div className="absolute z-30 flex items-center gap-1 bg-gray-900/90 backdrop-blur-sm p-1 rounded-lg shadow-xl"
-                                    style={{ left: pos.left, top: pos.top, transform: 'translate(-50%, calc(-100% - 8px))' }}
+                                <div
+                                    data-interactive-ui="true"
+                                    className="absolute transition-opacity transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] opacity-100"
+                                    style={{
+                                        left: anchor.left,
+                                        top: anchor.top,
+                                        transform: 'translate(-50%, calc(-100% - 10px)) scale(1)',
+                                        transformOrigin: 'bottom center',
+                                        zIndex: 30,
+                                    }}
                                     onMouseDown={e => e.stopPropagation()}
                                 >
-                                    {/* Link to record */}
-                                    <div className="relative">
-                                        <button onClick={(e) => handleLinkClick(e, m.id)}
-                                            className={`p-1.5 rounded-md transition-colors ${showLinkMenu ? 'bg-blue-600 text-white' : 'text-white hover:bg-gray-700'}`}
-                                            title="Link to record">
-                                            <LinkIcon className="w-4 h-4" />
+                                    <div className="flex items-center gap-0.5 bg-gray-900/90 backdrop-blur-sm p-1.5 rounded-xl shadow-xl text-white border border-white/10">
+                                        {/* Link to record */}
+                                        <div className="relative">
+                                            <button
+                                                onClick={(e) => handleLinkClick(e, m.id)}
+                                                title="Link to record"
+                                                className={`p-2 rounded-lg transition-colors ${showLinkMenu ? 'bg-blue-600 text-white' : 'hover:bg-white/10'}`}
+                                            >
+                                                <LinkIcon className="w-4 h-4" />
+                                            </button>
+                                            {showLinkMenu && <LinkSubMenu markupId={m.id} />}
+                                        </div>
+                                        {/* Delete */}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); deleteMarkup(m.id); }}
+                                            title="Delete"
+                                            className="p-2 rounded-lg hover:bg-red-500 hover:text-white transition-colors"
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
                                         </button>
-                                        {showLinkMenu && <LinkSubMenu markupId={m.id} />}
                                     </div>
-                                    {/* Delete */}
-                                    <button onClick={(e) => { e.stopPropagation(); deleteMarkup(m.id); }}
-                                        className="p-1.5 rounded-md text-white hover:bg-red-600 transition-colors"
-                                        title="Delete">
-                                        <TrashIcon className="w-4 h-4" />
-                                    </button>
                                 </div>
                             );
                         })()}
