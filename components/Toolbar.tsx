@@ -162,11 +162,11 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
   }, []);
 
   const mainTools = [
+    { id: 'text', label: 'Text', icon: <TextIcon /> },
     { id: 'pen', label: 'Pen', icon: <PenIcon /> },
     { id: 'highlighter', label: 'Highlighter', icon: <HighlighterIcon /> },
     { id: 'location', label: 'Location', icon: <LocationIcon /> },
     { id: 'image', label: 'Image', icon: <ImageIcon /> },
-    { id: 'text', label: 'Text', icon: <TextIcon /> },
   ];
   
   const customPinTools = [

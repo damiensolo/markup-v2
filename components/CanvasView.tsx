@@ -369,11 +369,14 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         editingTextCache.current = null;
     }, [editingTextId, onUpdateTextMarkup, onDeleteTextMarkup, setSelectedTextId]);
 
-    /** Fallback focus in case autoFocus attribute doesn't fire (e.g. inside overflow:hidden). */
+    /** Focus the textarea after all mouse events (mousedown/mouseup) have finished. */
     useEffect(() => {
         if (!editingTextId) return;
-        const ta = editingTextRef.current;
-        if (ta && document.activeElement !== ta) ta.focus();
+        const id = setTimeout(() => {
+            const ta = editingTextRef.current;
+            if (ta) { ta.focus(); ta.select(); }
+        }, 0);
+        return () => clearTimeout(id);
     }, [editingTextId]);
 
     /** Close color/size popovers when text selection changes. */
@@ -1374,50 +1377,40 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     {/* Screen-space text edit overlay — rendered outside the transform div so
                         font-size, position, and focus all work without CSS-scale complications. */}
                     {editingTextId && (() => {
-                        // Prefer live data from store; fall back to cached snapshot so the
-                        // textarea renders immediately even before textMarkups prop updates.
                         const editingText = textMarkups.find(t => t.id === editingTextId) ?? editingTextCache.current;
                         if (!editingText) return null;
                         const screenPos = getScreenPoint(editingText.x, editingText.y);
                         if (!screenPos) return null;
-                        const editFontSize = editingText.fontSize ?? 14; // px at scale=1 = screen pixels
+                        // Use fixed positioning (viewport-relative) so overflow:hidden on the
+                        // container never clips the textarea.
+                        const containerRect = imageContainerRef.current?.getBoundingClientRect();
+                        if (!containerRect) return null;
+                        const fixedLeft = containerRect.left + screenPos.left;
+                        const fixedTop = containerRect.top + screenPos.top;
+                        const editFontSize = (editingText.fontSize ?? 16) * viewTransform.scale;
                         return (
                             <textarea
                                 key={editingTextId}
                                 ref={editingTextRef}
                                 data-interactive-ui="true"
-                                autoFocus
                                 defaultValue={editingText.text}
-                                onFocus={(e) => {
-                                    // Select all text on focus so user can immediately replace
-                                    e.target.select();
-                                    // Set initial height
-                                    e.target.style.height = 'auto';
-                                    e.target.style.height = `${e.target.scrollHeight}px`;
-                                }}
                                 onChange={(e) => {
                                     editingTextContent.current = e.target.value;
-                                    // Auto-grow height
                                     e.target.style.height = 'auto';
                                     e.target.style.height = `${e.target.scrollHeight}px`;
+                                    e.target.style.width = 'auto';
+                                    e.target.style.width = `${Math.max(120, e.target.scrollWidth)}px`;
                                 }}
                                 onKeyDown={(e) => {
                                     e.stopPropagation();
-                                    if (e.key === 'Escape') {
-                                        e.preventDefault();
-                                        setEditingTextId(null);
-                                        editingTextContent.current = '';
-                                    }
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        commitTextEdit();
-                                    }
+                                    if (e.key === 'Escape') { e.preventDefault(); setEditingTextId(null); editingTextContent.current = ''; }
+                                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commitTextEdit(); }
                                 }}
                                 onBlur={commitTextEdit}
                                 style={{
-                                    position: 'absolute',
-                                    left: screenPos.left,
-                                    top: screenPos.top,
+                                    position: 'fixed',
+                                    left: fixedLeft,
+                                    top: fixedTop,
                                     minWidth: '120px',
                                     fontSize: `${editFontSize}px`,
                                     fontWeight: editingText.fontWeight ?? 'normal',
@@ -1430,13 +1423,15 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     borderRadius: '4px',
                                     padding: '4px 6px',
                                     outline: 'none',
-                                    resize: 'horizontal',
+                                    resize: 'none',
                                     overflow: 'hidden',
-                                    zIndex: 50,
+                                    zIndex: 9999,
                                     pointerEvents: 'auto',
+                                    userSelect: 'text',
                                     caretColor: '#3b82f6',
-                                    boxShadow: '0 0 0 3px rgba(59,130,246,0.25), 0 4px 12px rgba(0,0,0,0.15)',
+                                    boxShadow: '0 0 0 3px rgba(59,130,246,0.25), 0 4px 12px rgba(0,0,0,0.2)',
                                     minHeight: `${editFontSize * 1.4 + 8}px`,
+                                    whiteSpace: 'pre',
                                 }}
                             />
                         );
@@ -2312,6 +2307,138 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                 {line.punches?.map(punch => renderLineTag('punch', punch, punch.id))}
                                 {line.drawings?.map(drawing => renderLineTag('drawing', drawing, drawing.id))}
                                 {line.photos?.map(photo => renderLineTag('photo', photo, photo.id))}
+                            </React.Fragment>
+                        );
+                    })}
+
+                    {/* Text Markup Tags — upper-right / upper-left with diagonal leader lines */}
+                    {textMarkups.filter(t => t.visible).map(text => {
+                        const TAG_W = 132;
+                        const TAG_H = 22;
+                        const TAG_GAP = 26;
+                        // Vertical rise of leader above the text baseline
+                        const LEADER_V = 44;
+                        // Horizontal gap from text edge to tag column
+                        const LEADER_X = 52;
+                        const MARGIN = 8; // min distance from browser edge
+
+                        // Collect all visible linked items in order
+                        const tagColorClasses: Record<RectangleTagType, string> = { rfi: 'bg-blue-600/85 hover:bg-blue-500/85', submittal: 'bg-slate-600/85 hover:bg-slate-500/85', punch: 'bg-orange-600/90 hover:bg-orange-500/90', drawing: 'bg-indigo-600/85 hover:bg-indigo-500/85', photo: 'bg-sky-600/85 hover:bg-sky-500/85' };
+                        const allTags: { type: RectangleTagType; item: any; label: string }[] = [
+                            ...(filters['rfi'] ? (text.rfi ?? []).map(item => ({ type: 'rfi' as RectangleTagType, item, label: `RFI-${item.id}` })) : []),
+                            ...(filters['submittal'] ? (text.submittals ?? []).map(item => ({ type: 'submittal' as RectangleTagType, item, label: item.id })) : []),
+                            ...(filters['punch'] ? (text.punches ?? []).map(item => ({ type: 'punch' as RectangleTagType, item, label: item.id })) : []),
+                            ...(filters['drawing'] ? (text.drawings ?? []).map(item => ({ type: 'drawing' as RectangleTagType, item, label: item.id })) : []),
+                            ...(filters['photo'] ? (text.photos ?? []).map(item => ({ type: 'photo' as RectangleTagType, item, label: item.id })) : []),
+                        ];
+                        if (allTags.length === 0) return null;
+
+                        const screenPos = getScreenPoint(text.x, text.y);
+                        if (!screenPos) return null;
+
+                        // Container rect gives us the viewport origin of the canvas container
+                        const cRect = imageContainerRef.current?.getBoundingClientRect();
+                        if (!cRect) return null;
+
+                        // Estimate rendered text width (scaled font size × avg char width × char count)
+                        const scaledFontSize = (text.fontSize ?? 16) * viewTransform.scale;
+                        const estimatedTextWidth = Math.min(scaledFontSize * 0.58 * text.text.length, 500);
+
+                        // Text anchor positions in viewport coords
+                        const anchorVX = cRect.left + screenPos.left;      // first char (left edge)
+                        const lastCharVX = anchorVX + estimatedTextWidth;  // last char (right edge)
+                        const anchorVY = cRect.top + screenPos.top;
+
+                        const WIN_W = window.innerWidth;
+                        const WIN_H = window.innerHeight;
+
+                        // Stack height for all tags
+                        const stackHeight = allTags.length * TAG_GAP + TAG_H;
+
+                        // Preferred tag column left edge in viewport coords for each direction
+                        const rightColVX = lastCharVX + LEADER_X;
+                        const leftColVX  = anchorVX - LEADER_X - TAG_W;
+
+                        const rightFits = rightColVX + TAG_W + MARGIN <= WIN_W;
+                        const leftFits  = leftColVX  - MARGIN >= 0;
+
+                        // Prefer right (tags grow rightward from last char); fallback to left;
+                        // if neither fits choose whichever has more room.
+                        const placeRight =
+                            rightFits ? true :
+                            leftFits  ? false :
+                            (WIN_W - lastCharVX) >= anchorVX;
+
+                        // Clamp tag column to viewport, then convert back to container coords
+                        let colVX: number;
+                        if (placeRight) {
+                            colVX = Math.min(rightColVX, WIN_W - TAG_W - MARGIN);
+                        } else {
+                            colVX = Math.max(MARGIN, leftColVX);
+                        }
+                        const baseLeft = colVX - cRect.left;
+
+                        // Tags sit above the text — top of stack relative to viewport
+                        const preferredTopVY = anchorVY - LEADER_V - stackHeight;
+                        const clampedTopVY   = Math.max(MARGIN, Math.min(preferredTopVY, WIN_H - stackHeight - TAG_H - MARGIN));
+                        // Also clamp so tags don't go below the container bottom
+                        const maxContainerTop = containerSize.height - stackHeight - TAG_H - 4;
+                        const baseTop = Math.min(clampedTopVY - cRect.top, maxContainerTop);
+
+                        // Tag centre Y values in container coords
+                        const tagCenterYs = allTags.map((_, i) => baseTop + i * TAG_GAP + TAG_H / 2);
+                        const firstCY = tagCenterYs[0];
+                        const lastCY  = tagCenterYs[tagCenterYs.length - 1];
+                        const junctionY = (firstCY + lastCY) / 2;
+
+                        // Leader endpoints in container coords:
+                        // Dot at last char (right placement) or first char (left placement)
+                        const dotX     = placeRight ? screenPos.left + estimatedTextWidth + 2 : screenPos.left - 2;
+                        const dotY     = screenPos.top;
+                        const junctionX = placeRight ? baseLeft - 4 : baseLeft + TAG_W + 4;
+                        const leaderColor = text.color ?? '#ef4444';
+
+                        return (
+                            <React.Fragment key={`text-tags-for-${text.id}`}>
+                                {/* Leader line SVG — full-container overlay, pointer-events none */}
+                                <svg
+                                    style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 24, overflow: 'visible' }}
+                                >
+                                    {/* Anchor dot at text edge */}
+                                    <circle cx={dotX} cy={dotY} r={2.5} fill={leaderColor} opacity={0.8} />
+                                    {/* Diagonal leader: dot → junction */}
+                                    <line x1={dotX} y1={dotY} x2={junctionX} y2={junctionY} stroke={leaderColor} strokeWidth={1} strokeOpacity={0.6} strokeDasharray="4 2" />
+                                    {/* Vertical spine connecting all tags (only when >1) */}
+                                    {allTags.length > 1 && (
+                                        <line x1={junctionX} y1={firstCY} x2={junctionX} y2={lastCY} stroke={leaderColor} strokeWidth={1} strokeOpacity={0.5} />
+                                    )}
+                                    {/* Horizontal tick from spine to each tag */}
+                                    {tagCenterYs.map((cy, i) => (
+                                        <line key={i} x1={junctionX} y1={cy} x2={placeRight ? baseLeft : baseLeft + TAG_W} y2={cy} stroke={leaderColor} strokeWidth={1} strokeOpacity={0.5} />
+                                    ))}
+                                </svg>
+
+                                {/* Tag pills */}
+                                {allTags.map(({ type, item, label }, i) => (
+                                    <div
+                                        key={`${type}-text-tag-${text.id}-${item.id}`}
+                                        className={`absolute text-white text-xs font-bold px-1.5 py-0.5 rounded-sm shadow-md cursor-pointer transition-colors ${tagColorClasses[type]}`}
+                                        style={{ left: `${baseLeft}px`, top: `${tagCenterYs[i] - TAG_H / 2}px`, maxWidth: `${TAG_W}px`, pointerEvents: 'auto', zIndex: 25 }}
+                                        onClick={(e) => { e.stopPropagation(); if (type === 'rfi') onOpenRfiPanel(text.id, item.id); if (type === 'photo') onOpenPhotoViewer({ rectId: text.id, photoId: item.id }); }}
+                                        onMouseEnter={(e) => {
+                                            if (hidePopupTimer.current) { clearTimeout(hidePopupTimer.current); hidePopupTimer.current = null; }
+                                            const tagRect = e.currentTarget.getBoundingClientRect();
+                                            if (showPopupTimer.current) clearTimeout(showPopupTimer.current);
+                                            showPopupTimer.current = window.setTimeout(() => setHoveredItem({ type, rectId: text.id, itemId: item.id, position: { top: tagRect.top + tagRect.height / 2, left: tagRect.right } }), 180);
+                                        }}
+                                        onMouseLeave={() => {
+                                            if (showPopupTimer.current) { clearTimeout(showPopupTimer.current); showPopupTimer.current = null; }
+                                            hidePopupTimer.current = window.setTimeout(() => setHoveredItem(null), 500);
+                                        }}
+                                    >
+                                        <span className="block truncate">{label}</span>
+                                    </div>
+                                ))}
                             </React.Fragment>
                         );
                     })}
