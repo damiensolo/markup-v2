@@ -323,6 +323,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     // ── Local canvas pan state (select tool, empty-canvas drag) ───────────
     /** True while the user is panning by dragging empty canvas with the select tool. */
     const [isLocalPanning, setIsLocalPanning] = useState(false);
+    /** Ref mirror of isLocalPanning — reads synchronously inside event handlers (avoids stale closure). */
+    const isLocalPanningRef = useRef(false);
     /** Stores the pointer and transform values recorded when the pan started. */
     const panStartRef = useRef<{ clientX: number; clientY: number; tx: number; ty: number; scale: number } | null>(null);
 
@@ -393,6 +395,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         setTextColorPopoverOpen(false);
         setTextSizeDropdownOpen(false);
     }, [selectedTextId]);
+
 
     const prevDrawingScaleClearTick = useRef(0);
     const prevDrawingScaleRecalibrateTick = useRef(0);
@@ -792,8 +795,29 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     ty: viewTransform.translateY,
                     scale: viewTransform.scale,
                 };
+                isLocalPanningRef.current = true;
                 setIsLocalPanning(true);
-                return; // don't propagate to handleMouseDown
+
+                // Attach window listeners immediately (synchronous) so pan works
+                // from the very first mousemove — no dependency on React re-render cycle.
+                const onPanMove = (me: MouseEvent) => {
+                    if (!panStartRef.current) return;
+                    setViewTransform({
+                        scale: panStartRef.current.scale,
+                        translateX: panStartRef.current.tx + (me.clientX - panStartRef.current.clientX),
+                        translateY: panStartRef.current.ty + (me.clientY - panStartRef.current.clientY),
+                    });
+                };
+                const onPanUp = () => {
+                    window.removeEventListener('mousemove', onPanMove);
+                    window.removeEventListener('mouseup', onPanUp);
+                    panStartRef.current = null;
+                    isLocalPanningRef.current = false;
+                    setIsLocalPanning(false);
+                };
+                window.addEventListener('mousemove', onPanMove);
+                window.addEventListener('mouseup', onPanUp);
+                return;
             }
         }
 
@@ -801,17 +825,6 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-        // ── Local empty-canvas pan — must be first, nothing else runs ──────────
-        if (isLocalPanning && panStartRef.current) {
-            const dx = e.clientX - panStartRef.current.clientX;
-            const dy = e.clientY - panStartRef.current.clientY;
-            setViewTransform({
-                scale: panStartRef.current.scale,
-                translateX: panStartRef.current.tx + dx,
-                translateY: panStartRef.current.ty + dy,
-            });
-            return;
-        }
         // Text area rectangle draw preview
         if (textDrawState) {
             const coords = getRelativeCoords(e);
@@ -875,7 +888,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         // Live rect hover detection — drives cursor feedback for all tools.
         // Only run when no interaction is in progress (dragging, panning, etc.) so
         // we don't waste work or interfere with active gestures.
-        if (!isLocalPanning && interaction.type === 'none' && !textDrawState && !movingTextState && !draggingMeasId) {
+        if (!isLocalPanningRef.current && interaction.type === 'none' && !textDrawState && !movingTextState && !draggingMeasId) {
             const coords = getRelativeCoords(e);
             if (coords) {
                 let hitId: string | null = null;
@@ -897,12 +910,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
-        // ── Local empty-canvas pan end ─────────────────────────────────────────
-        if (isLocalPanning) {
-            panStartRef.current = null;
-            setIsLocalPanning(false);
-            return;
-        }
+        // Pan end is handled by the window mouseup listener (see useEffect above)
         // Text area rectangle draw end
         if (textDrawState) {
             const { startX, startY, currentX, currentY } = textDrawState;
@@ -931,6 +939,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
             editingTextContent.current = 'Text';
             editingTextCache.current = newText;
             setEditingTextId(newText.id);
+            setActiveTool('select');
             return;
         }
         // Text markup drag end
@@ -973,10 +982,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseLeave = () => {
-        if (isLocalPanning) {
-            panStartRef.current = null;
-            setIsLocalPanning(false);
-        }
+        // Pan continues via window listeners even after leaving canvas — no cleanup here
         if (textDrawState) {
             setTextDrawState(null);
         }

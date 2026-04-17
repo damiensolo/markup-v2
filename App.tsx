@@ -1118,6 +1118,7 @@ const App: React.FC = () => {
     pinDragOffset,
     markupFillColor,
     markupStrokeColor,
+    onDrawingComplete: () => setActiveTool('select'),
   });
 
   const deleteSelection = useCallback(() => {

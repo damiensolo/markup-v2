@@ -89,6 +89,7 @@ export const useCanvasInteraction = ({
   isSpacebarDown,
   setHasUnsavedChanges,
   pinDragOffset,
+  onDrawingComplete,
 }: any) => {
   const [interaction, setInteraction] = useState<InteractionState>({ type: 'none' });
   const [currentRect, setCurrentRect] = useState<Omit<Rectangle, 'id' | 'name' | 'visible'> | null>(null);
@@ -621,6 +622,7 @@ export const useCanvasInteraction = ({
         setSelectedLineIds([toCommit.id]);
         setSelectedLinePointIndex(null);
         setHasUnsavedChanges(true);
+        onDrawingComplete?.();
       }
     } else if (interaction.type === 'drawing' && currentRect) {
       const normalized = normalizeRect(currentRect, activeShape);
@@ -638,6 +640,7 @@ export const useCanvasInteraction = ({
         setRectangles((prev: Rectangle[]) => [...prev, newRect]);
         setSelectedRectIds([newRect.id]);
         setHasUnsavedChanges(true);
+        onDrawingComplete?.();
       }
     } else if (interaction.type === 'marquee' && marqueeRect) {
       const normalizedMarquee = normalizeRect(marqueeRect, 'box');
