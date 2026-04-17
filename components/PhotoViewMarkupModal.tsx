@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { Palette } from 'lucide-react';
 import type { Rectangle, LineMarkup, TextMarkup, ResizeHandle, RfiData, SubmittalData, PunchData, DrawingData, LinkModalConfig } from '../types';
 import type { PhotoData } from '../types';
@@ -10,7 +10,15 @@ import LinkModal from './LinkModal';
 import PhotoPickerModal from './PhotoPickerModal';
 import { DEFAULT_MARKUP_FILL, resolveRectFillColor, resolveRectStrokeColor } from '../utils/markupColors';
 import { XMarkIcon, TrashIcon, LinkIcon } from './Icons';
-import type { ToolbarPosition } from '../App';
+import type { RectangleTagType, ToolbarPosition } from '../App';
+
+const PHOTO_MARKUP_TAG_COLOR_CLASSES: Record<RectangleTagType, string> = {
+    rfi: 'bg-blue-600/85 hover:bg-blue-500/85',
+    submittal: 'bg-slate-600/85 hover:bg-slate-500/85',
+    punch: 'bg-orange-600/90 hover:bg-orange-500/90',
+    drawing: 'bg-indigo-600/85 hover:bg-indigo-500/85',
+    photo: 'bg-sky-600/85 hover:bg-sky-500/85',
+};
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -122,10 +130,10 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
     // ── sync colors from selection ────────────────────────────────────────
     const lastSyncedId = useRef<string | null>(null);
     useEffect(() => {
-        if (selectedRectIds.length === 0 && selectedLineIds.length === 0) {
+        if (selectedRectIds.length === 0 && selectedLineIds.length === 0 && !selectedTextId) {
             lastSyncedId.current = null; return;
         }
-        const id = selectedRectIds[0] || selectedLineIds[0];
+        const id = selectedRectIds[0] || selectedLineIds[0] || selectedTextId;
         if (lastSyncedId.current === id) return;
         lastSyncedId.current = id;
         const r = rectangles.find(x => x.id === id);
@@ -135,8 +143,13 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
             return;
         }
         const l = lineMarkups.find(x => x.id === id);
-        if (l) { setMarkupFillColor(l.fillColor ?? 'transparent'); setMarkupStrokeColor(l.strokeColor ?? '#EF4444'); }
-    }, [selectedRectIds, selectedLineIds, rectangles, lineMarkups]);
+        if (l) { setMarkupFillColor(l.fillColor ?? 'transparent'); setMarkupStrokeColor(l.strokeColor ?? '#EF4444'); return; }
+        const t = textMarkups.find(x => x.id === id);
+        if (t) {
+            setMarkupFillColor(DEFAULT_MARKUP_FILL);
+            setMarkupStrokeColor(t.color ?? '#EF4444');
+        }
+    }, [selectedRectIds, selectedLineIds, selectedTextId, rectangles, lineMarkups, textMarkups]);
 
     // ── close color panel on linkMenu open ───────────────────────────────
     useEffect(() => { if (linkMenuRectId) setColorPanelOpen(false); }, [linkMenuRectId]);
@@ -318,8 +331,12 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
             setLineMarkups(prev => prev.map(l => selectedLineIds.includes(l.id)
                 ? { ...l, ...(mode === 'fill' ? { fillColor: value } : { strokeColor: value }) } : l));
         }
-        if (selectedRectIds.length > 0 || selectedLineIds.length > 0) setHasUnsavedChanges(true);
-    }, [selectedRectIds, selectedLineIds]);
+        if (selectedTextId && selectedRectIds.length === 0 && selectedLineIds.length === 0) {
+            setTextMarkups(prev => prev.map(t => (t.id === selectedTextId ? { ...t, color: value } : t)));
+            setMarkupStrokeColor(value);
+        }
+        if (selectedRectIds.length > 0 || selectedLineIds.length > 0 || selectedTextId) setHasUnsavedChanges(true);
+    }, [selectedRectIds, selectedLineIds, selectedTextId]);
 
     // ── link handlers ──────────────────────────────────────────────────────
     const handleLinkButton = useCallback((e: React.MouseEvent, id: string) => {
@@ -578,6 +595,21 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
         const minY = Math.min(...pts.map(p => p.top)),  maxY = Math.max(...pts.map(p => p.top));
         return { left: minX, top: minY, width: maxX - minX, height: maxY - minY };
     })() : null;
+
+    const selectedTextScreenRect = useMemo(() => {
+        if (!selectedTextId || editingTextId) return null;
+        const text = textMarkups.find(t => t.id === selectedTextId);
+        if (!text) return null;
+        const sp = getLocalPoint(text.x, text.y);
+        const fs = text.fontSize ?? 14;
+        const estW = text.width != null && text.width > 0
+            ? (text.width / 100) * imgBounds.w
+            : Math.min(fs * 0.58 * Math.max((text.text || 'Text').length, 1), 200);
+        const estH = fs * 1.4;
+        return { left: sp.left, top: sp.top, width: estW, height: estH };
+    }, [selectedTextId, editingTextId, textMarkups, getLocalPoint, imgBounds.w]);
+
+    const selectionIsTextOnly = Boolean(selectedTextId && selectedRectIds.length === 0 && selectedLineIds.length === 0);
 
     const toolbarPosition: ToolbarPosition = 'bottom';
 
@@ -854,6 +886,174 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                         );
                     })}
 
+                    {/* ── Linked record tags (CanvasView parity) ───────────────── */}
+                    {rectangles.filter(r => r.visible).map(rect => {
+                        const normalized = normalizeRect(rect);
+                        const sr = getScreenRect(normalized);
+                        let tagCount = 0;
+                        const renderTag = (type: RectangleTagType, item: { id: string | number }, label: string) => {
+                            const positionIndex = tagCount++;
+                            return (
+                                <div
+                                    key={`${type}-tag-${rect.id}-${item.id}`}
+                                    className={`absolute text-white text-xs font-bold px-1.5 py-0.5 rounded-sm shadow-md cursor-default transition-colors ${PHOTO_MARKUP_TAG_COLOR_CLASSES[type]}`}
+                                    style={{ left: `${sr.left + sr.width + 5}px`, top: `${sr.top + positionIndex * 24}px`, pointerEvents: 'auto', zIndex: 25 }}
+                                    onClick={e => e.stopPropagation()}
+                                >
+                                    {label}
+                                </div>
+                            );
+                        };
+                        return (
+                            <React.Fragment key={`photo-tags-rect-${rect.id}`}>
+                                {rect.rfi?.map(rfi => renderTag('rfi', rfi, `RFI-${rfi.id}`))}
+                                {rect.submittals?.map(sub => renderTag('submittal', sub, sub.id))}
+                                {rect.punches?.map(punch => renderTag('punch', punch, punch.id))}
+                                {rect.drawings?.map(drawing => renderTag('drawing', drawing, drawing.id))}
+                                {rect.photos?.map(photo => renderTag('photo', photo, photo.id))}
+                            </React.Fragment>
+                        );
+                    })}
+
+                    {lineMarkups.filter(line => line.visible).map(line => {
+                        const screenPoints = line.points.map(p => getLocalPoint(p.x, p.y));
+                        if (screenPoints.length === 0) return null;
+                        const minX = Math.min(...screenPoints.map(p => p.left));
+                        const maxX = Math.max(...screenPoints.map(p => p.left));
+                        const minY = Math.min(...screenPoints.map(p => p.top));
+                        const maxY = Math.max(...screenPoints.map(p => p.top));
+                        const centerY = (minY + maxY) / 2;
+                        const TAG_W = 132;
+                        const TAG_H = 22;
+                        const TAG_GAP = 24;
+                        const rightRoom = containerSize.width - (maxX + 5);
+                        const leftRoom = minX - 5;
+                        const placeRight = rightRoom >= TAG_W || rightRoom >= leftRoom;
+                        const baseLeft = placeRight
+                            ? Math.min(maxX + 5, Math.max(6, containerSize.width - TAG_W - 6))
+                            : Math.max(6, minX - TAG_W - 5);
+                        const baseTop = Math.max(6, Math.min(centerY - TAG_H / 2, containerSize.height - TAG_H - 6));
+                        let tagCount = 0;
+                        const renderLineTag = (type: RectangleTagType, item: { id: string | number }, label: string) => {
+                            const positionIndex = tagCount++;
+                            const nextTop = Math.max(6, Math.min(baseTop + positionIndex * TAG_GAP, containerSize.height - TAG_H - 6));
+                            return (
+                                <div
+                                    key={`${type}-line-tag-${line.id}-${item.id}`}
+                                    className={`absolute text-white text-xs font-bold px-1.5 py-0.5 rounded-sm shadow-md cursor-default transition-colors ${PHOTO_MARKUP_TAG_COLOR_CLASSES[type]}`}
+                                    style={{ left: `${baseLeft}px`, top: `${nextTop}px`, maxWidth: `${TAG_W}px`, pointerEvents: 'auto', zIndex: 25 }}
+                                    onClick={e => e.stopPropagation()}
+                                >
+                                    <span className="block truncate">{label}</span>
+                                </div>
+                            );
+                        };
+                        return (
+                            <React.Fragment key={`photo-tags-line-${line.id}`}>
+                                {line.rfi?.map(rfi => renderLineTag('rfi', rfi, `RFI-${rfi.id}`))}
+                                {line.submittals?.map(sub => renderLineTag('submittal', sub, sub.id))}
+                                {line.punches?.map(punch => renderLineTag('punch', punch, punch.id))}
+                                {line.drawings?.map(drawing => renderLineTag('drawing', drawing, drawing.id))}
+                                {line.photos?.map(photo => renderLineTag('photo', photo, photo.id))}
+                            </React.Fragment>
+                        );
+                    })}
+
+                    {textMarkups.filter(t => t.visible).map(text => {
+                        const TAG_W = 132;
+                        const TAG_H = 22;
+                        const TAG_GAP = 24;
+                        const LEADER_V = 18;
+                        const LEADER_X = 20;
+                        const MARGIN = 8;
+                        const allTags: { type: RectangleTagType; item: { id: string | number }; label: string }[] = [
+                            ...(text.rfi ?? []).map(item => ({ type: 'rfi' as RectangleTagType, item, label: `RFI-${item.id}` })),
+                            ...(text.submittals ?? []).map(item => ({ type: 'submittal' as RectangleTagType, item, label: item.id })),
+                            ...(text.punches ?? []).map(item => ({ type: 'punch' as RectangleTagType, item, label: item.id })),
+                            ...(text.drawings ?? []).map(item => ({ type: 'drawing' as RectangleTagType, item, label: item.id })),
+                            ...(text.photos ?? []).map(item => ({ type: 'photo' as RectangleTagType, item, label: item.id })),
+                        ];
+                        if (allTags.length === 0) return null;
+
+                        const screenPos = getLocalPoint(text.x, text.y);
+                        const cRect = containerRef.current?.getBoundingClientRect();
+                        if (!cRect) return null;
+
+                        const scaledFontSize = text.fontSize ?? 16;
+                        const estimatedTextWidth = Math.min(scaledFontSize * 0.58 * Math.max(text.text.length, 1), 500);
+
+                        const anchorVX = cRect.left + screenPos.left;
+                        const lastCharVX = anchorVX + estimatedTextWidth;
+                        const anchorVY = cRect.top + screenPos.top;
+
+                        const WIN_W = window.innerWidth;
+                        const WIN_H = window.innerHeight;
+
+                        const stackHeight = allTags.length * TAG_GAP + TAG_H;
+
+                        const rightColVX = lastCharVX + LEADER_X;
+                        const leftColVX = anchorVX - LEADER_X - TAG_W;
+
+                        const rightFits = rightColVX + TAG_W + MARGIN <= WIN_W;
+                        const leftFits = leftColVX - MARGIN >= 0;
+
+                        const placeRight =
+                            rightFits ? true :
+                            leftFits ? false :
+                            (WIN_W - lastCharVX) >= anchorVX;
+
+                        let colVX: number;
+                        if (placeRight) {
+                            colVX = Math.min(rightColVX, WIN_W - TAG_W - MARGIN);
+                        } else {
+                            colVX = Math.max(MARGIN, leftColVX);
+                        }
+                        const baseLeft = colVX - cRect.left;
+
+                        const textMidVY = anchorVY + (scaledFontSize * 1.4) / 2;
+                        const preferredTopVY = textMidVY - LEADER_V - stackHeight;
+                        const clampedTopVY = Math.max(MARGIN, Math.min(preferredTopVY, WIN_H - stackHeight - TAG_H - MARGIN));
+                        const maxContainerTop = containerSize.height - stackHeight - TAG_H - 4;
+                        const baseTop = Math.min(clampedTopVY - cRect.top, maxContainerTop);
+
+                        const tagCenterYs = allTags.map((_, i) => baseTop + i * TAG_GAP + TAG_H / 2);
+                        const firstCY = tagCenterYs[0];
+                        const lastCY = tagCenterYs[tagCenterYs.length - 1];
+                        const junctionY = (firstCY + lastCY) / 2;
+
+                        const dotX = placeRight ? screenPos.left + estimatedTextWidth : screenPos.left;
+                        const dotY = screenPos.top + (scaledFontSize * 1.4) / 2;
+                        const junctionX = placeRight ? baseLeft - 2 : baseLeft + TAG_W + 2;
+                        const leaderColor = text.color ?? '#ef4444';
+
+                        return (
+                            <React.Fragment key={`photo-tags-text-${text.id}`}>
+                                <svg
+                                    style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 24, overflow: 'visible' }}
+                                >
+                                    <circle cx={dotX} cy={dotY} r={2.5} fill={leaderColor} opacity={0.8} />
+                                    <line x1={dotX} y1={dotY} x2={junctionX} y2={junctionY} stroke={leaderColor} strokeWidth={1} strokeOpacity={0.6} strokeDasharray="4 2" />
+                                    {allTags.length > 1 && (
+                                        <line x1={junctionX} y1={firstCY} x2={junctionX} y2={lastCY} stroke={leaderColor} strokeWidth={1} strokeOpacity={0.5} />
+                                    )}
+                                    {tagCenterYs.map((cy, i) => (
+                                        <line key={i} x1={junctionX} y1={cy} x2={placeRight ? baseLeft : baseLeft + TAG_W} y2={cy} stroke={leaderColor} strokeWidth={1} strokeOpacity={0.5} />
+                                    ))}
+                                </svg>
+                                {allTags.map(({ type, item, label }, i) => (
+                                    <div
+                                        key={`${type}-text-tag-${text.id}-${item.id}`}
+                                        className={`absolute text-white text-xs font-bold px-1.5 py-0.5 rounded-sm shadow-md cursor-default transition-colors ${PHOTO_MARKUP_TAG_COLOR_CLASSES[type]}`}
+                                        style={{ left: `${baseLeft}px`, top: `${tagCenterYs[i] - TAG_H / 2}px`, maxWidth: `${TAG_W}px`, pointerEvents: 'auto', zIndex: 25 }}
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        <span className="block truncate">{label}</span>
+                                    </div>
+                                ))}
+                            </React.Fragment>
+                        );
+                    })}
+
                     {/* ── Text edit textarea overlay (fixed, like CanvasView) ── */}
                     {editingTextId && (() => {
                         const t = textMarkups.find(x => x.id === editingTextId) ?? editingTextCache.current;
@@ -942,16 +1142,6 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                             }}
                         >
                             <div className="flex items-center gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white">
-                                <div className="relative" data-markup-color-trigger>
-                                    <button
-                                        type="button"
-                                        onClick={e => { e.stopPropagation(); setLinkMenuRectId(null); setColorPanelOpen(o => { const n = !o; if (n) setColorPanelSource('selection'); return n; }); }}
-                                        title="Fill & stroke"
-                                        className={`p-2 rounded-md transition-colors ${colorPanelOpen && colorPanelSource === 'selection' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
-                                    >
-                                        <Palette className="w-5 h-5" />
-                                    </button>
-                                </div>
                                 <div className="relative">
                                     <button
                                         onClick={e => selectedRectangle && handleLinkButton(e, selectedRectangle.id)}
@@ -971,6 +1161,16 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                                <div className="relative" data-markup-color-trigger>
+                                    <button
+                                        type="button"
+                                        onClick={e => { e.stopPropagation(); setLinkMenuRectId(null); setColorPanelOpen(o => { const n = !o; if (n) setColorPanelSource('selection'); return n; }); }}
+                                        title="Fill & stroke"
+                                        className={`p-2 rounded-md transition-colors ${colorPanelOpen && colorPanelSource === 'selection' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
+                                    >
+                                        <Palette className="w-5 h-5" />
+                                    </button>
                                 </div>
                                 <button
                                     onClick={e => { e.stopPropagation(); deleteSelected(); }}
@@ -996,16 +1196,6 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                             }}
                         >
                             <div className="flex items-center gap-1 bg-gray-900/80 backdrop-blur-sm p-1.5 rounded-lg shadow-lg text-white">
-                                <div className="relative" data-markup-color-trigger>
-                                    <button
-                                        type="button"
-                                        onClick={e => { e.stopPropagation(); setColorPanelOpen(o => { const n = !o; if (n) setColorPanelSource('selection'); return n; }); }}
-                                        title="Fill & stroke"
-                                        className={`p-2 rounded-md transition-colors ${colorPanelOpen && colorPanelSource === 'selection' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
-                                    >
-                                        <Palette className="w-5 h-5" />
-                                    </button>
-                                </div>
                                 <div className="relative">
                                     <button
                                         onClick={e => selectedLine && handleLinkButton(e, selectedLine.id)}
@@ -1025,6 +1215,16 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                                             </div>
                                         </div>
                                     )}
+                                </div>
+                                <div className="relative" data-markup-color-trigger>
+                                    <button
+                                        type="button"
+                                        onClick={e => { e.stopPropagation(); setLinkMenuRectId(null); setColorPanelOpen(o => { const n = !o; if (n) setColorPanelSource('selection'); return n; }); }}
+                                        title="Fill & stroke"
+                                        className={`p-2 rounded-md transition-colors ${colorPanelOpen && colorPanelSource === 'selection' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
+                                    >
+                                        <Palette className="w-5 h-5" />
+                                    </button>
                                 </div>
                                 <button
                                     onClick={e => { e.stopPropagation(); deleteSelected(); }}
@@ -1073,6 +1273,20 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                                             </div>
                                         )}
                                     </div>
+                                    <div className="relative" data-markup-color-trigger>
+                                        <button
+                                            type="button"
+                                            onClick={e => {
+                                                e.stopPropagation();
+                                                setLinkMenuRectId(null);
+                                                setColorPanelOpen(o => { const n = !o; if (n) setColorPanelSource('selection'); return n; });
+                                            }}
+                                            title="Fill & stroke"
+                                            className={`p-2 rounded-lg transition-colors ${colorPanelOpen && colorPanelSource === 'selection' ? 'bg-blue-600 text-white' : 'hover:bg-white/10'}`}
+                                        >
+                                            <Palette className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                     <button
                                         onClick={e => { e.stopPropagation(); deleteSelected(); }}
                                         title="Delete" className="p-2 rounded-md hover:bg-red-500 hover:text-white transition-colors"
@@ -1088,7 +1302,7 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                     {colorPanelOpen && (() => {
                         const PICKER_W = 300, PICKER_H = 520, GAP = 12;
                         let pickerStyle: React.CSSProperties;
-                        const activeSelectionRect = singleSelectionScreenRect ?? selectedLineScreenRect;
+                        const activeSelectionRect = singleSelectionScreenRect ?? selectedLineScreenRect ?? selectedTextScreenRect;
                         if (colorPanelSource === 'selection' && activeSelectionRect) {
                             const markupRight = activeSelectionRect.left + activeSelectionRect.width;
                             const markupLeft  = activeSelectionRect.left;
@@ -1116,7 +1330,7 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                                     strokeValue={markupStrokeColor}
                                     onChange={handleColorChange}
                                     onRequestClose={() => setColorPanelOpen(false)}
-                                    strokeOnly={activeTool === 'line' || activeTool === 'arrow' || activeTool === 'pen' || activeTool === 'highlighter'}
+                                    strokeOnly={activeTool === 'line' || activeTool === 'arrow' || activeTool === 'pen' || activeTool === 'highlighter' || selectionIsTextOnly}
                                 />
                             </div>
                         );
