@@ -610,7 +610,8 @@ export const useCanvasInteraction = ({
   
     if (interaction.type === 'drawing' && currentLineMarkup) {
       const pointCount = currentLineMarkup.points.length;
-      if (pointCount >= 2) {
+      const needsDrag = currentLineMarkup.type === 'line' || currentLineMarkup.type === 'arrow' || currentLineMarkup.type === 'freeline';
+      if (pointCount >= 2 && !(needsDrag && isClick)) {
         let toCommit = currentLineMarkup;
         if (currentLineMarkup.type === 'pen' || currentLineMarkup.type === 'highlighter') {
           // Simplify the path to reduce stored points while preserving visual quality

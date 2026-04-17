@@ -1220,6 +1220,15 @@ const App: React.FC = () => {
                 e.preventDefault();
                 deleteSelection();
                 break;
+            case 'escape':
+                e.preventDefault();
+                setSelectedRectIds([]);
+                setSelectedLineIds([]);
+                setSelectedLineId(null);
+                setSelectedLinePointIndex(null);
+                setSelectedPinId(null);
+                setSelectedTextId(null);
+                break;
         }
         
         if (e.code === 'Space' && !isSpacebarDown) {
