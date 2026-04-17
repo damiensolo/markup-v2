@@ -1272,106 +1272,6 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                             })}
                         </svg>
 
-                        {/* Text Markup Rendering (inside transform div — local coordinate space) */}
-                        {textMarkups.filter(t => t.visible).map(text => {
-                            const local = getLocalPoint(text.x, text.y);
-                            if (!local) return null;
-                            const s = viewTransform.scale;
-                            const isSelected = selectedTextId === text.id;
-                            const isEditing = editingTextId === text.id;
-                            const fontSize = (text.fontSize ?? 14) / s;
-                            const textColor = text.color ?? '#111827';
-                            const content = text.text || (isEditing ? '' : 'Text');
-
-                            return (
-                                <div
-                                    key={text.id}
-                                    data-text-markup-id={text.id}
-                                    style={{
-                                        position: 'absolute',
-                                        left: local.left,
-                                        top: local.top,
-                                        zIndex: isEditing ? 28 : (isSelected ? 25 : 16),
-                                        pointerEvents: 'auto',
-                                        cursor: isEditing ? 'text' : (isSelected ? 'move' : (activeTool === 'text' ? 'move' : 'pointer')),
-                                        userSelect: isEditing ? 'text' : 'none',
-                                    }}
-                                    onMouseDown={(e) => {
-                                        e.stopPropagation(); // always stop — even during editing
-                                        if (isEditing) return; // let browser handle cursor placement
-                                        // Clear other selections
-                                        setSelectedRectIds([]);
-                                        setSelectedLineIds([]);
-                                        setSelectedLineId(null);
-                                        setSelectedLinePointIndex(null);
-                                        setSelectedPinId(null);
-                                        setSelectedTextId(text.id);
-                                        // In text tool mode: single click enters edit mode immediately.
-                                        // In select mode: start a move drag (double-click edits).
-                                        if (activeTool === 'text' && !text.locked) {
-                                            setMovingTextState(null);
-                                            editingTextContent.current = text.text;
-                                            editingTextCache.current = text;
-                                            setEditingTextId(text.id);
-                                        } else if (!text.locked) {
-                                            const coords = getRelativeCoords(e);
-                                            if (coords) {
-                                                setMovingTextState({
-                                                    textId: text.id,
-                                                    startMouseX: coords.x,
-                                                    startMouseY: coords.y,
-                                                    startTextX: text.x,
-                                                    startTextY: text.y,
-                                                });
-                                            }
-                                        }
-                                    }}
-                                    onMouseUp={(e) => {
-                                        if (movingTextState) {
-                                            setMovingTextState(null);
-                                            e.stopPropagation();
-                                        }
-                                    }}
-                                    onDoubleClick={(e) => {
-                                        e.stopPropagation();
-                                        if (!text.locked) {
-                                            setMovingTextState(null);
-                                            editingTextContent.current = text.text;
-                                            editingTextCache.current = text;
-                                            setEditingTextId(text.id);
-                                        }
-                                    }}
-                                >
-                                    {/* When editing, a screen-space <textarea> overlay handles input.
-                                        We still render the span here so the div keeps its hit-test
-                                        area, but make it invisible so the textarea shows through. */}
-                                    <span
-                                        style={{
-                                            display: 'inline-block',
-                                            whiteSpace: 'pre-wrap',
-                                            wordBreak: 'break-word',
-                                            fontSize: `${fontSize}px`,
-                                            fontWeight: text.fontWeight ?? 'normal',
-                                            fontStyle: text.fontStyle ?? 'normal',
-                                            fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
-                                            color: isEditing ? 'transparent' : (text.text ? textColor : `${textColor}55`),
-                                            lineHeight: 1.4,
-                                            outline: isSelected && !isEditing
-                                                ? `${1.5 / s}px solid rgba(59,130,246,0.7)`
-                                                : 'none',
-                                            outlineOffset: `${3 / s}px`,
-                                            borderRadius: `${2 / s}px`,
-                                            padding: `${2 / s}px ${3 / s}px`,
-                                            boxShadow: isSelected && !isEditing
-                                                ? `0 0 0 ${3 / s}px rgba(59,130,246,0.15)`
-                                                : 'none',
-                                        }}
-                                    >
-                                        {content}
-                                    </span>
-                                </div>
-                            );
-                        })}
                     </div>
 
                     {/* Screen-space text edit overlay — rendered outside the transform div so
@@ -1436,6 +1336,113 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                             />
                         );
                     })()}
+
+                    {/* ── Text Markup Rendering — screen space (outside CSS-scale div) ──────────
+                        Rendering text outside the transform div means the browser re-rasterises
+                        glyphs at native resolution for every zoom level, eliminating the
+                        pixel-magnification blur caused by CSS scale().
+                        Position is computed with getScreenPoint (already accounts for
+                        viewTransform), and font-size is multiplied by the scale directly so
+                        the visual size matches the logical position on the image. */}
+                    {textMarkups.filter(t => t.visible).map(text => {
+                        const screenPos = getScreenPoint(text.x, text.y);
+                        if (!screenPos) return null;
+                        const s = viewTransform.scale;
+                        const isSelected = selectedTextId === text.id;
+                        const isEditing = editingTextId === text.id;
+                        // Font size in physical screen pixels — scales with zoom, renders crisply
+                        const fontSize = (text.fontSize ?? 14) * s;
+                        const textColor = text.color ?? '#111827';
+                        const content = text.text || (isEditing ? '' : 'Text');
+
+                        return (
+                            <div
+                                key={text.id}
+                                data-text-markup-id={text.id}
+                                style={{
+                                    position: 'absolute',
+                                    left: screenPos.left,
+                                    top: screenPos.top,
+                                    zIndex: isEditing ? 28 : (isSelected ? 25 : 16),
+                                    pointerEvents: 'auto',
+                                    cursor: isEditing ? 'text' : (isSelected ? 'move' : (activeTool === 'text' ? 'move' : 'pointer')),
+                                    userSelect: isEditing ? 'text' : 'none',
+                                    // Hint to the compositor to keep this layer crisp
+                                    willChange: 'transform',
+                                }}
+                                onMouseDown={(e) => {
+                                    e.stopPropagation();
+                                    if (isEditing) return;
+                                    setSelectedRectIds([]);
+                                    setSelectedLineIds([]);
+                                    setSelectedLineId(null);
+                                    setSelectedLinePointIndex(null);
+                                    setSelectedPinId(null);
+                                    setSelectedTextId(text.id);
+                                    if (activeTool === 'text' && !text.locked) {
+                                        setMovingTextState(null);
+                                        editingTextContent.current = text.text;
+                                        editingTextCache.current = text;
+                                        setEditingTextId(text.id);
+                                    } else if (!text.locked) {
+                                        const coords = getRelativeCoords(e);
+                                        if (coords) {
+                                            setMovingTextState({
+                                                textId: text.id,
+                                                startMouseX: coords.x,
+                                                startMouseY: coords.y,
+                                                startTextX: text.x,
+                                                startTextY: text.y,
+                                            });
+                                        }
+                                    }
+                                }}
+                                onMouseUp={(e) => {
+                                    if (movingTextState) {
+                                        setMovingTextState(null);
+                                        e.stopPropagation();
+                                    }
+                                }}
+                                onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    if (!text.locked) {
+                                        setMovingTextState(null);
+                                        editingTextContent.current = text.text;
+                                        editingTextCache.current = text;
+                                        setEditingTextId(text.id);
+                                    }
+                                }}
+                            >
+                                <span
+                                    style={{
+                                        display: 'inline-block',
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                        fontSize: `${fontSize}px`,
+                                        fontWeight: text.fontWeight ?? 'normal',
+                                        fontStyle: text.fontStyle ?? 'normal',
+                                        fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+                                        // @ts-ignore — well-supported, not in all TS DOM libs
+                                        textRendering: 'optimizeLegibility',
+                                        WebkitFontSmoothing: 'antialiased',
+                                        color: isEditing ? 'transparent' : (text.text ? textColor : `${textColor}55`),
+                                        lineHeight: 1.4,
+                                        outline: isSelected && !isEditing
+                                            ? '1.5px solid rgba(59,130,246,0.7)'
+                                            : 'none',
+                                        outlineOffset: '3px',
+                                        borderRadius: '2px',
+                                        padding: '2px 3px',
+                                        boxShadow: isSelected && !isEditing
+                                            ? '0 0 0 3px rgba(59,130,246,0.15)'
+                                            : 'none',
+                                    }}
+                                >
+                                    {content}
+                                </span>
+                            </div>
+                        );
+                    })}
 
                     {/* Screen-space Overlays */}
                     {pins.filter(pin => pin.visible && filters[pin.type as FilterCategory]).map(pin => {
@@ -2315,11 +2322,11 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     {textMarkups.filter(t => t.visible).map(text => {
                         const TAG_W = 132;
                         const TAG_H = 22;
-                        const TAG_GAP = 26;
-                        // Vertical rise of leader above the text baseline
-                        const LEADER_V = 44;
-                        // Horizontal gap from text edge to tag column
-                        const LEADER_X = 52;
+                        const TAG_GAP = 24;
+                        // How far above the text baseline the tag stack sits (tight but clear)
+                        const LEADER_V = 18;
+                        // Horizontal gap from text edge to the tag column
+                        const LEADER_X = 20;
                         const MARGIN = 8; // min distance from browser edge
 
                         // Collect all visible linked items in order
@@ -2378,8 +2385,10 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         }
                         const baseLeft = colVX - cRect.left;
 
-                        // Tags sit above the text — top of stack relative to viewport
-                        const preferredTopVY = anchorVY - LEADER_V - stackHeight;
+                        // Tags sit just above the text mid-line
+                        // anchorVY is the top of the text div; add half a line-height to get the visual centre
+                        const textMidVY = anchorVY + (scaledFontSize * 1.4) / 2;
+                        const preferredTopVY = textMidVY - LEADER_V - stackHeight;
                         const clampedTopVY   = Math.max(MARGIN, Math.min(preferredTopVY, WIN_H - stackHeight - TAG_H - MARGIN));
                         // Also clamp so tags don't go below the container bottom
                         const maxContainerTop = containerSize.height - stackHeight - TAG_H - 4;
@@ -2392,10 +2401,10 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         const junctionY = (firstCY + lastCY) / 2;
 
                         // Leader endpoints in container coords:
-                        // Dot at last char (right placement) or first char (left placement)
-                        const dotX     = placeRight ? screenPos.left + estimatedTextWidth + 2 : screenPos.left - 2;
-                        const dotY     = screenPos.top;
-                        const junctionX = placeRight ? baseLeft - 4 : baseLeft + TAG_W + 4;
+                        // Dot sits right at the text edge (last char right / first char left)
+                        const dotX      = placeRight ? screenPos.left + estimatedTextWidth : screenPos.left;
+                        const dotY      = screenPos.top + (scaledFontSize * 1.4) / 2; // vertically centred on cap-height
+                        const junctionX = placeRight ? baseLeft - 2 : baseLeft + TAG_W + 2;
                         const leaderColor = text.color ?? '#ef4444';
 
                         return (
