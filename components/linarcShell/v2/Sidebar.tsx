@@ -28,10 +28,11 @@ const PlanSheetsIcon = () => (
 
 const PlanSetsIcon = () => (
     <IconWrapper>
-        <div className="relative flex h-8 w-6 items-center justify-center">
-            <LayoutGrid size={22} strokeWidth={1.5} />
-            <Settings className="absolute bottom-0 right-0 text-current" size={10} strokeWidth={2.2} aria-hidden />
-        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/>
+            <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/>
+            <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/>
+        </svg>
     </IconWrapper>
 );
 
@@ -43,13 +44,27 @@ const MarkupsIcon = () => (
 
 const SheetUsageIcon = () => (
     <IconWrapper>
-        <List size={24} strokeWidth={1.5} />
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14.364 13.634a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506l4.013-4.009a1 1 0 0 0-3.004-3.004z"/>
+            <path d="M14.487 7.858A1 1 0 0 1 14 7V2"/>
+            <path d="M20 19.645V20a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l2.516 2.516"/>
+            <path d="M8 18h1"/>
+        </svg>
     </IconWrapper>
 );
 
 const TakeoffIcon = () => (
     <IconWrapper>
-        <Triangle size={24} strokeWidth={1.5} />
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 15v-3"/>
+            <path d="M14 15v-3"/>
+            <path d="M18 15v-3"/>
+            <path d="M2 8V4"/>
+            <path d="M22 6H2"/>
+            <path d="M22 8V4"/>
+            <path d="M6 15v-3"/>
+            <rect x="2" y="12" width="20" height="8" rx="2"/>
+        </svg>
     </IconWrapper>
 );
 
@@ -100,13 +115,13 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ item, isActive, onClick }) =>
         }`}
     >
         <div
-            className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${
-                isActive ? 'bg-blue-600 text-white shadow-sm' : 'bg-transparent text-current'
+            className={`flex items-center justify-center rounded-md w-8 h-8 transition-colors ${
+                isActive ? 'bg-gray-900 text-white shadow-sm' : 'bg-transparent text-current'
             }`}
         >
             {item.icon}
         </div>
-        <span className="text-center text-[10px] leading-tight px-0.5">{item.label}</span>
+        <span className={`text-center text-[10px] leading-tight px-0.5 ${isActive ? 'font-bold' : ''}`}>{item.label}</span>
         {isActive && (
             <div className="absolute right-[-2px] top-1/2 h-[16px] w-[4px] -translate-y-1/2 rounded-l-md bg-orange-500" />
         )}
