@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-    Plus, 
     FileDiff, 
     CheckSquare, 
     Truck, 
@@ -98,9 +97,20 @@ export const QuickCreateMenu: React.FC = () => {
                 aria-expanded={isOpen}
             >
                 <div className="flex items-center justify-center w-6 h-8">
-                    <div className="flex items-center justify-center w-6 h-6 rounded-full border border-current">
-                        <Plus size={16} />
-                    </div>
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="w-6 h-6"
+                    >
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M8 12h8" />
+                        <path d="M12 8v8" />
+                    </svg>
                 </div>
                 <span className="text-center text-[10px] leading-tight px-0.5">Quick Create</span>
             </button>
