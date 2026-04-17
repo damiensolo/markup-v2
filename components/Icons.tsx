@@ -82,13 +82,6 @@ export const CogIcon: React.FC<IconProps> = ({ className }) => <Settings classNa
 // Pins with specific colors and internal icons.
 // Outer box must be sized only by `className` (e.g. w-5 h-5 in lists). Do not add w-full/h-full here — it
 // conflicts with Tailwind width utilities and can expand to fill the whole flex row in the layers panel.
-export const PhotoPinIcon: React.FC<IconProps> = ({ className }) => (
-  <div className={`relative inline-flex shrink-0 items-center justify-center ${className ?? 'h-5 w-5'}`}>
-    <MapPin className="h-full w-full text-blue-500 fill-current" />
-    <Camera className="absolute w-[45%] h-[45%] text-white -translate-y-[15%]" />
-  </div>
-);
-
 export const SafetyPinIcon: React.FC<IconProps> = ({ className }) => (
   <div className={`relative inline-flex shrink-0 items-center justify-center ${className ?? 'h-5 w-5'}`}>
     <MapPin className="h-full w-full text-red-500 fill-current" />
@@ -115,7 +108,6 @@ export const EyeSlashIcon: React.FC<IconProps> = ({ className }) => <EyeOff clas
 export const ChevronRightIcon: React.FC<IconProps> = ({ className }) => <ChevronRight className={className} />;
 export const DocumentDuplicateIcon: React.FC<IconProps> = ({ className }) => <Copy className={className} />;
 export const ClipboardListIcon: React.FC<IconProps> = ({ className }) => <ClipboardList className={className} />;
-export const PhotoIcon: React.FC<IconProps> = ({ className }) => <Image className={className} />;
 export const ImageIcon: React.FC<IconProps> = ({ className }) => <Image className={className} />;
 export const LocationIcon: React.FC<IconProps> = ({ className }) => <MapPin className={className} />;
 export const MeasurementIcon: React.FC<IconProps> = ({ className }) => <Ruler className={className} />;

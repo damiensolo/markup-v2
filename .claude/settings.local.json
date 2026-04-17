@@ -17,7 +17,8 @@
       "Bash(echo \"Exit: $?\")",
       "mcp__plugin_figma_figma__get_metadata",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
-      "mcp__plugin_figma_figma__use_figma"
+      "mcp__plugin_figma_figma__use_figma",
+      "Bash(xargs grep *)"
     ]
   }
 }

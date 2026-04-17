@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MENUS_MODE } from '../utils/showcaseMode';
 import {
   MousePointerIcon, PenIcon, BoxIcon, ArrowIcon, TextIcon,
-  CloudIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon,
+  CloudIcon, EllipseIcon, SafetyPinIcon, PunchPinIcon,
   ImageIcon, LocationIcon, MeasurementIcon, HighlighterIcon,
   CustomPinIcon,
 } from './Icons';
@@ -14,7 +14,7 @@ import Tooltip from './Tooltip';
 type ActiveTool = 'select' | 'shape' | 'pen' | 'line' | 'arrow' | 'freeline' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveLineTool = 'line' | 'arrow' | 'freeline';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
-type ActivePinType = 'photo' | 'safety' | 'punch';
+type ActivePinType = 'safety' | 'punch';
 
 interface ToolbarProps {
   activeTool: ActiveTool;
@@ -31,6 +31,8 @@ interface ToolbarProps {
   onMarkupColorPanelToggle: () => void;
   onMarkupColorPanelClose: () => void;
   toolbarPosition: ToolbarPosition;
+  /** Tool IDs to hide. Omit entirely to show all tools (main toolbar default). */
+  hiddenTools?: string[];
 }
 
 interface ToolButtonProps {
@@ -78,9 +80,11 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
     onMarkupColorPanelToggle,
     onMarkupColorPanelClose,
     toolbarPosition,
+    hiddenTools = [],
   },
   ref
 ) {
+  const hide = (id: string) => hiddenTools.includes(id);
   const [isShapeMenuOpen, setShapeMenuOpen] = useState(MENUS_MODE);
   const [isLineMenuOpen, setLineMenuOpen] = useState(MENUS_MODE);
   const [isPinMenuOpen, setPinMenuOpen] = useState(MENUS_MODE);
@@ -180,7 +184,6 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
   ];
 
   const pinTools: { id: ActivePinType; label: string; icon: React.ReactNode }[] = [
-    { id: 'photo', label: 'Photo', icon: <PhotoPinIcon className="w-6 h-6" /> },
     { id: 'safety', label: 'Safety', icon: <SafetyPinIcon className="w-6 h-6" /> },
     { id: 'punch', label: 'Punch', icon: <PunchPinIcon className="w-6 h-6" /> },
   ];
@@ -269,7 +272,7 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
         </div>
         
         {/* Pin Tool Flyout */}
-        <div ref={pinMenuRef} className="relative">
+        {!hide('pin') && <div ref={pinMenuRef} className="relative">
              <Tooltip text={currentPinTool.label} shortcut="P" position={tooltipPos}>
                 <button
                     onClick={() => handleToolClick('pin')}
@@ -315,7 +318,7 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
                     ))}
                 </div>
             )}
-        </div>
+        </div>}
 
         <div ref={lineMenuRef} className="relative">
             <Tooltip text={currentLineTool.label} position={tooltipPos}>
@@ -353,15 +356,17 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
             )}
         </div>
 
-        <ToolButton
-            label="Measurement"
-            icon={<MeasurementIcon />}
-            isActive={activeTool === 'measurement'}
-            onClick={() => handleToolClick('measurement')}
-            tooltipPosition={tooltipPos}
-        />
+        {!hide('measurement') && (
+          <ToolButton
+              label="Measurement"
+              icon={<MeasurementIcon />}
+              isActive={activeTool === 'measurement'}
+              onClick={() => handleToolClick('measurement')}
+              tooltipPosition={tooltipPos}
+          />
+        )}
 
-        {mainTools.map((tool) => (
+        {mainTools.filter(t => !hide(t.id)).map((tool) => (
              <ToolButton
                 key={tool.id}
                 label={tool.label}
@@ -372,9 +377,11 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
             />
         ))}
 
-        <div className={`bg-gray-600 ${isVertical ? 'w-6 h-px my-1' : 'h-6 w-px mx-1'}`} />
+        {customPinTools.filter(t => !hide(t.id)).length > 0 && (
+          <div className={`bg-gray-600 ${isVertical ? 'w-6 h-px my-1' : 'h-6 w-px mx-1'}`} />
+        )}
 
-        {customPinTools.map((tool) => (
+        {customPinTools.filter(t => !hide(t.id)).map((tool) => (
              <ToolButton
                 key={tool.id}
                 label={tool.label}

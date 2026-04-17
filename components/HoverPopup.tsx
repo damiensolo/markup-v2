@@ -1,22 +1,21 @@
 import React from 'react';
-import type { HoveredItemInfo, Rectangle, PhotoData, SafetyIssueData, PunchData, DrawingData, Pin } from '../types';
+import type { HoveredItemInfo, Rectangle, SafetyIssueData, PunchData, DrawingData, Pin, PhotoData } from '../types';
 
 interface HoverPopupProps {
     hoveredItem: HoveredItemInfo | null;
     rectangles: Rectangle[];
-    allPhotos: PhotoData[];
     allPunches: PunchData[];
     allSafetyIssues: SafetyIssueData[];
-    onOpenPhotoViewer: (config: { rectId?: string; photoId: string, pinId?: string }) => void;
     onOpenRfiPanel: (rectId: string, rfiId: number | null) => void;
     onClearHover: () => void;
     hidePopupTimer: React.MutableRefObject<number | null>;
     showPopupTimer: React.MutableRefObject<number | null>;
     onPinClick: (pin: Pin) => void;
+    onOpenPhotoMarkup: (photo: PhotoData) => void;
 }
 
 const HoverPopup: React.FC<HoverPopupProps> = ({
-    hoveredItem, rectangles, allPhotos, allPunches, allSafetyIssues, onOpenPhotoViewer, onOpenRfiPanel, onClearHover, hidePopupTimer, showPopupTimer, onPinClick
+    hoveredItem, rectangles, allPunches, allSafetyIssues, onOpenRfiPanel, onClearHover, hidePopupTimer, showPopupTimer, onPinClick, onOpenPhotoMarkup
 }) => {
     if (!hoveredItem) return null;
 
@@ -26,25 +25,7 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
         case 'pin':
             const pin = hoveredItem.pin;
             if (pin) {
-                if (pin.type === 'photo') {
-                    const photo = allPhotos.find(p => p.id === pin.linkedId);
-                     if (photo) content = (
-                        <>
-                            <h4 className="font-semibold text-gray-900 dark:text-zinc-100 mb-2 truncate">{photo.id}: {photo.title}</h4>
-                             <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onOpenPhotoViewer({ photoId: photo.id, pinId: pin.id });
-                                    onClearHover(); // Close the popup
-                                }}
-                                className="rounded-md mb-3 w-full h-32 block hover:opacity-80 transition-opacity cursor-pointer"
-                            >
-                                <img src={photo.url} alt={photo.title} className="w-full h-full object-cover rounded-md" />
-                            </button>
-                            <p className="text-sm text-gray-400">Click pin or thumbnail to view & annotate.</p>
-                        </>
-                    );
-                } else if (pin.type === 'safety') {
+                if (pin.type === 'safety') {
                     const issue = allSafetyIssues.find(i => i.id === pin.linkedId);
                     if (issue) content = (
                          <>
@@ -123,21 +104,32 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                         );
                         break;
                     case 'photo':
-                        const photo = rect.photos?.find(p => p.id === hoveredItem.itemId);
+                        const photo = rect.photos?.find((p: PhotoData) => p.id === hoveredItem.itemId);
                         if (photo) content = (
                             <>
                                 <h4 className="font-semibold text-gray-900 dark:text-zinc-100 mb-2 truncate">{photo.id}: {photo.title}</h4>
                                 <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onOpenPhotoViewer({ rectId: rect.id, photoId: photo.id });
-                                        onClearHover(); // Close the popup
-                                    }}
-                                    className="rounded-md mb-3 w-full h-32 block hover:opacity-80 transition-opacity cursor-pointer"
+                                    type="button"
+                                    onClick={() => { onOpenPhotoMarkup(photo); onClearHover(); }}
+                                    className="w-full rounded-md overflow-hidden mb-3 block hover:opacity-90 transition-opacity"
                                 >
-                                    <img src={photo.url} alt={photo.title} className="w-full h-full object-cover rounded-md" />
+                                    <img
+                                        src={photo.url}
+                                        alt={photo.title}
+                                        className="w-full object-cover"
+                                        style={{ maxHeight: '160px' }}
+                                        onError={(e) => {
+                                            const t = e.currentTarget;
+                                            t.onerror = null;
+                                            t.style.display = 'none';
+                                            const placeholder = document.createElement('div');
+                                            placeholder.className = 'flex items-center justify-center bg-gray-100 dark:bg-zinc-800 rounded-md text-gray-400 dark:text-zinc-500 text-xs py-8';
+                                            placeholder.textContent = 'Image unavailable';
+                                            t.parentNode?.insertBefore(placeholder, t);
+                                        }}
+                                    />
                                 </button>
-                                <p className="text-sm text-gray-400">Click tag or thumbnail to view & annotate.</p>
+                                <p className="text-sm text-gray-400">Click to view &amp; annotate.</p>
                             </>
                         );
                         break;

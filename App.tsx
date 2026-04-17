@@ -2,9 +2,11 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { MENUS_MODE } from './utils/showcaseMode';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import type { Rectangle, RfiData, RfiFormState, SubmittalData, PunchData, DrawingData, PhotoData, PhotoMarkup, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet, Measurement, LineMarkup, LineToolType, TextMarkup } from './types';
+import type { Rectangle, RfiData, RfiFormState, SubmittalData, PunchData, DrawingData, PhotoData, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet, Measurement, LineMarkup, LineToolType, TextMarkup } from './types';
 import LinkModal from './components/LinkModal';
-import PhotoViewerModal from './components/PhotoViewerModal';
+import PhotoPickerModal from './components/PhotoPickerModal';
+import PhotoViewMarkupModal from './components/PhotoViewMarkupModal';
+import type { PhotoMarkupData } from './components/PhotoViewMarkupModal';
 import ShareModal from './components/ShareModal';
 import DownloadOptionsModal from './components/DownloadOptionsModal';
 import CompareSheetsModal, { type CompareSheetChoice } from './components/CompareSheetsModal';
@@ -105,12 +107,6 @@ const mockDrawings: DrawingData[] = [
             { id: 'v1', name: 'Initial Release', timestamp: '2024-06-15', thumbnailUrl: '/blueprint-structural.svg' },
         ]
     },
-];
-
-const mockPhotos: PhotoData[] = [
-    { id: 'PHOTO-01', title: 'Site Condition - West Wing', url: 'https://images.pexels.com/photos/1115804/pexels-photo-1115804.jpeg?auto=compress&cs=tinysrgb&w=600', source: 'linarc' },
-    { id: 'PHOTO-02', title: 'Pre-pour inspection formwork', url: 'https://images.pexels.com/photos/302804/pexels-photo-302804.jpeg?auto=compress&cs=tinysrgb&w=600', source: 'linarc' },
-    { id: 'PHOTO-03', title: 'HVAC Ducting - 3rd Floor', url: 'https://images.pexels.com/photos/834892/pexels-photo-834892.jpeg?auto=compress&cs=tinysrgb&w=600', source: 'linarc' },
 ];
 
 const mockSafetyIssues: SafetyIssueData[] = [
@@ -720,7 +716,6 @@ const App: React.FC = () => {
   const [drawingScaleRecalibrateTick, setDrawingScaleRecalibrateTick] = useState(0);
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
   const [allRfis, setAllRfis] = useState<RfiData[]>(mockRfis);
-  const [allPhotos, setAllPhotos] = useState<PhotoData[]>(mockPhotos);
   const [allPunches, setAllPunches] = useState<PunchData[]>(mockPunches);
   const [allSafetyIssues, setAllSafetyIssues] = useState<SafetyIssueData[]>(mockSafetyIssues);
   
@@ -743,7 +738,7 @@ const App: React.FC = () => {
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
   const [activeLineTool, setActiveLineTool] = useState<LineToolType>('arrow');
   const [activeShape, setActiveShape] = useState<'cloud' | 'box' | 'ellipse'>('box');
-  const [activePinType, setActivePinType] = useState<'photo' | 'safety' | 'punch'>('safety');
+  const [activePinType, setActivePinType] = useState<'safety' | 'punch'>('safety');
   const [activeColor, setActiveColor] = useState<'fill' | 'stroke'>('fill');
   const [markupFillColor, setMarkupFillColor] = useState<string>(DEFAULT_MARKUP_FILL);
   const [markupStrokeColor, setMarkupStrokeColor] = useState<string>('#EF4444');
@@ -768,9 +763,12 @@ const App: React.FC = () => {
   const [linkModalConfig, setLinkModalConfig] = useState<LinkModalConfig | null>(null);
   const [linkTargetRectId, setLinkTargetRectId] = useState<string | null>(null);
   
-  const [isPhotoViewerOpen, setIsPhotoViewerOpen] = useState(false);
-  const [photoViewerConfig, setPhotoViewerConfig] = useState<{ rectId?: string; photoId: string, pinId?: string } | null>(null);
-  
+  const [isPhotoPickerOpen, setIsPhotoPickerOpen] = useState(false);
+  const [photoPickerTargetId, setPhotoPickerTargetId] = useState<string | null>(null);
+
+  const [isPhotoMarkupOpen, setIsPhotoMarkupOpen] = useState(false);
+  const [photoMarkupTarget, setPhotoMarkupTarget] = useState<PhotoData | null>(null);
+
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
@@ -818,7 +816,6 @@ const App: React.FC = () => {
   // Refs
   const imageContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const photoFileInputRef = useRef<HTMLInputElement>(null);
   const hidePopupTimer = useRef<number | null>(null);
   const showPopupTimer = useRef<number | null>(null);
   const mouseDownRef = useRef<{x: number, y: number} | null>(null);
@@ -987,20 +984,14 @@ const App: React.FC = () => {
             setIsLinkModalOpen(true);
             break;
         case 'Link Photo':
-            setLinkModalConfig({
-                type: 'photo',
-                title: 'Link a Photo',
-                items: allPhotos,
-                displayFields: [{ key: 'id' }, { key: 'title' }],
-                searchFields: ['id', 'title'],
-            });
-            setIsLinkModalOpen(true);
+            setPhotoPickerTargetId(targetId);
+            setIsPhotoPickerOpen(true);
             break;
         default:
             alert(`Linking ${type} for rectangle ${targetId}`);
             break;
     }
-  }, [allRfis, allPhotos, allPunches, allDrawings, handleOpenRfiPanel]);
+  }, [allRfis, allPunches, allDrawings, handleOpenRfiPanel]);
 
   const handleSetActiveTool = useCallback((tool: ActiveTool) => {
     setActiveTool(tool);
@@ -1188,7 +1179,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         const target = e.target as HTMLElement;
-        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable || isLinkModalOpen || isPhotoViewerOpen || isShareModalOpen || isDownloadModalOpen || isCompareModalOpen) {
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable || isLinkModalOpen || isShareModalOpen || isDownloadModalOpen || isCompareModalOpen) {
             return;
         }
 
@@ -1260,7 +1251,6 @@ const App: React.FC = () => {
       deleteSelection,
       isSpacebarDown,
       isLinkModalOpen,
-      isPhotoViewerOpen,
       isShareModalOpen,
       isDownloadModalOpen,
       isCompareModalOpen,
@@ -1355,7 +1345,6 @@ const App: React.FC = () => {
   };
 
   const triggerFileUpload = () => fileInputRef.current?.click();
-  const triggerPhotoUpload = () => photoFileInputRef.current?.click();
 
   const handleSelectLinkItem = (item: any) => {
     if (linkTargetRectId) {
@@ -1383,10 +1372,6 @@ const App: React.FC = () => {
                 if (!updated.drawings) updated.drawings = [];
                 const fullDrawing = allDrawings.find((d) => d.id === item.id);
                 if (fullDrawing && !updated.drawings.some((d) => d.id === item.id)) updated.drawings.push(fullDrawing);
-                break;
-              case 'photo':
-                if (!updated.photos) updated.photos = [];
-                if (!updated.photos.some((p) => p.id === item.id)) updated.photos.push(item);
                 break;
             }
             return updated;
@@ -1416,10 +1401,6 @@ const App: React.FC = () => {
                 const fullDrawing = allDrawings.find((d) => d.id === item.id);
                 if (fullDrawing && !updated.drawings.some((d) => d.id === item.id)) updated.drawings.push(fullDrawing);
                 break;
-              case 'photo':
-                if (!updated.photos) updated.photos = [];
-                if (!updated.photos.some((p) => p.id === item.id)) updated.photos.push(item);
-                break;
             }
             return updated;
           }));
@@ -1448,10 +1429,6 @@ const App: React.FC = () => {
                           const fullDrawing = allDrawings.find(d => d.id === item.id);
                           if (fullDrawing && !newRect.drawings.some(d => d.id === item.id)) newRect.drawings.push(fullDrawing);
                           break;
-                      case 'photo':
-                          if (!newRect.photos) newRect.photos = [];
-                          if (!newRect.photos.some(p => p.id === item.id)) newRect.photos.push(item);
-                          break;
                   }
                   return newRect;
               }
@@ -1460,27 +1437,54 @@ const App: React.FC = () => {
         }
         setExpandedLayerIds(prev => [...new Set([...prev, linkTargetRectId])]);
         setHasUnsavedChanges(true);
-    } else if (pinTargetCoords && linkModalConfig?.type === 'photo') {
-        const newPinName = `Photo ${pins.filter(p => p.type === 'photo').length + 1}`;
-        const newPin: Pin = {
-            id: `pin-${Date.now()}`,
-            type: 'photo',
-            x: pinTargetCoords.x,
-            y: pinTargetCoords.y,
-            linkedId: item.id,
-            name: newPinName,
-            visible: true
-        };
-        setPins(prev => [...prev, newPin]);
-        setHasUnsavedChanges(true);
-        setPinTargetCoords(null);
-        setActiveTool('select');
-        setActivePanel(null);
     }
 
     setIsLinkModalOpen(false);
     setLinkModalConfig(null);
     setLinkTargetRectId(null);
+  };
+
+  const handlePhotoLinked = (photo: PhotoData) => {
+    if (!photoPickerTargetId) return;
+    const targetId = photoPickerTargetId;
+
+    const getExistingPhotos = (): PhotoData[] => {
+      const txt = textMarkups.find(t => t.id === targetId);
+      if (txt) return txt.photos ?? [];
+      const line = lineMarkups.find(l => l.id === targetId);
+      if (line) return line.photos ?? [];
+      const rect = rectangles.find(r => r.id === targetId);
+      return rect?.photos ?? [];
+    };
+
+    const existing = getExistingPhotos();
+    if (existing.length > 0 && !existing.some(p => p.id === photo.id)) {
+      if (!window.confirm(`This item already has ${existing.length} linked photo${existing.length > 1 ? 's' : ''}. Replace with the selected photo?`)) return;
+      const replace = <T extends { photos?: PhotoData[] }>(item: T): T => ({ ...item, photos: [photo] });
+      if (isTextMarkup(targetId, textMarkups)) {
+        setTextMarkups(prev => prev.map(t => t.id === targetId ? replace(t) : t));
+      } else if (isLineMarkup(targetId, lineMarkups)) {
+        setLineMarkups(prev => prev.map(l => l.id === targetId ? replace(l) : l));
+      } else {
+        setRectangles(prev => prev.map(r => r.id === targetId ? replace(r) : r));
+      }
+    } else {
+      const push = <T extends { photos?: PhotoData[] }>(item: T): T => {
+        if (item.photos?.some(p => p.id === photo.id)) return item;
+        return { ...item, photos: [...(item.photos ?? []), photo] };
+      };
+      if (isTextMarkup(targetId, textMarkups)) {
+        setTextMarkups(prev => prev.map(t => t.id === targetId ? push(t) : t));
+      } else if (isLineMarkup(targetId, lineMarkups)) {
+        setLineMarkups(prev => prev.map(l => l.id === targetId ? push(l) : l));
+      } else {
+        setRectangles(prev => prev.map(r => r.id === targetId ? push(r) : r));
+      }
+    }
+    setExpandedLayerIds(prev => [...new Set([...prev, targetId])]);
+    setHasUnsavedChanges(true);
+    setIsPhotoPickerOpen(false);
+    setPhotoPickerTargetId(null);
   };
 
   const handleRfiFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -1584,11 +1588,7 @@ const App: React.FC = () => {
   
   const handlePinDetails = (pin: Pin) => {
       setSelectedPinId(null);
-      if (pin.type === 'photo') {
-          setActivePanel(null);
-          setPhotoViewerConfig({ photoId: pin.linkedId, pinId: pin.id });
-          setIsPhotoViewerOpen(true);
-      } else if (pin.type === 'safety') {
+      if (pin.type === 'safety') {
           const issue = allSafetyIssues.find(i => i.id === pin.linkedId);
           if (issue) {
               setSafetyFormData(issue);
@@ -1714,70 +1714,6 @@ const App: React.FC = () => {
       setActiveTool('select');
     }
     handlePunchPanelCancel();
-  };
-  
-  const handlePhotoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (file && file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const newPhoto: PhotoData = { id: `UPLOAD-${Date.now()}`, title: file.name, url: e.target?.result as string, source: 'upload', markups: [] };
-          setAllPhotos(prev => [...prev, newPhoto]);
-          if (linkTargetRectId) {
-             if (isTextMarkup(linkTargetRectId, textMarkups)) {
-                setTextMarkups((prevTexts) => prevTexts.map((t) => {
-                  if (t.id !== linkTargetRectId) return t;
-                  const updated = { ...t };
-                  if (!updated.photos) updated.photos = [];
-                  updated.photos.push(newPhoto);
-                  return updated;
-                }));
-             } else if (isLineMarkup(linkTargetRectId, lineMarkups)) {
-                setLineMarkups((prevLines) => prevLines.map((line) => {
-                  if (line.id !== linkTargetRectId) return line;
-                  const updated = { ...line };
-                  if (!updated.photos) updated.photos = [];
-                  updated.photos.push(newPhoto);
-                  return updated;
-                }));
-             } else {
-                setRectangles(prevRects => prevRects.map(rect => {
-                  if (rect.id === linkTargetRectId) {
-                      const newRect = {...rect};
-                      if (!newRect.photos) newRect.photos = [];
-                      newRect.photos.push(newPhoto);
-                      return newRect;
-                  }
-                  return rect;
-                }));
-             }
-             setExpandedLayerIds(prev => [...new Set([...prev, linkTargetRectId])]);
-             setHasUnsavedChanges(true);
-          } else if (pinTargetCoords) {
-             const newPinName = `Photo ${pins.filter(p => p.type === 'photo').length + 1}`;
-             const newPin: Pin = { id: `pin-${Date.now()}`, type: 'photo', x: pinTargetCoords.x, y: pinTargetCoords.y, linkedId: newPhoto.id, name: newPinName, visible: true };
-             setPins(prev => [...prev, newPin]);
-             setHasUnsavedChanges(true);
-             setActiveTool('select');
-             setActivePanel(null);
-          }
-          setIsLinkModalOpen(false);
-          setLinkModalConfig(null);
-          setLinkTargetRectId(null);
-          setPinTargetCoords(null);
-        };
-        reader.readAsDataURL(file);
-        event.target.value = '';
-      }
-  };
-
-  const handleUpdatePhotoMarkups = (newMarkups: PhotoMarkup[]) => {
-    if (!photoViewerConfig) return;
-    const { photoId } = photoViewerConfig;
-    setAllPhotos(prevPhotos => prevPhotos.map(photo => 
-        photo.id === photoId ? { ...photo, markups: newMarkups } : photo
-    ));
-    setHasUnsavedChanges(true);
   };
   
   const handleFilterChange = (filter: FilterCategory) => {
@@ -1940,7 +1876,6 @@ const App: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canvasVisible, hasUnsavedChanges, performGoBack]);
 
-  const currentPhotoForViewer = photoViewerConfig ? allPhotos.find(p => p.id === photoViewerConfig.photoId) : null;
   const areFiltersActive = Object.values(filters).some(v => !v);
 
   // Handlers for Layers Panel
@@ -2013,11 +1948,6 @@ const App: React.FC = () => {
     handleSetActiveTool('select');
   }, [handleSetActiveTool]);
 
-  const handleOpenPhotoViewerFromLayer = useCallback((photoId: string) => {
-    setPhotoViewerConfig({ photoId });
-    setIsPhotoViewerOpen(true);
-  }, []);
-
   const toggleLayerExpand = (id: string) => {
     setExpandedLayerIds(prev => prev.includes(id) ? prev.filter(expandedId => expandedId !== id) : [...prev, id]);
   };
@@ -2051,7 +1981,6 @@ const App: React.FC = () => {
     <LinarcAppShell>
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden text-gray-900 dark:text-zinc-100">
       <input type="file" accept="image/*,.pdf" onChange={handleFileChange} className="hidden" ref={fileInputRef} />
-      <input type="file" accept="image/*" onChange={handlePhotoFileChange} className="hidden" ref={photoFileInputRef} />
         {!imageSrc && !currentDrawing ? (
           <WelcomeScreen onUploadClick={triggerFileUpload} />
         ) : (
@@ -2106,7 +2035,6 @@ const App: React.FC = () => {
                   onTogglePinVisibility={handleTogglePinVisibility}
                   onToggleLineVisibility={handleToggleLineVisibility}
                   onOpenRfiPanel={handleOpenRfiPanel}
-                  onOpenPhotoViewer={handleOpenPhotoViewerFromLayer}
                   markupSetNames={markupSetNames}
                   onToggleBatchVisibility={handleToggleBatchVisibility}
                   onToggleLock={handleToggleItemLock}
@@ -2225,10 +2153,6 @@ const App: React.FC = () => {
                     setOpenLinkSubmenu={setOpenLinkSubmenu}
                     handleSubmenuLink={handleSubmenuLink}
                     onOpenRfiPanel={handleOpenRfiPanel}
-                    onOpenPhotoViewer={(config) => {
-                      setPhotoViewerConfig(config);
-                      setIsPhotoViewerOpen(true);
-                    }}
                     mouseDownRef={mouseDownRef}
                     setSelectedRectIds={setSelectedRectIds}
                     getRelativeCoords={getRelativeCoords}
@@ -2334,18 +2258,14 @@ const App: React.FC = () => {
         <HoverPopup
             hoveredItem={hoveredItem}
             rectangles={rectangles}
-            allPhotos={allPhotos}
             allPunches={allPunches}
             allSafetyIssues={allSafetyIssues}
-            onOpenPhotoViewer={(config) => {
-                setPhotoViewerConfig(config);
-                setIsPhotoViewerOpen(true);
-            }}
             onOpenRfiPanel={handleOpenRfiPanel}
             onClearHover={() => setHoveredItem(null)}
             hidePopupTimer={hidePopupTimer}
             showPopupTimer={showPopupTimer}
             onPinClick={handlePinDetails}
+            onOpenPhotoMarkup={(photo) => { setHoveredItem(null); setPhotoMarkupTarget(photo); setIsPhotoMarkupOpen(true); }}
         />
       )}
 
@@ -2360,16 +2280,21 @@ const App: React.FC = () => {
             setPinTargetCoords(null);
         }}
         onSelect={handleSelectLinkItem}
-        onUploadRequest={triggerPhotoUpload}
       />
       
-      <PhotoViewerModal
-        isOpen={isPhotoViewerOpen}
-        photoData={currentPhotoForViewer || null}
-        onClose={() => setIsPhotoViewerOpen(false)}
-        onUpdateMarkups={handleUpdatePhotoMarkups}
+      <PhotoPickerModal
+        isOpen={isPhotoPickerOpen}
+        onClose={() => { setIsPhotoPickerOpen(false); setPhotoPickerTargetId(null); }}
+        onPhotoLinked={handlePhotoLinked}
+      />
+
+      <PhotoViewMarkupModal
+        isOpen={isPhotoMarkupOpen}
+        photo={photoMarkupTarget}
+        onSave={(_markups: PhotoMarkupData) => { setIsPhotoMarkupOpen(false); setPhotoMarkupTarget(null); }}
+        onClose={() => { setIsPhotoMarkupOpen(false); setPhotoMarkupTarget(null); }}
         allRfis={allRfis}
-        submittals={mockSubmittals}
+        allSubmittals={mockSubmittals}
         allPunches={allPunches}
         allDrawings={allDrawings}
       />

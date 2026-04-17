@@ -66,86 +66,13 @@ export interface DrawingData {
   versions: DrawingVersion[];
 }
 
-/**
- * Represents a markup annotation on a linked photo.
- * Values are percentages (0-100) relative to the photo's dimensions.
- */
-export type PhotoMarkupShapeType = 'box' | 'ellipse' | 'cloud';
 
-export interface ShapePhotoMarkup {
-    id: string;
-    type: 'shape';
-    shape: PhotoMarkupShapeType;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    color?: string;
-    rfi?: RfiData[];
-    submittals?: SubmittalData[];
-    punches?: PunchData[];
-    drawings?: DrawingData[];
-}
-
-export interface PenPhotoMarkup {
-    id: string;
-    type: 'pen';
-    points: { x: number; y: number }[];
-    color?: string;
-}
-
-export interface ArrowPhotoMarkup {
-    id: string;
-    type: 'arrow';
-    start: { x: number; y: number };
-    end: { x: number; y: number };
-    color?: string;
-}
-
-export interface TextPhotoMarkup {
-    id: string;
-    type: 'text';
-    x: number;
-    y: number;
-    text: string;
-    color?: string;
-}
-
-/** Straight line (no arrowhead). Supports linked records. */
-export interface LinePhotoMarkup {
-    id: string;
-    type: 'line';
-    start: { x: number; y: number };
-    end: { x: number; y: number };
-    color?: string;
-    rfi?: RfiData[];
-    submittals?: SubmittalData[];
-    punches?: PunchData[];
-    drawings?: DrawingData[];
-}
-
-/** Thick semi-transparent highlight stroke. */
-export interface HighlighterPhotoMarkup {
-    id: string;
-    type: 'highlighter';
-    points: { x: number; y: number }[];
-    color?: string;
-}
-
-export type PhotoMarkup = ShapePhotoMarkup | PenPhotoMarkup | ArrowPhotoMarkup | TextPhotoMarkup | LinePhotoMarkup | HighlighterPhotoMarkup;
-
-
-/**
- * Represents Photo data linked to a rectangle.
- */
 export interface PhotoData {
   id: string;
   title: string;
   url: string;
   source: 'linarc' | 'upload';
-  markups?: PhotoMarkup[];
 }
-
 
 /**
  * Represents a rectangle highlight on the blueprint.
@@ -189,10 +116,10 @@ export interface SafetyIssueData {
  */
 export interface Pin {
   id: string;
-  type: 'photo' | 'safety' | 'punch';
+  type: 'safety' | 'punch';
   x: number; // percentage
   y: number; // percentage
-  linkedId: string; // id of PhotoData, SafetyIssueData, or PunchData
+  linkedId: string; // id of SafetyIssueData or PunchData
   name: string;
   visible: boolean;
   locked?: boolean;

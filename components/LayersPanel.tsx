@@ -1,8 +1,8 @@
 
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, PhotoData, LineMarkup } from '../types';
-import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, PhotoIcon, LockClosedIcon, LockOpenIcon, XMarkIcon } from './Icons';
+import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, LineMarkup } from '../types';
+import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, LockClosedIcon, LockOpenIcon, XMarkIcon } from './Icons';
 import Tooltip from './Tooltip';
 import { getRectDimensions, getEllipseDimensions, formatFt, formatArea } from '../utils/measurementUtils';
 import { MENUS_MODE } from '../utils/showcaseMode';
@@ -46,7 +46,6 @@ interface LayersPanelProps {
     onTogglePinVisibility: (id: string) => void;
     onToggleLineVisibility: (id: string) => void;
     onOpenRfiPanel: (rectId: string, rfiId: number) => void;
-    onOpenPhotoViewer: (photoId: string) => void;
     markupSetNames: Record<string, string>;
     onToggleBatchVisibility: (items: { id: string; type: 'rect' | 'pin' | 'line' }[], visible: boolean) => void;
     onToggleLock: (id: string, type: 'rect' | 'pin' | 'line') => void;
@@ -69,7 +68,6 @@ const ItemIcon = ({ item }: { item: LayerItem }) => {
         return <span className={iconClass}><svg viewBox="0 0 24 24"><path d="M4 20L20 4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" fill="none" /></svg></span>;
     }
     else {
-        if (item.type === 'photo') return <PhotoPinIcon className={iconClass} />;
         if (item.type === 'safety') return <SafetyPinIcon className={iconClass} />;
         return <PunchPinIcon className={iconClass} />;
     }
@@ -82,7 +80,6 @@ const LinkedItemIcon = ({ type }: { type: string }) => {
         case 'submittal': return <DocumentDuplicateIcon className={iconClass} />;
         case 'drawing': return <DocumentDuplicateIcon className={iconClass} />;
         case 'punch': return <ClipboardListIcon className={iconClass} />;
-        case 'photo': return <PhotoIcon className={iconClass} />;
         default: return null;
     }
 };
@@ -103,7 +100,7 @@ const MeasurementChip: React.FC<{ label: string; value: string; emphasized?: boo
 const LayersPanel: React.FC<LayersPanelProps> = ({
     isOpen, onClose, rectangles, pins, lineMarkups, selectedRectIds, selectedPinId, selectedLineIds, selectedLineId, expandedIds, onToggleExpand,
     onSelectRect, onSelectPin, onSelectLine, onRenameRect, onRenamePin, onRenameLine, onDeleteRect, onDeletePin, onDeleteLine,
-    onToggleRectVisibility, onTogglePinVisibility, onToggleLineVisibility, onOpenRfiPanel, onOpenPhotoViewer, markupSetNames, onToggleBatchVisibility, onToggleLock,
+    onToggleRectVisibility, onTogglePinVisibility, onToggleLineVisibility, onOpenRfiPanel, markupSetNames, onToggleBatchVisibility, onToggleLock,
     drawingScale, naturalSize, onRecalibrateDrawingScale, compareDrawings,
 }) => {
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -278,8 +275,7 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
             (item.rfi?.length || 0) > 0 ||
             (item.submittals?.length || 0) > 0 ||
             (item.punches?.length || 0) > 0 ||
-            (item.drawings?.length || 0) > 0 ||
-            (item.photos?.length || 0) > 0
+            (item.drawings?.length || 0) > 0
         );
 
         return (
@@ -362,12 +358,6 @@ const LayersPanel: React.FC<LayersPanelProps> = ({
                             <li key={drawing.id} onClick={() => handleLinkClick('https://demo.linarc.io/projectPortal/kbUydYsp3LW2WhsQ/document/newPlans/markup/A-3.2/AHV6vNEm20250627115709/latest')} className="flex items-center px-4 py-2 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60">
                                 <LinkedItemIcon type="drawing" />
                                 <span className="text-sm truncate text-gray-700 dark:text-gray-300">{drawing.id}: {drawing.title}</span>
-                            </li>
-                        ))}
-                        {item.photos?.map((photo: PhotoData) => (
-                            <li key={photo.id} onClick={() => onOpenPhotoViewer(photo.id)} className="flex items-center px-4 py-2 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700/60">
-                                <LinkedItemIcon type="photo" />
-                                <span className="text-sm truncate text-gray-700 dark:text-gray-300">{photo.id}: {photo.title}</span>
                             </li>
                         ))}
                     </ul>

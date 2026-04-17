@@ -6,7 +6,7 @@ import { Palette, ChevronUp, ChevronDown } from 'lucide-react';
 import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle, Measurement, LineMarkup, LineToolType, TextMarkup } from '../types';
 import ScaleDialog from './ScaleDialog';
 import { RectangleTagType, ToolbarPosition, ImageGeom } from '../App';
-import { UploadIcon, TrashIcon, LinkIcon, ArrowUpTrayIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowsPointingOutIcon, SunIcon, MoonIcon, SafetyPinIcon, PunchPinIcon, PhotoPinIcon, InformationCircleIcon, FilterIcon, CogIcon } from './Icons';
+import { UploadIcon, TrashIcon, LinkIcon, ArrowUpTrayIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowsPointingOutIcon, SunIcon, MoonIcon, SafetyPinIcon, PunchPinIcon, InformationCircleIcon, FilterIcon, CogIcon } from './Icons';
 import Toolbar from './Toolbar';
 import Tooltip from './Tooltip';
 import MarkupColorPicker from './MarkupColorPicker';
@@ -16,7 +16,7 @@ import { MENUS_MODE } from '../utils/showcaseMode';
 
 type ActiveTool = 'select' | 'shape' | 'pen' | 'line' | 'arrow' | 'freeline' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
-type ActivePinType = 'photo' | 'safety' | 'punch';
+type ActivePinType = 'safety' | 'punch';
 type ActiveColor = 'fill' | 'stroke';
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 
@@ -95,7 +95,6 @@ interface CanvasViewProps {
     setOpenLinkSubmenu: (submenu: string | null) => void;
     handleSubmenuLink: (e: React.MouseEvent, type: string, targetId: string | null) => void;
     onOpenRfiPanel: (rectId: string, rfiId: number | null) => void;
-    onOpenPhotoViewer: (config: { rectId?: string; photoId: string, pinId?: string }) => void;
     mouseDownRef: React.RefObject<{ x: number, y: number } | null>;
     setSelectedRectIds: (ids: string[]) => void;
     getRelativeCoords: (event: React.MouseEvent | WheelEvent | MouseEvent) => { x: number; y: number } | null;
@@ -217,7 +216,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         markupFillColor, markupStrokeColor, onMarkupColorChange, onMarkupActiveModeChange,
         setDraggingPinId, setSelectedPinId, setSelectedLineIds, setSelectedLineId, setSelectedLinePointIndex, handlePinDetails, handleDeletePin, setHoveredItem,
         hidePopupTimer, showPopupTimer, handleResizeStart, handlePublishRect, handleLinkRect, onDeleteSelection, setOpenLinkSubmenu,
-        handleSubmenuLink, onOpenRfiPanel, onOpenPhotoViewer, mouseDownRef, setSelectedRectIds, getRelativeCoords, setPinDragOffset,
+        handleSubmenuLink, onOpenRfiPanel, mouseDownRef, setSelectedRectIds, getRelativeCoords, setPinDragOffset,
         measurements, drawingScale, onMeasurementAdd, onMeasurementDelete, onMeasurementUpdate, onDrawingScaleSet, onNaturalSizeChange,
         drawingScaleClearTick, drawingScaleRecalibrateTick, onBeginScaleRecalibration,
         compareImages, compareAlignment,
@@ -1595,7 +1594,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     {pins.filter(pin => pin.visible && filters[pin.type as FilterCategory]).map(pin => {
                       const screenPos = getScreenPoint(pin.x, pin.y);
                       if (!screenPos) return null;
-                      const PinIcon = { photo: PhotoPinIcon, safety: SafetyPinIcon, punch: PunchPinIcon }[pin.type];
+                      const PinIcon = { safety: SafetyPinIcon, punch: PunchPinIcon }[pin.type];
                       
                       // Allow selecting/dragging pin even in 'shape' mode to avoid confusion
                       const isSelectable = activeTool === 'select' || activeTool === 'shape';
@@ -2383,7 +2382,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     key={`${type}-tag-${rect.id}-${item.id}`}
                                     className={`absolute text-white text-xs font-bold px-1.5 py-0.5 rounded-sm shadow-md cursor-pointer transition-colors ${tagColorClasses[type]}`}
                                     style={{ left: `${screenRect.left + screenRect.width + 5}px`, top: `${screenRect.top + positionIndex * 24}px`, pointerEvents: 'auto', zIndex: 25 }}
-                                    onClick={(e) => { e.stopPropagation(); if(type === 'rfi') onOpenRfiPanel(rect.id, item.id); if(type === 'photo') { onOpenPhotoViewer({ rectId: rect.id, photoId: item.id }); } }}
+                                    onClick={(e) => { e.stopPropagation(); if(type === 'rfi') onOpenRfiPanel(rect.id, item.id); }}
                                     onMouseEnter={(e) => {
                                         if (hidePopupTimer.current) { clearTimeout(hidePopupTimer.current); hidePopupTimer.current = null; }
                                         const tagRect = e.currentTarget.getBoundingClientRect();
@@ -2441,7 +2440,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     key={`${type}-line-tag-${line.id}-${item.id}`}
                                     className={`absolute text-white text-xs font-bold px-1.5 py-0.5 rounded-sm shadow-md cursor-pointer transition-colors ${tagColorClasses[type]}`}
                                     style={{ left: `${baseLeft}px`, top: `${nextTop}px`, maxWidth: `${TAG_W}px`, pointerEvents: 'auto', zIndex: 25 }}
-                                    onClick={(e) => { e.stopPropagation(); if(type === 'rfi') onOpenRfiPanel(line.id, item.id); if(type === 'photo') { onOpenPhotoViewer({ rectId: line.id, photoId: item.id }); } }}
+                                    onClick={(e) => { e.stopPropagation(); if(type === 'rfi') onOpenRfiPanel(line.id, item.id); }}
                                     onMouseEnter={(e) => {
                                         if (hidePopupTimer.current) { clearTimeout(hidePopupTimer.current); hidePopupTimer.current = null; }
                                         const tagRect = e.currentTarget.getBoundingClientRect();
@@ -2585,7 +2584,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                         key={`${type}-text-tag-${text.id}-${item.id}`}
                                         className={`absolute text-white text-xs font-bold px-1.5 py-0.5 rounded-sm shadow-md cursor-pointer transition-colors ${tagColorClasses[type]}`}
                                         style={{ left: `${baseLeft}px`, top: `${tagCenterYs[i] - TAG_H / 2}px`, maxWidth: `${TAG_W}px`, pointerEvents: 'auto', zIndex: 25 }}
-                                        onClick={(e) => { e.stopPropagation(); if (type === 'rfi') onOpenRfiPanel(text.id, item.id); if (type === 'photo') onOpenPhotoViewer({ rectId: text.id, photoId: item.id }); }}
+                                        onClick={(e) => { e.stopPropagation(); if (type === 'rfi') onOpenRfiPanel(text.id, item.id); }}
                                         onMouseEnter={(e) => {
                                             if (hidePopupTimer.current) { clearTimeout(hidePopupTimer.current); hidePopupTimer.current = null; }
                                             const tagRect = e.currentTarget.getBoundingClientRect();

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { XMarkIcon, UploadIcon } from './Icons';
+import { XMarkIcon } from './Icons';
 import type { LinkModalConfig } from '../types';
 
 interface LinkModalProps {
@@ -7,10 +7,9 @@ interface LinkModalProps {
     config: LinkModalConfig | null;
     onClose: () => void;
     onSelect: (item: any) => void;
-    onUploadRequest: () => void;
 }
 
-const LinkModal: React.FC<LinkModalProps> = ({ isOpen, config, onClose, onSelect, onUploadRequest }) => {
+const LinkModal: React.FC<LinkModalProps> = ({ isOpen, config, onClose, onSelect }) => {
     const [searchTerm, setSearchTerm] = useState('');
 
     useEffect(() => {
@@ -88,18 +87,6 @@ const LinkModal: React.FC<LinkModalProps> = ({ isOpen, config, onClose, onSelect
                     )}
                 </ul>
 
-                {config.type === 'photo' && (
-                    <div className="linarc-modal-footer !justify-center">
-                        <button
-                            type="button"
-                            onClick={onUploadRequest}
-                            className="linarc-btn-primary inline-flex w-full max-w-md items-center justify-center gap-2 py-2.5 sm:w-auto"
-                        >
-                            <UploadIcon className="h-5 w-5" />
-                            Upload from computer
-                        </button>
-                    </div>
-                )}
             </div>
         </div>
     );
