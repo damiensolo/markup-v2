@@ -324,12 +324,19 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     const [editingTextId, setEditingTextId] = useState<string | null>(null);
     /** Moving a text markup: tracks start mouse position and text's original x/y. */
     const [movingTextState, setMovingTextState] = useState<{ textId: string; startMouseX: number; startMouseY: number; startTextX: number; startTextY: number } | null>(null);
-    /** Whether the text color swatch popover is open (keyed to selectedTextId). */
+    /** Whether the text color palette row is open. */
     const [textColorPopoverOpen, setTextColorPopoverOpen] = useState(false);
-    /** Ref to contenteditable div for committing edits on blur. */
-    const editingTextRef = useRef<HTMLDivElement>(null);
-    /** Pending text content while editing (synced on every input event). */
+    /** Whether the font-size dropdown is open. */
+    const [textSizeDropdownOpen, setTextSizeDropdownOpen] = useState(false);
+    /** Ref to the screen-space textarea overlay used when editing a text markup. */
+    const editingTextRef = useRef<HTMLTextAreaElement>(null);
+    /** Pending text content while editing (synced on every change event). */
     const editingTextContent = useRef<string>('');
+    /**
+     * Cached copy of the TextMarkup being edited. Updated whenever edit mode starts
+     * so the textarea can render even if textMarkups prop hasn't propagated yet.
+     */
+    const editingTextCache = useRef<TextMarkup | null>(null);
 
     const resetMeasurementCalibrationUi = useCallback(() => {
         setIsCalibrating(false);
@@ -347,36 +354,32 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     /** Commit pending edit to the markup store. Clears editingTextId. */
     const commitTextEdit = useCallback(() => {
         if (!editingTextId) return;
+        const capturedId = editingTextId;
         const raw = editingTextContent.current.trim();
         if (raw) {
-            onUpdateTextMarkup(editingTextId, { text: raw });
+            onUpdateTextMarkup(capturedId, { text: raw });
         } else {
             // Empty text → delete the markup
-            onDeleteTextMarkup(editingTextId);
+            onDeleteTextMarkup(capturedId);
             setSelectedTextId(null);
         }
-        setEditingTextId(null);
+        // Use functional updater to avoid overriding a new edit session
+        setEditingTextId(prev => prev === capturedId ? null : prev);
         editingTextContent.current = '';
+        editingTextCache.current = null;
     }, [editingTextId, onUpdateTextMarkup, onDeleteTextMarkup, setSelectedTextId]);
 
-    /** Auto-focus the contenteditable when edit mode starts. */
+    /** Fallback focus in case autoFocus attribute doesn't fire (e.g. inside overflow:hidden). */
     useEffect(() => {
         if (!editingTextId) return;
-        const div = editingTextRef.current;
-        if (!div) return;
-        // Move cursor to end
-        div.focus();
-        const range = document.createRange();
-        range.selectNodeContents(div);
-        range.collapse(false);
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(range);
+        const ta = editingTextRef.current;
+        if (ta && document.activeElement !== ta) ta.focus();
     }, [editingTextId]);
 
-    /** Close color popover when text selection changes. */
+    /** Close color/size popovers when text selection changes. */
     useEffect(() => {
         setTextColorPopoverOpen(false);
+        setTextSizeDropdownOpen(false);
     }, [selectedTextId]);
 
     const prevDrawingScaleClearTick = useRef(0);
@@ -687,14 +690,16 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-        // If a text is being edited, commit on any external click
-        if (editingTextId) {
-            commitTextEdit();
-        }
-        // Clicks on canvas (not intercepted by a text div) clear text selection
+        // Universal interactive-UI guard — must be first so action menus / toolbar
+        // clicks never accidentally clear state or start new interactions.
+        if ((e.target as HTMLElement).closest('[data-interactive-ui="true"]')) return;
+
+        // Clicks that land on the bare canvas clear text selection.
+        // (Clicks on a text div are stopped by stopPropagation in the text handler.)
         if (selectedTextId) {
             setSelectedTextId(null);
             setTextColorPopoverOpen(false);
+            setTextSizeDropdownOpen(false);
         }
 
         // Alignment drag mode — intercept all mouse activity
@@ -738,17 +743,18 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                 id: `text-${Date.now()}`,
                 x: coords.x,
                 y: coords.y,
-                text: '',
+                text: 'Text',
                 name: `Text ${textMarkups.length + 1}`,
                 visible: true,
-                fontSize: 14,
+                fontSize: 16,
                 fontWeight: 'normal',
                 fontStyle: 'normal',
-                color: '#111827',
+                color: '#ef4444',
             };
             onCreateTextMarkup(newText);
             setSelectedTextId(newText.id);
-            editingTextContent.current = '';
+            editingTextContent.current = 'Text';
+            editingTextCache.current = newText;
             setEditingTextId(newText.id);
             return;
         }
@@ -1288,8 +1294,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                         userSelect: isEditing ? 'text' : 'none',
                                     }}
                                     onMouseDown={(e) => {
+                                        e.stopPropagation(); // always stop — even during editing
                                         if (isEditing) return; // let browser handle cursor placement
-                                        e.stopPropagation();
                                         // Clear other selections
                                         setSelectedRectIds([]);
                                         setSelectedLineIds([]);
@@ -1297,7 +1303,14 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                         setSelectedLinePointIndex(null);
                                         setSelectedPinId(null);
                                         setSelectedTextId(text.id);
-                                        if (!text.locked) {
+                                        // In text tool mode: single click enters edit mode immediately.
+                                        // In select mode: start a move drag (double-click edits).
+                                        if (activeTool === 'text' && !text.locked) {
+                                            setMovingTextState(null);
+                                            editingTextContent.current = text.text;
+                                            editingTextCache.current = text;
+                                            setEditingTextId(text.id);
+                                        } else if (!text.locked) {
                                             const coords = getRelativeCoords(e);
                                             if (coords) {
                                                 setMovingTextState({
@@ -1321,87 +1334,113 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                         if (!text.locked) {
                                             setMovingTextState(null);
                                             editingTextContent.current = text.text;
+                                            editingTextCache.current = text;
                                             setEditingTextId(text.id);
                                         }
                                     }}
                                 >
-                                    {isEditing ? (
-                                        <div
-                                            ref={editingTextRef}
-                                            contentEditable
-                                            suppressContentEditableWarning
-                                            data-interactive-ui="true"
-                                            onInput={(e) => {
-                                                editingTextContent.current = (e.currentTarget as HTMLDivElement).innerText;
-                                            }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Escape') {
-                                                    e.stopPropagation();
-                                                    // Cancel: restore original text
-                                                    setEditingTextId(null);
-                                                    editingTextContent.current = '';
-                                                    // If text was empty (newly created), remove it
-                                                    if (!text.text) {
-                                                        onDeleteTextMarkup(text.id);
-                                                        setSelectedTextId(null);
-                                                    }
-                                                }
-                                                // Enter without shift commits
-                                                if (e.key === 'Enter' && !e.shiftKey) {
-                                                    e.preventDefault();
-                                                    commitTextEdit();
-                                                }
-                                            }}
-                                            onBlur={commitTextEdit}
-                                            style={{
-                                                display: 'inline-block',
-                                                minWidth: '2px',
-                                                minHeight: `${fontSize * 1.4}px`,
-                                                outline: 'none',
-                                                whiteSpace: 'pre-wrap',
-                                                wordBreak: 'break-word',
-                                                fontSize: `${fontSize}px`,
-                                                fontWeight: text.fontWeight ?? 'normal',
-                                                fontStyle: text.fontStyle ?? 'normal',
-                                                fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
-                                                color: textColor,
-                                                lineHeight: 1.4,
-                                                caretColor: '#3b82f6',
-                                                borderBottom: `${1.5 / s}px dashed #3b82f6`,
-                                                paddingBottom: `${1 / s}px`,
-                                            }}
-                                            dangerouslySetInnerHTML={{ __html: text.text }}
-                                        />
-                                    ) : (
-                                        <span
-                                            style={{
-                                                display: 'inline-block',
-                                                whiteSpace: 'pre-wrap',
-                                                wordBreak: 'break-word',
-                                                fontSize: `${fontSize}px`,
-                                                fontWeight: text.fontWeight ?? 'normal',
-                                                fontStyle: text.fontStyle ?? 'normal',
-                                                fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
-                                                color: text.text ? textColor : `${textColor}55`,
-                                                lineHeight: 1.4,
-                                                outline: isSelected
-                                                    ? `${1.5 / s}px solid rgba(59,130,246,0.7)`
-                                                    : 'none',
-                                                outlineOffset: `${3 / s}px`,
-                                                borderRadius: `${2 / s}px`,
-                                                padding: `${2 / s}px ${3 / s}px`,
-                                                boxShadow: isSelected
-                                                    ? `0 0 0 ${3 / s}px rgba(59,130,246,0.15)`
-                                                    : 'none',
-                                            }}
-                                        >
-                                            {content}
-                                        </span>
-                                    )}
+                                    {/* When editing, a screen-space <textarea> overlay handles input.
+                                        We still render the span here so the div keeps its hit-test
+                                        area, but make it invisible so the textarea shows through. */}
+                                    <span
+                                        style={{
+                                            display: 'inline-block',
+                                            whiteSpace: 'pre-wrap',
+                                            wordBreak: 'break-word',
+                                            fontSize: `${fontSize}px`,
+                                            fontWeight: text.fontWeight ?? 'normal',
+                                            fontStyle: text.fontStyle ?? 'normal',
+                                            fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+                                            color: isEditing ? 'transparent' : (text.text ? textColor : `${textColor}55`),
+                                            lineHeight: 1.4,
+                                            outline: isSelected && !isEditing
+                                                ? `${1.5 / s}px solid rgba(59,130,246,0.7)`
+                                                : 'none',
+                                            outlineOffset: `${3 / s}px`,
+                                            borderRadius: `${2 / s}px`,
+                                            padding: `${2 / s}px ${3 / s}px`,
+                                            boxShadow: isSelected && !isEditing
+                                                ? `0 0 0 ${3 / s}px rgba(59,130,246,0.15)`
+                                                : 'none',
+                                        }}
+                                    >
+                                        {content}
+                                    </span>
                                 </div>
                             );
                         })}
                     </div>
+
+                    {/* Screen-space text edit overlay — rendered outside the transform div so
+                        font-size, position, and focus all work without CSS-scale complications. */}
+                    {editingTextId && (() => {
+                        // Prefer live data from store; fall back to cached snapshot so the
+                        // textarea renders immediately even before textMarkups prop updates.
+                        const editingText = textMarkups.find(t => t.id === editingTextId) ?? editingTextCache.current;
+                        if (!editingText) return null;
+                        const screenPos = getScreenPoint(editingText.x, editingText.y);
+                        if (!screenPos) return null;
+                        const editFontSize = editingText.fontSize ?? 14; // px at scale=1 = screen pixels
+                        return (
+                            <textarea
+                                key={editingTextId}
+                                ref={editingTextRef}
+                                data-interactive-ui="true"
+                                autoFocus
+                                defaultValue={editingText.text}
+                                onFocus={(e) => {
+                                    // Select all text on focus so user can immediately replace
+                                    e.target.select();
+                                    // Set initial height
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = `${e.target.scrollHeight}px`;
+                                }}
+                                onChange={(e) => {
+                                    editingTextContent.current = e.target.value;
+                                    // Auto-grow height
+                                    e.target.style.height = 'auto';
+                                    e.target.style.height = `${e.target.scrollHeight}px`;
+                                }}
+                                onKeyDown={(e) => {
+                                    e.stopPropagation();
+                                    if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        setEditingTextId(null);
+                                        editingTextContent.current = '';
+                                    }
+                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                        e.preventDefault();
+                                        commitTextEdit();
+                                    }
+                                }}
+                                onBlur={commitTextEdit}
+                                style={{
+                                    position: 'absolute',
+                                    left: screenPos.left,
+                                    top: screenPos.top,
+                                    minWidth: '120px',
+                                    fontSize: `${editFontSize}px`,
+                                    fontWeight: editingText.fontWeight ?? 'normal',
+                                    fontStyle: editingText.fontStyle ?? 'normal',
+                                    fontFamily: 'ui-sans-serif, system-ui, -apple-system, sans-serif',
+                                    color: editingText.color ?? '#ef4444',
+                                    lineHeight: 1.4,
+                                    background: 'rgba(255,255,255,0.95)',
+                                    border: '2px solid #3b82f6',
+                                    borderRadius: '4px',
+                                    padding: '4px 6px',
+                                    outline: 'none',
+                                    resize: 'horizontal',
+                                    overflow: 'hidden',
+                                    zIndex: 50,
+                                    pointerEvents: 'auto',
+                                    caretColor: '#3b82f6',
+                                    boxShadow: '0 0 0 3px rgba(59,130,246,0.25), 0 4px 12px rgba(0,0,0,0.15)',
+                                    minHeight: `${editFontSize * 1.4 + 8}px`,
+                                }}
+                            />
+                        );
+                    })()}
 
                     {/* Screen-space Overlays */}
                     {pins.filter(pin => pin.visible && filters[pin.type as FilterCategory]).map(pin => {
@@ -1586,40 +1625,94 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         const screenPos = getScreenPoint(selectedText.x, selectedText.y);
                         if (!screenPos) return null;
 
-                        const FONT_SIZES = [10, 12, 14, 18, 24, 36];
-                        const TEXT_COLORS = [
-                            { hex: '#111827', label: 'Black' },
+                        const FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 60, 72];
+
+                        // Two-row color palette: warm/neutral top, cool/accent bottom
+                        const COLOR_ROW1 = [
+                            { hex: '#000000', label: 'Black' },
                             { hex: '#6b7280', label: 'Gray' },
-                            { hex: '#ef4444', label: 'Red' },
-                            { hex: '#f97316', label: 'Orange' },
-                            { hex: '#eab308', label: 'Yellow' },
-                            { hex: '#22c55e', label: 'Green' },
-                            { hex: '#3b82f6', label: 'Blue' },
-                            { hex: '#a855f7', label: 'Purple' },
                             { hex: '#ffffff', label: 'White' },
+                            { hex: '#dc2626', label: 'Red' },
+                            { hex: '#ea580c', label: 'Orange' },
+                            { hex: '#ca8a04', label: 'Amber' },
+                            { hex: '#16a34a', label: 'Green' },
+                            { hex: '#0d9488', label: 'Teal' },
                         ];
-                        const currentColor = selectedText.color ?? '#111827';
-                        const currentSize = selectedText.fontSize ?? 14;
+                        const COLOR_ROW2 = [
+                            { hex: '#1e40af', label: 'Navy' },
+                            { hex: '#2563eb', label: 'Blue' },
+                            { hex: '#7c3aed', label: 'Violet' },
+                            { hex: '#db2777', label: 'Pink' },
+                            { hex: '#f87171', label: 'Light Red' },
+                            { hex: '#fbbf24', label: 'Yellow' },
+                            { hex: '#4ade80', label: 'Light Green' },
+                            { hex: '#60a5fa', label: 'Sky Blue' },
+                        ];
+
+                        const currentColor = selectedText.color ?? '#ef4444';
+                        const currentSize = selectedText.fontSize ?? 16;
                         const isBold = selectedText.fontWeight === 'bold';
                         const isItalic = selectedText.fontStyle === 'italic';
-
-                        const menuLeft = screenPos.left;
-                        const menuTop = screenPos.top;
+                        const isColorActive = textColorPopoverOpen;
+                        const isSizeActive = textSizeDropdownOpen;
 
                         return (
                             <div
                                 data-interactive-ui="true"
                                 className={`absolute transition-opacity transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isMenuVisible ? 'opacity-100' : 'opacity-0'}`}
                                 style={{
-                                    left: menuLeft,
-                                    top: menuTop,
+                                    left: screenPos.left,
+                                    top: screenPos.top,
                                     transform: `translate(-50%, calc(-100% - 10px)) scale(${isMenuVisible ? 1 : 0.9})`,
                                     transformOrigin: 'bottom center',
                                     pointerEvents: isMenuVisible ? 'auto' : 'none',
                                     zIndex: 35,
                                 }}
                             >
+                                {/* ── Color palette panel (appears below main bar, above text) ── */}
+                                {isColorActive && (
+                                    <div className="mb-1.5 px-2 py-2 bg-gray-900/95 backdrop-blur-sm rounded-xl shadow-xl border border-white/10 flex flex-col gap-1.5">
+                                        {[COLOR_ROW1, COLOR_ROW2].map((row, ri) => (
+                                            <div key={ri} className="flex gap-1.5">
+                                                {row.map(({ hex, label }) => {
+                                                    const isActive = currentColor === hex;
+                                                    return (
+                                                        <button
+                                                            key={hex}
+                                                            title={label}
+                                                            onClick={() => {
+                                                                onUpdateTextMarkup(selectedText.id, { color: hex });
+                                                                setTextColorPopoverOpen(false);
+                                                            }}
+                                                            className="relative flex-shrink-0 transition-transform hover:scale-110 active:scale-95"
+                                                            style={{ width: 26, height: 26 }}
+                                                        >
+                                                            <span
+                                                                className="block w-full h-full rounded-lg"
+                                                                style={{
+                                                                    backgroundColor: hex,
+                                                                    boxShadow: isActive
+                                                                        ? '0 0 0 2px #fff, 0 0 0 4px #3b82f6'
+                                                                        : hex === '#ffffff' ? 'inset 0 0 0 1px rgba(255,255,255,0.25)' : 'none',
+                                                                    border: hex === '#ffffff' ? '1px solid rgba(255,255,255,0.2)' : 'none',
+                                                                }}
+                                                            />
+                                                            {isActive && (
+                                                                <svg className="absolute inset-0 m-auto w-3.5 h-3.5 pointer-events-none" viewBox="0 0 14 14" fill="none">
+                                                                    <path d="M2.5 7L5.5 10L11.5 4" stroke={hex === '#ffffff' || hex === '#fbbf24' || hex === '#4ade80' ? '#111827' : '#ffffff'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                                </svg>
+                                                            )}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* ── Main toolbar ── */}
                                 <div className="flex items-center gap-0.5 bg-gray-900/90 backdrop-blur-sm p-1.5 rounded-xl shadow-xl text-white border border-white/10">
+
                                     {/* Link */}
                                     <div className="relative">
                                         <button
@@ -1676,50 +1769,31 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
 
                                     <div className="w-px h-5 bg-white/20 mx-0.5" />
 
-                                    {/* Font size presets */}
-                                    <div className="flex items-center gap-0.5">
-                                        {FONT_SIZES.map(size => (
-                                            <button
-                                                key={size}
-                                                onClick={() => onUpdateTextMarkup(selectedText.id, { fontSize: size })}
-                                                title={`${size}px`}
-                                                className={`h-8 px-1.5 rounded-lg text-xs font-medium transition-colors ${currentSize === size ? 'bg-blue-600 text-white' : 'hover:bg-white/10 text-gray-300'}`}
-                                            >
-                                                {size}
-                                            </button>
-                                        ))}
-                                    </div>
-
-                                    <div className="w-px h-5 bg-white/20 mx-0.5" />
-
-                                    {/* Color swatch button */}
+                                    {/* Font size dropdown */}
                                     <div className="relative">
                                         <button
-                                            title="Text color"
-                                            onClick={(e) => { e.stopPropagation(); setTextColorPopoverOpen(o => !o); }}
-                                            className="w-8 h-8 rounded-lg hover:bg-white/10 transition-colors flex items-center justify-center"
+                                            title="Font size"
+                                            onClick={() => { setTextSizeDropdownOpen(o => !o); setTextColorPopoverOpen(false); }}
+                                            className={`flex items-center gap-1 h-8 px-2 rounded-lg text-sm font-medium transition-colors ${isSizeActive ? 'bg-blue-600 text-white' : 'hover:bg-white/10 text-gray-200'}`}
                                         >
-                                            <span className="text-xs font-bold underline" style={{ color: currentColor === '#ffffff' ? '#d1d5db' : currentColor }}>A</span>
+                                            <span className="w-6 text-center tabular-nums">{currentSize}</span>
+                                            <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${isSizeActive ? 'rotate-180' : ''}`} />
                                         </button>
-                                        {textColorPopoverOpen && (
+                                        {isSizeActive && (
                                             <div
-                                                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 p-2 bg-gray-900/95 backdrop-blur-sm rounded-xl shadow-xl border border-white/10"
-                                                style={{ zIndex: 40 }}
-                                                onMouseDown={(e) => e.stopPropagation()}
+                                                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 bg-gray-900/95 backdrop-blur-sm rounded-xl shadow-xl border border-white/10 overflow-hidden"
+                                                style={{ zIndex: 45 }}
                                             >
-                                                <div className="grid grid-cols-3 gap-1.5">
-                                                    {TEXT_COLORS.map(({ hex, label }) => (
+                                                <div className="flex flex-col py-1 max-h-56 overflow-y-auto">
+                                                    {FONT_SIZES.map(size => (
                                                         <button
-                                                            key={hex}
-                                                            title={label}
-                                                            onClick={() => { onUpdateTextMarkup(selectedText.id, { color: hex }); setTextColorPopoverOpen(false); }}
-                                                            className="w-7 h-7 rounded-lg border-2 transition-all hover:scale-110"
-                                                            style={{
-                                                                backgroundColor: hex,
-                                                                borderColor: currentColor === hex ? '#3b82f6' : hex === '#ffffff' ? '#6b7280' : 'transparent',
-                                                                boxShadow: currentColor === hex ? '0 0 0 1px #3b82f6' : 'none',
-                                                            }}
-                                                        />
+                                                            key={size}
+                                                            onClick={() => { onUpdateTextMarkup(selectedText.id, { fontSize: size }); setTextSizeDropdownOpen(false); }}
+                                                            className={`flex items-center justify-between px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${currentSize === size ? 'bg-blue-600 text-white font-medium' : 'text-gray-200 hover:bg-white/10'}`}
+                                                        >
+                                                            <span>{size}</span>
+                                                            <span className="ml-4 text-xs opacity-50">px</span>
+                                                        </button>
                                                     ))}
                                                 </div>
                                             </div>
@@ -1728,11 +1802,33 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
 
                                     <div className="w-px h-5 bg-white/20 mx-0.5" />
 
+                                    {/* Color button — shows current color, toggles palette panel */}
+                                    <button
+                                        title="Text color"
+                                        onClick={() => { setTextColorPopoverOpen(o => !o); setTextSizeDropdownOpen(false); }}
+                                        className={`w-8 h-8 rounded-lg transition-colors flex items-center justify-center gap-1 flex-col ${isColorActive ? 'bg-white/15 ring-2 ring-blue-500 ring-offset-1 ring-offset-gray-900' : 'hover:bg-white/10'}`}
+                                    >
+                                        {/* "A" glyph in current color */}
+                                        <span
+                                            className="text-xs font-bold leading-none"
+                                            style={{ color: currentColor === '#ffffff' ? '#d1d5db' : currentColor }}
+                                        >
+                                            A
+                                        </span>
+                                        {/* Color underbar */}
+                                        <span
+                                            className="block h-0.5 w-4 rounded-full"
+                                            style={{ backgroundColor: currentColor === '#ffffff' ? '#d1d5db' : currentColor }}
+                                        />
+                                    </button>
+
+                                    <div className="w-px h-5 bg-white/20 mx-0.5" />
+
                                     {/* Edit (enter edit mode) */}
                                     {!editingTextId && (
                                         <button
                                             title="Edit text"
-                                            onClick={(e) => { e.stopPropagation(); editingTextContent.current = selectedText.text; setEditingTextId(selectedText.id); }}
+                                            onClick={(e) => { e.stopPropagation(); editingTextContent.current = selectedText.text; editingTextCache.current = selectedText; setEditingTextId(selectedText.id); }}
                                             className="p-2 rounded-lg hover:bg-white/10 transition-colors"
                                         >
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.75} stroke="currentColor" className="w-4 h-4">

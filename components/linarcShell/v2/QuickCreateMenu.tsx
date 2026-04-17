@@ -102,7 +102,7 @@ export const QuickCreateMenu: React.FC = () => {
                         <Plus size={16} />
                     </div>
                 </div>
-                <span>Create</span>
+                <span className="text-center text-[10px] leading-tight px-0.5">Quick Create</span>
             </button>
 
             {createPortal(

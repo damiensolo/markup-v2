@@ -663,7 +663,15 @@ const Header: React.FC<HeaderProps> = ({ onSelectionChange, version = 'v1', onBo
                         aria-label={`${activeCategory.title} menu`}
                     >
                         <div className="relative flex items-center justify-center">
-                            {activeCategory.mainIcon}
+                            <div
+                                className={
+                                    activeCategoryKey === 'documentation'
+                                        ? 'flex items-center justify-center -translate-x-2'
+                                        : 'flex items-center justify-center'
+                                }
+                            >
+                                {activeCategory.mainIcon}
+                            </div>
                             <motion.div
                                 animate={{ rotate: isMenuVisible ? 180 : 0 }}
                                 transition={{ duration: 0.2 }}
@@ -673,7 +681,13 @@ const Header: React.FC<HeaderProps> = ({ onSelectionChange, version = 'v1', onBo
                                 <ChevronDownIcon className="w-4 h-4 text-gray-400 group-hover:text-white transition-colors" style={{ marginLeft: '0px', marginRight: '0px' }} />
                             </motion.div>
                         </div>
-                        <span className="text-[12px] font-bold text-white whitespace-nowrap">{categoryAbbreviations[activeCategoryKey]}</span>
+                        <span
+                            className={`text-[12px] font-bold text-white whitespace-nowrap ${
+                                activeCategoryKey === 'documentation' ? 'inline-block -translate-x-2' : ''
+                            }`}
+                        >
+                            {categoryAbbreviations[activeCategoryKey]}
+                        </span>
                         <div className="absolute top-full h-1 w-full" aria-hidden />
                         <AnimatePresence>
                             {isMenuVisible && 

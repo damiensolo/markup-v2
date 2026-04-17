@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-    LayoutDashboard, 
-    KanbanSquare, 
-    FileSpreadsheet, 
-    CheckCircle2, 
-    XCircle,
-    Bookmark
+import {
+    Map,
+    LayoutGrid,
+    Settings,
+    PencilRuler,
+    List,
+    Triangle,
+    Bookmark,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BookmarksMenu from './FavoritesMenu';
@@ -19,11 +20,38 @@ const IconWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     </div>
 );
 
-const DashboardIcon = () => <IconWrapper><LayoutDashboard size={24} strokeWidth={1.5} /></IconWrapper>;
-const BoardsIcon = () => <IconWrapper><KanbanSquare size={24} strokeWidth={1.5} /></IconWrapper>;
-const LogsIcon = () => <IconWrapper><FileSpreadsheet size={24} strokeWidth={1.5} /></IconWrapper>;
-const CompletedIcon = () => <IconWrapper><CheckCircle2 size={24} strokeWidth={1.5} /></IconWrapper>;
-const ClosedIcon = () => <IconWrapper><XCircle size={24} strokeWidth={1.5} /></IconWrapper>;
+const PlanSheetsIcon = () => (
+    <IconWrapper>
+        <Map size={24} strokeWidth={1.5} />
+    </IconWrapper>
+);
+
+const PlanSetsIcon = () => (
+    <IconWrapper>
+        <div className="relative flex h-8 w-6 items-center justify-center">
+            <LayoutGrid size={22} strokeWidth={1.5} />
+            <Settings className="absolute bottom-0 right-0 text-current" size={10} strokeWidth={2.2} aria-hidden />
+        </div>
+    </IconWrapper>
+);
+
+const MarkupsIcon = () => (
+    <IconWrapper>
+        <PencilRuler size={24} strokeWidth={1.5} />
+    </IconWrapper>
+);
+
+const SheetUsageIcon = () => (
+    <IconWrapper>
+        <List size={24} strokeWidth={1.5} />
+    </IconWrapper>
+);
+
+const TakeoffIcon = () => (
+    <IconWrapper>
+        <Triangle size={24} strokeWidth={1.5} />
+    </IconWrapper>
+);
 
 // Bookmarks Icon
 const BookmarksIcon = () => (
@@ -47,11 +75,11 @@ const LinarcLogo = () => (
 
 // --- Data for Sidebar ---
 const sidebarItems = [
-    { key: 'dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
-    { key: 'boards', label: 'Boards', icon: <BoardsIcon /> },
-    { key: 'logs', label: 'Logs', icon: <LogsIcon /> },
-    { key: 'completed', label: 'Completed', icon: <CompletedIcon /> },
-    { key: 'closed', label: 'Closed', icon: <ClosedIcon /> },
+    { key: 'planSheets', label: 'Plan Sheets', icon: <PlanSheetsIcon /> },
+    { key: 'planSets', label: 'Plan Sets', icon: <PlanSetsIcon /> },
+    { key: 'markups', label: 'Markups', icon: <MarkupsIcon /> },
+    { key: 'sheetUsage', label: 'Sheet Usage', icon: <SheetUsageIcon /> },
+    { key: 'takeoff', label: 'Takeoff', icon: <TakeoffIcon /> },
 ];
 
 interface SidebarItemProps {
@@ -67,11 +95,21 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ item, isActive, onClick }) =>
             e.preventDefault();
             onClick();
         }}
-        className={`relative flex flex-col items-center justify-center gap-1.5 h-[80px] w-full text-xs font-medium transition-colors duration-200 ${isActive ? 'text-gray-900' : 'text-gray-500 hover:text-gray-800'}`}
+        className={`relative flex flex-col items-center justify-center gap-1.5 h-[80px] w-full text-xs font-medium transition-colors duration-200 ${
+            isActive ? 'text-gray-900' : 'text-gray-500 hover:text-gray-800'
+        }`}
     >
-        {item.icon}
-        <span>{item.label}</span>
-        {isActive && <div className="absolute right-[-2px] top-1/2 -translate-y-1/2 h-[16px] w-[4px] bg-blue-600 rounded-l-md"></div>}
+        <div
+            className={`flex items-center justify-center rounded-md p-1.5 transition-colors ${
+                isActive ? 'bg-blue-600 text-white shadow-sm' : 'bg-transparent text-current'
+            }`}
+        >
+            {item.icon}
+        </div>
+        <span className="text-center text-[10px] leading-tight px-0.5">{item.label}</span>
+        {isActive && (
+            <div className="absolute right-[-2px] top-1/2 h-[16px] w-[4px] -translate-y-1/2 rounded-l-md bg-orange-500" />
+        )}
     </a>
 );
 
@@ -92,8 +130,8 @@ interface SidebarProps {
 }
 
 
-const Sidebar: React.FC<SidebarProps> = ({ version = 'v1', bookmarks = [], onSelect, onToggleBookmark }) => {
-    const [activeItemKey, setActiveItemKey] = useState('dashboard');
+const Sidebar: React.FC<SidebarProps> = ({ version: _version = 'v1', bookmarks = [], onSelect, onToggleBookmark }) => {
+    const [activeItemKey, setActiveItemKey] = useState('planSheets');
     const [isBookmarksMenuVisible, setBookmarksMenuVisible] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const bookmarksMenuRef = useRef<HTMLDivElement>(null);
@@ -138,51 +176,47 @@ const Sidebar: React.FC<SidebarProps> = ({ version = 'v1', bookmarks = [], onSel
             <div className="flex-grow flex flex-col gap-1 pt-3">
                 <QuickCreateMenu />
                 
-                {/* Bookmarks Button - Only for v2 */}
-                {version === 'v2' && (
-                    <div 
-                        ref={bookmarksMenuRef}
-                        className="relative w-full"
+                <div ref={bookmarksMenuRef} className="relative w-full">
+                    <button
+                        ref={bookmarksButtonRef}
+                        type="button"
+                        onClick={() => {
+                            setBookmarksMenuVisible(!isBookmarksMenuVisible);
+                        }}
+                        className={`relative flex h-[80px] w-full flex-col items-center justify-center gap-1.5 text-xs font-medium transition-colors duration-200 ${
+                            isBookmarksMenuVisible ? 'text-gray-900' : 'text-gray-500 hover:text-gray-800'
+                        }`}
+                        aria-label="Bookmarks menu"
+                        aria-expanded={isBookmarksMenuVisible}
                     >
-                        <button
-                            ref={bookmarksButtonRef}
-                            onClick={() => {
-                                setBookmarksMenuVisible(!isBookmarksMenuVisible);
-                            }}
-                            className={`relative flex flex-col items-center justify-center gap-1.5 h-[80px] w-full text-xs font-medium transition-colors duration-200 ${
-                                isBookmarksMenuVisible 
-                                    ? 'text-gray-900' 
-                                    : 'text-gray-500 hover:text-gray-800'
-                            }`}
-                            aria-label="Bookmarks menu"
-                            aria-expanded={isBookmarksMenuVisible}
-                        >
-                            <BookmarksIcon />
-                            <span>Bookmarks</span>
-                            {isBookmarksMenuVisible && (
-                                <div className="absolute right-[-2px] top-1/2 -translate-y-1/2 h-[16px] w-[4px] bg-blue-600 rounded-l-md"></div>
-                            )}
-                        </button>
-                        <AnimatePresence>
-                            {isBookmarksMenuVisible && bookmarks && onSelect && onToggleBookmark && (
-                                <BookmarksMenu 
-                                    bookmarks={bookmarks}
-                                    onSelect={handleSelect}
-                                    onToggleBookmark={onToggleBookmark}
-                                    position="right"
-                                    triggerRef={bookmarksButtonRef}
-                                />
-                            )}
-                        </AnimatePresence>
-                    </div>
-                )}
+                        <BookmarksIcon />
+                        <span className="text-center text-[10px] leading-tight">Bookmarks</span>
+                        {isBookmarksMenuVisible && (
+                            <div className="absolute right-[-2px] top-1/2 h-[16px] w-[4px] -translate-y-1/2 rounded-l-md bg-orange-500" />
+                        )}
+                    </button>
+                    <AnimatePresence>
+                        {isBookmarksMenuVisible && bookmarks && onSelect && onToggleBookmark && (
+                            <BookmarksMenu
+                                bookmarks={bookmarks}
+                                onSelect={handleSelect}
+                                onToggleBookmark={onToggleBookmark}
+                                position="right"
+                                triggerRef={bookmarksButtonRef}
+                            />
+                        )}
+                    </AnimatePresence>
+                </div>
                 
                 {sidebarItems.map((item) => (
                     <SidebarItem
                         key={item.key}
                         item={item}
                         isActive={activeItemKey === item.key}
-                        onClick={() => setActiveItemKey(item.key)}
+                        onClick={() => {
+                            setActiveItemKey(item.key);
+                            setBookmarksMenuVisible(false);
+                        }}
                     />
                 ))}
             </div>
