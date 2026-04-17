@@ -58,6 +58,7 @@ interface CanvasViewProps {
     imageContainerRef: React.RefObject<HTMLDivElement>;
     imageGeom: ImageGeom;
     onImageGeomChange: (geom: ImageGeom) => void;
+    setViewTransform: (t: ViewTransform) => void;
     handleMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
     handleMouseMove: (event: React.MouseEvent<HTMLDivElement>) => void;
     handleMouseUp: (event: React.MouseEvent<HTMLDivElement>) => void;
@@ -211,7 +212,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         imageSrc, rectangles, pins, lineMarkups, textMarkups, selectedTextId, setSelectedTextId, onCreateTextMarkup, onUpdateTextMarkup, onDeleteTextMarkup, filters, viewTransform, interaction, activeTool, hoveredRectId, hoveredLineId, draggingPinId,
         selectedRectIds, selectedPinId, selectedLineIds, selectedLineId, selectedLinePointIndex, currentRect, currentLineMarkup, marqueeRect, isMenuVisible, linkMenuRectId, setLinkMenuRectId, openLinkSubmenu,
         theme, toolbarPosition, setToolbarPosition, isSpacebarDown, imageContainerRef, imageGeom, onImageGeomChange,
-        handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handleZoom, handleThemeToggle, 
+        setViewTransform, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave, handleZoom, handleThemeToggle,
         setHoveredRectId, setActiveTool, activeLineTool, setActiveLineTool, activeShape, setActiveShape, activePinType, setActivePinType, activeColor,
         markupFillColor, markupStrokeColor, onMarkupColorChange, onMarkupActiveModeChange,
         setDraggingPinId, setSelectedPinId, setSelectedLineIds, setSelectedLineId, setSelectedLinePointIndex, handlePinDetails, handleDeletePin, setHoveredItem,
@@ -319,11 +320,19 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     /** Rubber-band preview from last freeline point to cursor while adding points (%, image space). */
     const [freelinePreviewEnd, setFreelinePreviewEnd] = useState<{ x: number; y: number } | null>(null);
 
+    // ── Local canvas pan state (select tool, empty-canvas drag) ───────────
+    /** True while the user is panning by dragging empty canvas with the select tool. */
+    const [isLocalPanning, setIsLocalPanning] = useState(false);
+    /** Stores the pointer and transform values recorded when the pan started. */
+    const panStartRef = useRef<{ clientX: number; clientY: number; tx: number; ty: number; scale: number } | null>(null);
+
     // ── Text markup interaction state ──────────────────────────────────────
     /** ID of text markup currently being inline-edited. */
     const [editingTextId, setEditingTextId] = useState<string | null>(null);
     /** Moving a text markup: tracks start mouse position and text's original x/y. */
     const [movingTextState, setMovingTextState] = useState<{ textId: string; startMouseX: number; startMouseY: number; startTextX: number; startTextY: number } | null>(null);
+    /** Drawing a new text area rectangle: tracks start and current drag position (percentages). */
+    const [textDrawState, setTextDrawState] = useState<{ startX: number; startY: number; currentX: number; currentY: number } | null>(null);
     /** Whether the text color palette row is open. */
     const [textColorPopoverOpen, setTextColorPopoverOpen] = useState(false);
     /** Whether the font-size dropdown is open. */
@@ -519,45 +528,48 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
 
     const getCursorClass = () => {
         if (compareAlignment?.isAligning) return 'cursor-grab';
-        if (interaction.type === 'panning' || draggingPinId) return 'cursor-grabbing';
-        if (isSpacebarDown) return 'cursor-grab';
-        switch (interaction.type) {
-            case 'moving': return 'cursor-grabbing';
-            case 'resizing':
-                if (interaction.handle === 'tl' || interaction.handle === 'br') return 'cursor-nwse-resize';
-                if (interaction.handle === 'tr' || interaction.handle === 'bl') return 'cursor-nesw-resize';
-                break;
-            case 'drawing':
-            case 'marquee':
-                return 'cursor-crosshair';
+
+        // Active interactions always take priority
+        if (isLocalPanning || interaction.type === 'panning' || draggingPinId) return 'cursor-grabbing';
+        if (movingTextState) return 'cursor-grabbing';
+        if (interaction.type === 'moving') return 'cursor-grabbing';
+        if (interaction.type === 'resizing') {
+            if (interaction.handle === 'tl' || interaction.handle === 'br') return 'cursor-nwse-resize';
+            if (interaction.handle === 'tr' || interaction.handle === 'bl') return 'cursor-nesw-resize';
         }
-        if (activeTool === 'pin') return 'cursor-crosshair';
-        if (activeTool === 'text') return movingTextState ? 'cursor-grabbing' : 'cursor-text';
-        if (activeTool === 'pen' || activeTool === 'highlighter') {
-            // Show move cursor when hovering over an existing freehand stroke so the
-            // user knows they can grab it instead of drawing a new one.
-            if (hoveredLineId && lineMarkups.some((l: LineMarkup) => l.id === hoveredLineId && (l.type === 'pen' || l.type === 'highlighter'))) {
-                return 'cursor-move';
-            }
-            return 'cursor-crosshair';
-        }
-        if (activeTool === 'line' || activeTool === 'arrow') {
-            return selectedLineId ? 'cursor-move' : 'cursor-crosshair';
-        }
-        if (activeTool === 'freeline') {
-            if (interaction.type === 'moving' || interaction.type === 'panning') return 'cursor-grabbing';
-            return 'cursor-crosshair';
-        }
+        if (interaction.type === 'drawing' || interaction.type === 'marquee' || textDrawState) return 'cursor-crosshair';
         if (draggingMeasId) return 'cursor-grabbing';
-        if (activeTool === 'measurement') return 'cursor-crosshair';
-        if (activeTool === 'shape') {
-            if (hoveredRectId) return 'cursor-move';
-            return 'cursor-crosshair';
-        }
+
+        // Spacebar pan mode — closed hand cursor (overrides idle tool cursors)
+        if (isSpacebarDown) return 'cursor-grabbing';
+
+        // Hover context: what is under the cursor right now?
+        // Rects and lines use pointer-events:none so the container handles their cursor.
+        // Text and pin elements set their own cursor via inline style (handled at element level).
+        const overRect = !!hoveredRectId;
+        const overLine = !!hoveredLineId;
+        const overMarkup = overRect || overLine;
+        const hoveredIsSelected =
+            (overRect && selectedRectIds.includes(hoveredRectId!)) ||
+            (overLine && selectedLineIds.includes(hoveredLineId!));
+
         if (activeTool === 'select') {
-            if (hoveredRectId) return 'cursor-move';
-            if (viewTransform.scale > 1) return 'cursor-grab';
+            if (overMarkup) return hoveredIsSelected ? 'cursor-move' : 'cursor-default';
+            // Empty canvas: open hand (inviting pan)
+            return 'cursor-grab';
         }
+
+        // All drawing tools: objects always take priority for selection → show arrow
+        if (overMarkup) return 'cursor-default';
+
+        // Empty-canvas cursor per drawing tool
+        if (activeTool === 'measurement') return 'cursor-crosshair';
+        if (activeTool === 'text') return 'cursor-crosshair';
+        if (activeTool === 'pin') return 'cursor-crosshair';
+        if (activeTool === 'pen' || activeTool === 'highlighter') return 'cursor-crosshair';
+        if (activeTool === 'line' || activeTool === 'arrow' || activeTool === 'freeline') return 'cursor-crosshair';
+        if (activeTool === 'shape') return 'cursor-crosshair';
+
         return 'cursor-default';
     };
 
@@ -574,6 +586,26 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
       return newRect;
     };
     
+    /**
+     * Returns true when the given canvas-percentage coords are over empty space —
+     * no visible rect, no line (from last-frame hoveredLineId).
+     * Text and pin divs stop propagation on mousedown, so if onCanvasMouseDown
+     * fires at all we already know we're not over one of those.
+     */
+    const isEmptyCanvas = (coords: { x: number; y: number }): boolean => {
+        // Rect hit test (they have pointer-events:none so we must check manually)
+        for (let i = rectangles.length - 1; i >= 0; i--) {
+            const r = rectangles[i];
+            if (!r.visible) continue;
+            const n = normalizeRect(r);
+            if (coords.x >= n.x && coords.x <= n.x + n.width &&
+                coords.y >= n.y && coords.y <= n.y + n.height) return false;
+        }
+        // Line hit — use last-frame hoveredLineId (accurate for the position the user just clicked)
+        if (hoveredLineId) return false;
+        return true;
+    };
+
     const getScreenPoint = useCallback((x: number, y: number): { left: number; top: number } | null => {
         if (!imageGeom.width) return null;
 
@@ -742,29 +774,50 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
             if ((e.target as HTMLElement).closest('[data-interactive-ui="true"]')) return;
             const coords = getRelativeCoords(e);
             if (!coords) return;
-            const newText: TextMarkup = {
-                id: `text-${Date.now()}`,
-                x: coords.x,
-                y: coords.y,
-                text: 'Text',
-                name: `Text ${textMarkups.length + 1}`,
-                visible: true,
-                fontSize: 16,
-                fontWeight: 'normal',
-                fontStyle: 'normal',
-                color: '#ef4444',
-            };
-            onCreateTextMarkup(newText);
-            setSelectedTextId(newText.id);
-            editingTextContent.current = 'Text';
-            editingTextCache.current = newText;
-            setEditingTextId(newText.id);
+            setTextDrawState({ startX: coords.x, startY: coords.y, currentX: coords.x, currentY: coords.y });
             return;
         }
+
+        // ── Empty-canvas pan (select tool, primary button, no spacebar, no shift) ──
+        // Must run before handleMouseDown so it owns the event and nothing else intercepts it.
+        // Spacebar panning is handled inside the hook (fires earlier via isSpacebarDown check).
+        // Shift+drag is reserved for marquee multi-select (handled by the hook).
+        if (activeTool === 'select' && e.button === 0 && !isSpacebarDown && !e.shiftKey) {
+            const coords = getRelativeCoords(e);
+            if (coords && isEmptyCanvas(coords)) {
+                panStartRef.current = {
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                    tx: viewTransform.translateX,
+                    ty: viewTransform.translateY,
+                    scale: viewTransform.scale,
+                };
+                setIsLocalPanning(true);
+                return; // don't propagate to handleMouseDown
+            }
+        }
+
         handleMouseDown(e);
     };
 
     const onCanvasMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        // ── Local empty-canvas pan — must be first, nothing else runs ──────────
+        if (isLocalPanning && panStartRef.current) {
+            const dx = e.clientX - panStartRef.current.clientX;
+            const dy = e.clientY - panStartRef.current.clientY;
+            setViewTransform({
+                scale: panStartRef.current.scale,
+                translateX: panStartRef.current.tx + dx,
+                translateY: panStartRef.current.ty + dy,
+            });
+            return;
+        }
+        // Text area rectangle draw preview
+        if (textDrawState) {
+            const coords = getRelativeCoords(e);
+            if (coords) setTextDrawState(s => s ? { ...s, currentX: coords.x, currentY: coords.y } : s);
+            return;
+        }
         // Text markup drag
         if (movingTextState) {
             const coords = getRelativeCoords(e);
@@ -818,10 +871,68 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
         } else {
             setFreelinePreviewEnd(null);
         }
+
+        // Live rect hover detection — drives cursor feedback for all tools.
+        // Only run when no interaction is in progress (dragging, panning, etc.) so
+        // we don't waste work or interfere with active gestures.
+        if (!isLocalPanning && interaction.type === 'none' && !textDrawState && !movingTextState && !draggingMeasId) {
+            const coords = getRelativeCoords(e);
+            if (coords) {
+                let hitId: string | null = null;
+                for (let i = rectangles.length - 1; i >= 0; i--) {
+                    const r = rectangles[i];
+                    if (!r.visible) continue;
+                    const n = normalizeRect(r);
+                    if (coords.x >= n.x && coords.x <= n.x + n.width &&
+                        coords.y >= n.y && coords.y <= n.y + n.height) {
+                        hitId = r.id;
+                        break;
+                    }
+                }
+                setHoveredRectId(hitId);
+            }
+        }
+
         handleMouseMove(e);
     };
 
     const onCanvasMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+        // ── Local empty-canvas pan end ─────────────────────────────────────────
+        if (isLocalPanning) {
+            panStartRef.current = null;
+            setIsLocalPanning(false);
+            return;
+        }
+        // Text area rectangle draw end
+        if (textDrawState) {
+            const { startX, startY, currentX, currentY } = textDrawState;
+            setTextDrawState(null);
+            const dx = Math.abs(currentX - startX);
+            const dy = Math.abs(currentY - startY);
+            const isDrag = dx > 0.5 || dy > 0.5;
+            const x = Math.min(startX, currentX);
+            const y = Math.min(startY, currentY);
+            const width = isDrag ? dx : undefined;
+            const newText: TextMarkup = {
+                id: `text-${Date.now()}`,
+                x,
+                y,
+                text: 'Text',
+                name: `Text ${textMarkups.length + 1}`,
+                visible: true,
+                fontSize: 16,
+                fontWeight: 'normal',
+                fontStyle: 'normal',
+                color: '#ef4444',
+                width,
+            };
+            onCreateTextMarkup(newText);
+            setSelectedTextId(newText.id);
+            editingTextContent.current = 'Text';
+            editingTextCache.current = newText;
+            setEditingTextId(newText.id);
+            return;
+        }
         // Text markup drag end
         if (movingTextState) {
             setMovingTextState(null);
@@ -862,6 +973,13 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     };
 
     const onCanvasMouseLeave = () => {
+        if (isLocalPanning) {
+            panStartRef.current = null;
+            setIsLocalPanning(false);
+        }
+        if (textDrawState) {
+            setTextDrawState(null);
+        }
         if (movingTextState) {
             setMovingTextState(null);
         }
@@ -878,6 +996,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
             setMeasCurrent(null);
         }
         setFreelinePreviewEnd(null);
+        setHoveredRectId(null);
         handleMouseLeave();
     };
 
@@ -899,6 +1018,14 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
     })() : null;
     let multiSelectionScreenRect = lastSelectedRectangle ? getScreenRect(lastSelectedRectangle) : null;
     let marqueeScreenRect = marqueeRect ? getScreenRect(normalizeRect(marqueeRect)) : null;
+    const textDrawScreenRect = textDrawState ? (() => {
+        const x = Math.min(textDrawState.startX, textDrawState.currentX);
+        const y = Math.min(textDrawState.startY, textDrawState.currentY);
+        const w = Math.abs(textDrawState.currentX - textDrawState.startX);
+        const h = Math.abs(textDrawState.currentY - textDrawState.startY);
+        if (w < 0.1 && h < 0.1) return null;
+        return getScreenRect({ x, y, width: w, height: h, shape: 'box' } as any);
+    })() : null;
 
     const getToolbarPositionClasses = () => {
         switch (toolbarPosition) {
@@ -1288,6 +1415,10 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         const fixedLeft = containerRect.left + screenPos.left;
                         const fixedTop = containerRect.top + screenPos.top;
                         const editFontSize = (editingText.fontSize ?? 16) * viewTransform.scale;
+                        const hasFixedWidth = editingText.width != null && editingText.width > 0;
+                        const fixedWidthPx = hasFixedWidth
+                            ? (editingText.width! / 100) * imageGeom.width * viewTransform.scale
+                            : null;
                         return (
                             <textarea
                                 key={editingTextId}
@@ -1298,8 +1429,10 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     editingTextContent.current = e.target.value;
                                     e.target.style.height = 'auto';
                                     e.target.style.height = `${e.target.scrollHeight}px`;
-                                    e.target.style.width = 'auto';
-                                    e.target.style.width = `${Math.max(120, e.target.scrollWidth)}px`;
+                                    if (!hasFixedWidth) {
+                                        e.target.style.width = 'auto';
+                                        e.target.style.width = `${Math.max(120, e.target.scrollWidth)}px`;
+                                    }
                                 }}
                                 onKeyDown={(e) => {
                                     e.stopPropagation();
@@ -1311,7 +1444,9 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     position: 'fixed',
                                     left: fixedLeft,
                                     top: fixedTop,
-                                    minWidth: '120px',
+                                    minWidth: hasFixedWidth ? undefined : '120px',
+                                    width: fixedWidthPx != null ? `${fixedWidthPx}px` : undefined,
+                                    maxWidth: fixedWidthPx != null ? `${fixedWidthPx}px` : undefined,
                                     fontSize: `${editFontSize}px`,
                                     fontWeight: editingText.fontWeight ?? 'normal',
                                     fontStyle: editingText.fontStyle ?? 'normal',
@@ -1331,7 +1466,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     caretColor: '#3b82f6',
                                     boxShadow: '0 0 0 3px rgba(59,130,246,0.25), 0 4px 12px rgba(0,0,0,0.2)',
                                     minHeight: `${editFontSize * 1.4 + 8}px`,
-                                    whiteSpace: 'pre',
+                                    whiteSpace: hasFixedWidth ? 'pre-wrap' : 'pre',
+                                    wordBreak: hasFixedWidth ? 'break-word' : undefined,
                                 }}
                             />
                         );
@@ -1354,6 +1490,9 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         const fontSize = (text.fontSize ?? 14) * s;
                         const textColor = text.color ?? '#111827';
                         const content = text.text || (isEditing ? '' : 'Text');
+                        const textBoxWidth = text.width != null && text.width > 0
+                            ? (text.width / 100) * imageGeom.width * s
+                            : null;
 
                         return (
                             <div
@@ -1363,9 +1502,10 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     position: 'absolute',
                                     left: screenPos.left,
                                     top: screenPos.top,
+                                    width: textBoxWidth != null ? `${textBoxWidth}px` : undefined,
                                     zIndex: isEditing ? 28 : (isSelected ? 25 : 16),
                                     pointerEvents: 'auto',
-                                    cursor: isEditing ? 'text' : (isSelected ? 'move' : (activeTool === 'text' ? 'move' : 'pointer')),
+                                    cursor: isEditing ? 'text' : (isSelected ? 'move' : 'default'),
                                     userSelect: isEditing ? 'text' : 'none',
                                     // Hint to the compositor to keep this layer crisp
                                     willChange: 'transform',
@@ -1418,6 +1558,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                         display: 'inline-block',
                                         whiteSpace: 'pre-wrap',
                                         wordBreak: 'break-word',
+                                        width: textBoxWidth != null ? '100%' : undefined,
                                         fontSize: `${fontSize}px`,
                                         fontWeight: text.fontWeight ?? 'normal',
                                         fontStyle: text.fontStyle ?? 'normal',
@@ -1453,8 +1594,11 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                       // Allow selecting/dragging pin even in 'shape' mode to avoid confusion
                       const isSelectable = activeTool === 'select' || activeTool === 'shape';
                       
-                      const pinCursor = isSelectable ? (draggingPinId === pin.id ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-pointer';
                       const isSelected = selectedPinId === pin.id;
+                      // Selected + dragging → closed hand; selected + idle → move cursor; unselected → arrow
+                      const pinCursor = draggingPinId === pin.id
+                          ? 'cursor-grabbing'
+                          : (isSelectable && isSelected ? 'cursor-move' : 'cursor-default');
                       return (
                           <div
                               key={pin.id}
@@ -1917,6 +2061,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     })()}
 
                     {marqueeScreenRect && (<div className="absolute border-2 border-dashed border-blue-400 bg-blue-400/15 pointer-events-none" style={marqueeScreenRect} />)}
+
+                    {textDrawScreenRect && (<div className="absolute border-2 border-dashed border-blue-500 bg-blue-500/10 pointer-events-none" style={textDrawScreenRect} />)}
 
                     {/* Measurement lines overlay */}
                     {(measurements.length > 0 || (measStart && measCurrent) || calibLine) && (

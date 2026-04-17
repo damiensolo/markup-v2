@@ -299,6 +299,8 @@ export interface TextMarkup {
   name: string;
   visible: boolean;
   locked?: boolean;
+  /** Width of the text box as a percentage of image width. If set, text wraps within this width. */
+  width?: number;
   /** Visual font size in screen pixels at scale=1. Default: 14. */
   fontSize?: number;
   fontWeight?: 'normal' | 'bold';

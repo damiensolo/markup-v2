@@ -430,13 +430,14 @@ export const useCanvasInteraction = ({
              }
         }
       } else {
-        if (viewTransform.scale > 1) {
-            setInteraction({ type: 'panning', startPoint: { x: event.clientX, y: event.clientY }, initialTransform: viewTransform });
-        } else {
+        // Empty canvas: shift+drag for marquee multi-select; plain drag always pans
+        if (event.shiftKey) {
             setSelectedRectIds([]);
             setSelectedLineIds([]);
             setInteraction({ type: 'marquee', startPoint: coords });
             setMarqueeRect({ x: coords.x, y: coords.y, width: 0, height: 0, shape: 'box' });
+        } else {
+            setInteraction({ type: 'panning', startPoint: { x: event.clientX, y: event.clientY }, initialTransform: viewTransform });
         }
       }
     } else if (activeTool === 'shape') {

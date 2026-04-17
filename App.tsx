@@ -2137,6 +2137,7 @@ const App: React.FC = () => {
                     onDeleteTextMarkup={handleDeleteTextMarkup}
                     filters={filters}
                     viewTransform={viewTransform}
+                    setViewTransform={setViewTransform}
                     interaction={interaction}
                     activeTool={activeTool}
                     hoveredRectId={hoveredRectId}
