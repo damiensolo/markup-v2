@@ -132,3 +132,10 @@ export const PanelLeftIcon: React.FC<IconProps> = ({ className }) => <PanelLeft 
 export const PanelRightIcon: React.FC<IconProps> = ({ className }) => <PanelRight className={className} />;
 export const LockClosedIcon: React.FC<IconProps> = ({ className }) => <Lock className={className} />;
 export const LockOpenIcon: React.FC<IconProps> = ({ className }) => <Unlock className={className} />;
+
+/** Diagonal straight-line icon — matches the line tool in Toolbar.tsx */
+export const LineIcon: React.FC<IconProps> = ({ className }) => (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+        <path d="M4 20L20 4" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+);

@@ -2357,6 +2357,10 @@ const App: React.FC = () => {
         photoData={currentPhotoForViewer || null}
         onClose={() => setIsPhotoViewerOpen(false)}
         onUpdateMarkups={handleUpdatePhotoMarkups}
+        allRfis={allRfis}
+        submittals={mockSubmittals}
+        allPunches={allPunches}
+        allDrawings={allDrawings}
       />
 
       <ShareModal

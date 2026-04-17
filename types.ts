@@ -80,12 +80,18 @@ export interface ShapePhotoMarkup {
     y: number;
     width: number;
     height: number;
+    color?: string;
+    rfi?: RfiData[];
+    submittals?: SubmittalData[];
+    punches?: PunchData[];
+    drawings?: DrawingData[];
 }
 
 export interface PenPhotoMarkup {
-    id:string;
+    id: string;
     type: 'pen';
     points: { x: number; y: number }[];
+    color?: string;
 }
 
 export interface ArrowPhotoMarkup {
@@ -93,6 +99,7 @@ export interface ArrowPhotoMarkup {
     type: 'arrow';
     start: { x: number; y: number };
     end: { x: number; y: number };
+    color?: string;
 }
 
 export interface TextPhotoMarkup {
@@ -101,9 +108,31 @@ export interface TextPhotoMarkup {
     x: number;
     y: number;
     text: string;
+    color?: string;
 }
 
-export type PhotoMarkup = ShapePhotoMarkup | PenPhotoMarkup | ArrowPhotoMarkup | TextPhotoMarkup;
+/** Straight line (no arrowhead). Supports linked records. */
+export interface LinePhotoMarkup {
+    id: string;
+    type: 'line';
+    start: { x: number; y: number };
+    end: { x: number; y: number };
+    color?: string;
+    rfi?: RfiData[];
+    submittals?: SubmittalData[];
+    punches?: PunchData[];
+    drawings?: DrawingData[];
+}
+
+/** Thick semi-transparent highlight stroke. */
+export interface HighlighterPhotoMarkup {
+    id: string;
+    type: 'highlighter';
+    points: { x: number; y: number }[];
+    color?: string;
+}
+
+export type PhotoMarkup = ShapePhotoMarkup | PenPhotoMarkup | ArrowPhotoMarkup | TextPhotoMarkup | LinePhotoMarkup | HighlighterPhotoMarkup;
 
 
 /**
