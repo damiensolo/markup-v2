@@ -2,7 +2,7 @@
 
 // Fix: Import 'useCallback' from 'react' to resolve 'Cannot find name' errors.
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Palette, ChevronUp, ChevronDown } from 'lucide-react';
+import { Palette, ChevronUp, ChevronDown, Minus, Plus } from 'lucide-react';
 import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle, Measurement, LineMarkup, LineToolType, TextMarkup } from '../types';
 import ScaleDialog from './ScaleDialog';
 import { RectangleTagType, ToolbarPosition, ImageGeom } from '../App';
@@ -1810,6 +1810,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                         return (
                             <div
                                 data-interactive-ui="true"
+                                onWheel={(e) => e.nativeEvent.stopImmediatePropagation()}
                                 className={`absolute transition-opacity transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isMenuVisible ? 'opacity-100' : 'opacity-0'}`}
                                 style={{
                                     left: screenPos.left,
@@ -1920,35 +1921,58 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
 
                                     <div className="w-px h-5 bg-white/20 mx-0.5" />
 
-                                    {/* Font size dropdown */}
-                                    <div className="relative">
+                                    {/* Font size stepper + dropdown */}
+                                    <div className="relative flex items-center bg-white/5 rounded-lg border border-white/10">
                                         <button
-                                            title="Font size"
-                                            onClick={() => { setTextSizeDropdownOpen(o => !o); setTextColorPopoverOpen(false); }}
-                                            className={`flex items-center gap-1 h-8 px-2 rounded-lg text-sm font-medium transition-colors ${isSizeActive ? 'bg-blue-600 text-white' : 'hover:bg-white/10 text-gray-200'}`}
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); onUpdateTextMarkup(selectedText.id, { fontSize: Math.max(1, currentSize - 1) }); }}
+                                            title="Decrease font size"
+                                            className="h-8 w-7 flex items-center justify-center hover:bg-white/10 transition-colors border-r border-white/10 rounded-l-lg text-gray-400 hover:text-white"
                                         >
-                                            <span className="w-6 text-center tabular-nums">{currentSize}</span>
-                                            <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${isSizeActive ? 'rotate-180' : ''}`} />
+                                            <Minus className="w-3 h-3" />
                                         </button>
-                                        {isSizeActive && (
-                                            <div
-                                                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 bg-gray-900/95 backdrop-blur-sm rounded-xl shadow-xl border border-white/10 overflow-hidden"
-                                                style={{ zIndex: 45 }}
+                                        
+                                        <div className="relative">
+                                            <button
+                                                title="Select font size"
+                                                onClick={(e) => { e.stopPropagation(); setTextSizeDropdownOpen(o => !o); setTextColorPopoverOpen(false); }}
+                                                className={`flex items-center justify-center gap-1 h-8 px-2 min-w-[3.25rem] text-sm font-medium transition-colors ${isSizeActive ? 'bg-blue-600 text-white' : 'hover:bg-white/10 text-gray-200'}`}
                                             >
-                                                <div className="flex flex-col py-1 max-h-56 overflow-y-auto">
-                                                    {FONT_SIZES.map(size => (
-                                                        <button
-                                                            key={size}
-                                                            onClick={() => { onUpdateTextMarkup(selectedText.id, { fontSize: size }); setTextSizeDropdownOpen(false); }}
-                                                            className={`flex items-center justify-between px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${currentSize === size ? 'bg-blue-600 text-white font-medium' : 'text-gray-200 hover:bg-white/10'}`}
-                                                        >
-                                                            <span>{size}</span>
-                                                            <span className="ml-4 text-xs opacity-50">px</span>
-                                                        </button>
-                                                    ))}
+                                                <span className="tabular-nums">{currentSize}</span>
+                                                <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform ${isSizeActive ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            
+                                            {isSizeActive && (
+                                                <div
+                                                    data-interactive-ui="true"
+                                                    onWheel={(e) => { e.stopPropagation(); e.nativeEvent.stopImmediatePropagation(); }}
+                                                    className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-900/95 backdrop-blur-md rounded-xl shadow-2xl border border-white/10 overflow-hidden ring-1 ring-black/50"
+                                                    style={{ zIndex: 45 }}
+                                                >
+                                                    <div className="flex flex-col py-1 max-h-64 overflow-y-auto overflow-x-hidden w-24">
+                                                        {FONT_SIZES.map(size => (
+                                                            <button
+                                                                key={size}
+                                                                onClick={(e) => { e.stopPropagation(); onUpdateTextMarkup(selectedText.id, { fontSize: size }); setTextSizeDropdownOpen(false); }}
+                                                                className={`flex items-center justify-between px-3 py-1.5 text-sm whitespace-nowrap transition-colors ${currentSize === size ? 'bg-blue-600 text-white font-medium' : 'text-gray-200 hover:bg-white/10'}`}
+                                                            >
+                                                                <span>{size}</span>
+                                                                <span className="ml-2 text-[10px] opacity-40">px</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); onUpdateTextMarkup(selectedText.id, { fontSize: Math.min(200, currentSize + 1) }); }}
+                                            title="Increase font size"
+                                            className="h-8 w-7 flex items-center justify-center hover:bg-white/10 transition-colors border-l border-white/10 rounded-r-lg text-gray-400 hover:text-white"
+                                        >
+                                            <Plus className="w-3 h-3" />
+                                        </button>
                                     </div>
 
                                     <div className="w-px h-5 bg-white/20 mx-0.5" />

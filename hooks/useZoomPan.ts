@@ -79,6 +79,20 @@ export const useZoomPan = (
     if (!el) return;
 
     const onWheel = (e: WheelEvent) => {
+      // Don't zoom if scrolling over interactive UI (toolbar, dropdowns, etc.)
+      const path = e.composedPath();
+      for (const node of path) {
+          if (node instanceof HTMLElement && (
+              node.hasAttribute('data-interactive-ui') ||
+              node.tagName === 'BUTTON' ||
+              node.tagName === 'INPUT' ||
+              node.tagName === 'TEXTAREA' ||
+              node.tagName === 'SELECT'
+          )) {
+              return;
+          }
+      }
+
       e.preventDefault();
       e.stopPropagation();
 
