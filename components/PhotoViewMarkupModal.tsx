@@ -1166,7 +1166,7 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                                     <button
                                         type="button"
                                         onClick={e => { e.stopPropagation(); setLinkMenuRectId(null); setColorPanelOpen(o => { const n = !o; if (n) setColorPanelSource('selection'); return n; }); }}
-                                        title="Fill & stroke"
+                                        title="Markup Color"
                                         className={`p-2 rounded-md transition-colors ${colorPanelOpen && colorPanelSource === 'selection' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
                                     >
                                         <Palette className="w-5 h-5" />
@@ -1220,7 +1220,7 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                                     <button
                                         type="button"
                                         onClick={e => { e.stopPropagation(); setLinkMenuRectId(null); setColorPanelOpen(o => { const n = !o; if (n) setColorPanelSource('selection'); return n; }); }}
-                                        title="Fill & stroke"
+                                        title="Markup Color"
                                         className={`p-2 rounded-md transition-colors ${colorPanelOpen && colorPanelSource === 'selection' ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
                                     >
                                         <Palette className="w-5 h-5" />
@@ -1281,7 +1281,7 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                                                 setLinkMenuRectId(null);
                                                 setColorPanelOpen(o => { const n = !o; if (n) setColorPanelSource('selection'); return n; });
                                             }}
-                                            title="Fill & stroke"
+                                            title="Markup Color"
                                             className={`p-2 rounded-lg transition-colors ${colorPanelOpen && colorPanelSource === 'selection' ? 'bg-blue-600 text-white' : 'hover:bg-white/10'}`}
                                         >
                                             <Palette className="w-4 h-4" />
@@ -1330,7 +1330,15 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                                     strokeValue={markupStrokeColor}
                                     onChange={handleColorChange}
                                     onRequestClose={() => setColorPanelOpen(false)}
-                                    strokeOnly={activeTool === 'line' || activeTool === 'arrow' || activeTool === 'pen' || activeTool === 'highlighter' || selectionIsTextOnly}
+                                    strokeOnly={
+                                        activeTool === 'line' || 
+                                        activeTool === 'arrow' || 
+                                        activeTool === 'pen' || 
+                                        activeTool === 'highlighter' || 
+                                        activeTool === 'freeline' ||
+                                        selectionIsTextOnly ||
+                                        (selectedLineIds.length > 0 && selectedRectIds.length === 0)
+                                    }
                                 />
                             </div>
                         );

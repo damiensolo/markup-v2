@@ -4,7 +4,7 @@ import { MENUS_MODE } from './utils/showcaseMode';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { Rectangle, RfiData, RfiFormState, SubmittalData, PunchData, DrawingData, PhotoData, Pin, SafetyIssueData, LinkModalConfig, HoveredItemInfo, ViewTransform, InteractionState, DrawingVersion, MarkupSet, Measurement, LineMarkup, LineToolType, TextMarkup } from './types';
 import LinkModal from './components/LinkModal';
-import PhotoPickerModal from './components/PhotoPickerModal';
+import PhotoPickerModal, { MOCK_PHOTOS } from './components/PhotoPickerModal';
 import PhotoViewMarkupModal from './components/PhotoViewMarkupModal';
 import type { PhotoMarkupData } from './components/PhotoViewMarkupModal';
 import ShareModal from './components/ShareModal';
@@ -27,7 +27,7 @@ import {
 } from './utils/markupColors';
 import LayersPanel, { type CompareDrawingsInfo } from './components/LayersPanel';
 import { LinarcAppShell } from './components/linarcShell/LinarcAppShell';
-import { FilterIcon, ChevronLeftIcon, ShareIcon, SnapshotIcon, DocumentDuplicateIcon, FolderOpenIcon, SquarePenIcon, PanelLeftIcon, PanelRightIcon } from './components/Icons';
+import { FilterIcon, ChevronLeftIcon, ShareIcon, SnapshotIcon, DocumentDuplicateIcon, FolderOpenIcon, SquarePenIcon, PanelLeftIcon, PanelRightIcon, PhotoPinIcon, SafetyPinIcon, PunchPinIcon } from './components/Icons';
 
 type FilterCategory = 'rfi' | 'submittal' | 'punch' | 'drawing' | 'photo' | 'safety';
 export type RectangleTagType = Exclude<FilterCategory, 'safety'>;
@@ -1100,6 +1100,10 @@ const App: React.FC = () => {
     getRelativeCoords,
     handleSubmenuLink,
     setPinTargetCoords,
+    handleLinkPhoto: (targetId: string) => {
+      setPhotoPickerTargetId(targetId);
+      setIsPhotoPickerOpen(true);
+    },
     setSafetyTargetPinId, setSafetyFormData,
     setPunchTargetPinId, setPunchFormData, setPunchPanelMode,
     setActivePanel,
@@ -1448,6 +1452,26 @@ const App: React.FC = () => {
     if (!photoPickerTargetId) return;
     const targetId = photoPickerTargetId;
 
+    if (targetId === 'pin-target' && pinTargetCoords) {
+        const newPinName = `Photo ${pins.filter(p => p.type === 'photo').length + 1}`;
+        const newPin: Pin = {
+            id: `pin-${Date.now()}`,
+            type: 'photo',
+            x: pinTargetCoords.x,
+            y: pinTargetCoords.y,
+            linkedId: photo.id,
+            name: newPinName,
+            visible: true
+        };
+        setPins(prev => [...prev, newPin]);
+        setPinTargetCoords(null);
+        setActiveTool('select');
+        setHasUnsavedChanges(true);
+        setIsPhotoPickerOpen(false);
+        setPhotoPickerTargetId(null);
+        return;
+    }
+
     const getExistingPhotos = (): PhotoData[] => {
       const txt = textMarkups.find(t => t.id === targetId);
       if (txt) return txt.photos ?? [];
@@ -1602,6 +1626,12 @@ const App: React.FC = () => {
               setPunchTargetPinId(pin.id);
               setPunchPanelMode('create');
               setActivePanel('punch');
+          }
+      } else if (pin.type === 'photo') {
+          const photo = MOCK_PHOTOS.find(p => p.id === pin.linkedId);
+          if (photo) {
+              setPhotoMarkupTarget(photo);
+              setIsPhotoMarkupOpen(true);
           }
       }
   };
@@ -2284,7 +2314,12 @@ const App: React.FC = () => {
       
       <PhotoPickerModal
         isOpen={isPhotoPickerOpen}
-        onClose={() => { setIsPhotoPickerOpen(false); setPhotoPickerTargetId(null); }}
+        onClose={() => { 
+            setIsPhotoPickerOpen(false); 
+            setPhotoPickerTargetId(null); 
+            if (pinTargetCoords || activeTool === 'pin') setActiveTool('select');
+            setPinTargetCoords(null);
+        }}
         onPhotoLinked={handlePhotoLinked}
       />
 

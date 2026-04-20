@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { MENUS_MODE } from '../utils/showcaseMode';
 import {
   MousePointerIcon, PenIcon, BoxIcon, ArrowIcon, TextIcon,
-  CloudIcon, EllipseIcon, SafetyPinIcon, PunchPinIcon,
+  CloudIcon, EllipseIcon, SafetyPinIcon, PunchPinIcon, PhotoPinIcon,
   ImageIcon, LocationIcon, MeasurementIcon, HighlighterIcon,
   CustomPinIcon,
 } from './Icons';
@@ -14,7 +14,7 @@ import Tooltip from './Tooltip';
 type ActiveTool = 'select' | 'shape' | 'pen' | 'line' | 'arrow' | 'freeline' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveLineTool = 'line' | 'arrow' | 'freeline';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
-type ActivePinType = 'safety' | 'punch';
+type ActivePinType = 'safety' | 'punch' | 'photo';
 
 interface ToolbarProps {
   activeTool: ActiveTool;
@@ -186,6 +186,7 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
   const pinTools: { id: ActivePinType; label: string; icon: React.ReactNode }[] = [
     { id: 'safety', label: 'Safety', icon: <SafetyPinIcon className="w-6 h-6" /> },
     { id: 'punch', label: 'Punch', icon: <PunchPinIcon className="w-6 h-6" /> },
+    { id: 'photo', label: 'Photo', icon: <PhotoPinIcon className="w-6 h-6" /> },
   ];
 
   const currentShapeTool = shapeTools.find(s => s.id === activeShape) || shapeTools[1];
@@ -394,7 +395,7 @@ const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(function Toolbar(
 
         {/* Fill / stroke — opens docked panel on canvas (ref for anchoring picker above this control) */}
         <div ref={ref} className="relative" data-markup-color-trigger>
-            <Tooltip text="Fill & stroke" position={tooltipPos}>
+            <Tooltip text="Markup Color" position={tooltipPos}>
                 <button
                     type="button"
                     onClick={handleColorButtonClick}

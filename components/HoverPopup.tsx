@@ -1,5 +1,6 @@
 import React from 'react';
 import type { HoveredItemInfo, Rectangle, SafetyIssueData, PunchData, DrawingData, Pin, PhotoData } from '../types';
+import { MOCK_PHOTOS } from './PhotoPickerModal';
 
 interface HoverPopupProps {
     hoveredItem: HoveredItemInfo | null;
@@ -47,6 +48,25 @@ const HoverPopup: React.FC<HoverPopupProps> = ({
                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-1"><span className="font-semibold text-gray-500 dark:text-gray-400">Assignee:</span> {punch.assignee}</p>
                             <p className="text-sm text-gray-600 dark:text-gray-300 mb-3"><span className="font-semibold text-gray-500 dark:text-gray-400">Status:</span> {punch.status}</p>
                             <p className="text-sm text-gray-400">Click title or pin to view details.</p>
+                        </>
+                    );
+                } else if (pin.type === 'photo') {
+                    // Photo pins store the photo ID in linkedId
+                    const photo = MOCK_PHOTOS.find(p => p.id === pin.linkedId);
+                    if (photo) content = (
+                        <>
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onOpenPhotoMarkup(photo); onClearHover(); }} 
+                                className="w-full text-left group"
+                            >
+                                <h4 className="font-semibold text-gray-900 dark:text-zinc-100 mb-2 truncate group-hover:text-gray-700 dark:group-hover:text-zinc-300 transition-colors underline decoration-dotted">
+                                    {photo.id}: {photo.title}
+                                </h4>
+                                <div className="rounded-md overflow-hidden mb-3 border border-gray-100 dark:border-zinc-800 shadow-sm transition-opacity group-hover:opacity-90">
+                                    <img src={photo.url} alt={photo.title} className="w-full h-32 object-cover" />
+                                </div>
+                            </button>
+                            <p className="text-sm text-gray-400">Click title or photo to view & annotate.</p>
                         </>
                     );
                 }

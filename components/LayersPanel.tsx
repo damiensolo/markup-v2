@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { Rectangle, Pin, RfiData, SubmittalData, PunchData, DrawingData, LineMarkup } from '../types';
-import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, SafetyPinIcon, PunchPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, LockClosedIcon, LockOpenIcon, XMarkIcon } from './Icons';
+import { ChevronDoubleLeftIcon, EyeIcon, EyeSlashIcon, TrashIcon, CloudIcon, BoxIcon, EllipseIcon, SafetyPinIcon, PunchPinIcon, PhotoPinIcon, ChevronRightIcon, DocumentDuplicateIcon, ClipboardListIcon, LockClosedIcon, LockOpenIcon, XMarkIcon } from './Icons';
 import Tooltip from './Tooltip';
 import { getRectDimensions, getEllipseDimensions, formatFt, formatArea } from '../utils/measurementUtils';
 import { MENUS_MODE } from '../utils/showcaseMode';
@@ -69,6 +69,7 @@ const ItemIcon = ({ item }: { item: LayerItem }) => {
     }
     else {
         if (item.type === 'safety') return <SafetyPinIcon className={iconClass} />;
+        if (item.type === 'photo') return <PhotoPinIcon className={iconClass} />;
         return <PunchPinIcon className={iconClass} />;
     }
 };

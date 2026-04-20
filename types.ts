@@ -116,7 +116,7 @@ export interface SafetyIssueData {
  */
 export interface Pin {
   id: string;
-  type: 'safety' | 'punch';
+  type: 'safety' | 'punch' | 'photo';
   x: number; // percentage
   y: number; // percentage
   linkedId: string; // id of SafetyIssueData or PunchData

@@ -5,7 +5,7 @@ import type { Rectangle, Pin, InteractionState, SafetyIssueData, PunchData, Line
 
 type ActiveTool = 'select' | 'shape' | 'pen' | 'line' | 'arrow' | 'freeline' | 'text' | 'pin' | 'image' | 'location' | 'measurement' | 'polygon' | 'highlighter' | 'customPin' | 'fill' | 'stroke';
 type ActiveShape = 'cloud' | 'box' | 'ellipse';
-type ActivePinType = 'safety' | 'punch';
+type ActivePinType = 'safety' | 'punch' | 'photo';
 
 const normalizeRect = (rect: Omit<Rectangle, 'id' | 'name' | 'visible'> | Rectangle, activeShape: ActiveShape): Rectangle => {
   const newRect = { ...rect, id: 'id' in rect ? rect.id : '', shape: 'shape' in rect && rect.shape ? rect.shape : activeShape, name: 'name' in rect ? rect.name : '', visible: 'visible' in rect ? rect.visible : true };
@@ -82,6 +82,7 @@ export const useCanvasInteraction = ({
   getRelativeCoords,
   handleSubmenuLink,
   setPinTargetCoords,
+  handleLinkPhoto,
   setSafetyTargetPinId, setSafetyFormData,
   setPunchTargetPinId, setPunchFormData, setPunchPanelMode,
   setActivePanel,
@@ -596,6 +597,10 @@ export const useCanvasInteraction = ({
           setPunchFormData({ title: '', status: 'Open', assignee: '' });
           setPunchPanelMode('create');
           setActivePanel('punch');
+          break;
+        case 'photo':
+          setPinTargetCoords(coords);
+          handleLinkPhoto('pin-target'); // reuse the existing linking logic
           break;
       }
       setInteraction({ type: 'none' });

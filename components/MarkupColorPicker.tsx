@@ -359,13 +359,8 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
       <div className="mb-4 flex gap-2">
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            {strokeOnly ? 'Outline color' : 'Area highlight'}
+            Markup Color
           </h3>
-          {!strokeOnly && (
-            <p className="mt-0.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
-              Adjust on the canvas — this panel stays out of the way.
-            </p>
-          )}
         </div>
         {onRequestClose && (
           <button
@@ -402,7 +397,7 @@ const MarkupColorPicker: React.FC<MarkupColorPickerProps> = ({
                 : 'text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200'
             }`}
           >
-            Outline
+            Stroke
           </button>
         </div>
       )}

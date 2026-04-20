@@ -6,7 +6,7 @@ import { Palette, ChevronUp, ChevronDown, Minus, Plus } from 'lucide-react';
 import type { Rectangle, Pin, ViewTransform, InteractionState, HoveredItemInfo, ResizeHandle, Measurement, LineMarkup, LineToolType, TextMarkup } from '../types';
 import ScaleDialog from './ScaleDialog';
 import { RectangleTagType, ToolbarPosition, ImageGeom } from '../App';
-import { UploadIcon, TrashIcon, LinkIcon, ArrowUpTrayIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowsPointingOutIcon, SunIcon, MoonIcon, SafetyPinIcon, PunchPinIcon, InformationCircleIcon, FilterIcon, CogIcon } from './Icons';
+import { UploadIcon, TrashIcon, LinkIcon, ArrowUpTrayIcon, MagnifyingGlassPlusIcon, MagnifyingGlassMinusIcon, ArrowsPointingOutIcon, SunIcon, MoonIcon, SafetyPinIcon, PunchPinIcon, PhotoPinIcon, InformationCircleIcon, FilterIcon, CogIcon } from './Icons';
 import Toolbar from './Toolbar';
 import Tooltip from './Tooltip';
 import MarkupColorPicker from './MarkupColorPicker';
@@ -1594,7 +1594,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                     {pins.filter(pin => pin.visible && filters[pin.type as FilterCategory]).map(pin => {
                       const screenPos = getScreenPoint(pin.x, pin.y);
                       if (!screenPos) return null;
-                      const PinIcon = { safety: SafetyPinIcon, punch: PunchPinIcon }[pin.type];
+                      const PinIcon = { safety: SafetyPinIcon, punch: PunchPinIcon, photo: PhotoPinIcon }[pin.type as 'safety' | 'punch' | 'photo'];
                       
                       // Allow selecting/dragging pin even in 'shape' mode to avoid confusion
                       const isSelectable = activeTool === 'select' || activeTool === 'shape';
@@ -1709,7 +1709,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                                 return next;
                                             });
                                         }}
-                                        title="Fill & stroke"
+                                        title="Markup Color"
                                         className={`p-2 rounded-md transition-colors ${markupColorPanelOpen ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
                                     >
                                         <Palette className="w-5 h-5" />
@@ -1758,7 +1758,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                                 return next;
                                             });
                                         }}
-                                        title="Fill & stroke"
+                                        title="Markup Color"
                                         className={`p-2 rounded-md transition-colors ${markupColorPanelOpen ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
                                     >
                                         <Palette className="w-5 h-5" />
@@ -2039,7 +2039,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                                 return next;
                                             });
                                         }}
-                                        title="Fill & stroke"
+                                        title="Markup Color"
                                         className={`p-2 rounded-md transition-colors ${markupColorPanelOpen ? 'bg-blue-600 text-white' : 'hover:bg-gray-700'}`}
                                     >
                                         <Palette className="w-5 h-5" />
@@ -2708,7 +2708,7 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                 className="pointer-events-auto absolute z-[50] max-h-[min(640px,calc(100%-4rem))] w-[min(300px,calc(100%-1.5rem))] overflow-y-auto overscroll-contain rounded-2xl"
                                 style={pickerStyle}
                                 role="dialog"
-                                aria-label="Markup fill and outline"
+                                aria-label="Markup color picker"
                             >
                                 <MarkupColorPicker
                                     activeMode={activeColor}
@@ -2717,7 +2717,16 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                     strokeValue={markupStrokeColor}
                                     onChange={onMarkupColorChange}
                                     onRequestClose={() => setMarkupColorPanelOpen(false)}
-                                    strokeOnly={activeTool === 'line' || activeTool === 'arrow' || activeTool === 'pen' || activeTool === 'highlighter'}
+                                    strokeOnly={
+                                        activeTool === 'line' || 
+                                        activeTool === 'arrow' || 
+                                        activeTool === 'pen' || 
+                                        activeTool === 'highlighter' || 
+                                        activeTool === 'freeline' || 
+                                        activeTool === 'measurement' ||
+                                        (selectedLineIds.length > 0 && selectedRectIds.length === 0) ||
+                                        (selectedTextId !== null && selectedRectIds.length === 0 && selectedLineIds.length === 0)
+                                    }
                                 />
                             </div>
                         );

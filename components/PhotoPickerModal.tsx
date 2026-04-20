@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { XMarkIcon, UploadIcon } from './Icons';
 import type { PhotoData } from '../types';
 
-const MOCK_PHOTOS: PhotoData[] = [
+export const MOCK_PHOTOS: PhotoData[] = [
     { id: 'PHOTO-01', title: 'Site Condition - West Wing', url: 'https://images.pexels.com/photos/1115804/pexels-photo-1115804.jpeg?auto=compress&cs=tinysrgb&w=600', source: 'linarc' },
     { id: 'PHOTO-02', title: 'Pre-pour inspection formwork', url: 'https://images.pexels.com/photos/302804/pexels-photo-302804.jpeg?auto=compress&cs=tinysrgb&w=600', source: 'linarc' },
     { id: 'PHOTO-03', title: 'HVAC Ducting - 3rd Floor', url: 'https://images.pexels.com/photos/834892/pexels-photo-834892.jpeg?auto=compress&cs=tinysrgb&w=600', source: 'linarc' },
