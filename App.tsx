@@ -1075,6 +1075,7 @@ const App: React.FC = () => {
 
   const {
     interaction,
+    setInteraction,
     currentRect,
     currentLineMarkup,
     marqueeRect,
@@ -2168,7 +2169,7 @@ const App: React.FC = () => {
                       const rectToResize = rectangles.find(r => r.id === rectId);
                       if (!startPoint || !rectToResize || rectToResize.locked) return;
                       setLinkMenuRectId(null);
-                      useCanvasInteraction.setState({ type: 'resizing', startPoint, initialRects: [rectToResize], handle });
+                      setInteraction({ type: 'resizing', startPoint, initialRects: [rectToResize], handle });
                     }}
                     handlePublishRect={(e, id) => {
                       e.stopPropagation();

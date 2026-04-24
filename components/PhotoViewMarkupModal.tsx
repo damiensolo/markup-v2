@@ -241,7 +241,7 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
 
     // ── interaction hook ─────────────────────────────────────────────────
     const noop = useCallback(() => {}, []);
-    const { interaction, currentRect, currentLineMarkup, hoveredLineId, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave } =
+    const { interaction, setInteraction, currentRect, currentLineMarkup, hoveredLineId, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave } =
         useCanvasInteraction({
             rectangles, setRectangles, pins: [], setPins: noop,
             activeTool, activeShape, activePinType: 'safety',
@@ -276,7 +276,7 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
         const rect = rectangles.find(r => r.id === rectId);
         if (!startPoint || !rect) return;
         setLinkMenuRectId(null);
-        useCanvasInteraction.setState({ type: 'resizing', startPoint, initialRects: [rect], handle } as any);
+        setInteraction({ type: 'resizing', startPoint, initialRects: [rect], handle } as any);
     }, [getRelativeCoords, rectangles]);
 
     // ── text tool helpers ─────────────────────────────────────────────────
@@ -768,7 +768,7 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                                         return (
                                             <circle key={idx} cx={lp.left} cy={lp.top}
                                                 r={isSelectedPoint ? 6 : 4}
-                                                fill="#ffffff" stroke={strokeColor} strokeWidth={2} />
+                                                fill="#ffffff" stroke={isSelected ? '#3b82f6' : strokeColor} strokeWidth={2} />
                                         );
                                     })}
                                 </g>
@@ -1109,24 +1109,28 @@ const PhotoViewMarkupModal: React.FC<Props> = ({ isOpen, photo, initialMarkups, 
                     })()}
 
                     {/* ── Resize handles (same as CanvasView) ──────────────── */}
-                    {singleSelectionScreenRect && !selectedRectangle?.locked && (
+                    {singleSelectionScreenRect && !selectedRectangle?.locked && (() => {
+                        const strokeColor = resolveRectStrokeColor(selectedRectangle!, true);
+                        return (
                         <>
                             {(['tl', 'tr', 'bl', 'br'] as ResizeHandle[]).map(handle => (
                                 <div
                                     key={handle}
                                     data-interactive-ui="true"
-                                    className="absolute w-3.5 h-3.5 bg-red-400 border-2 border-white dark:border-gray-900 rounded-full"
+                                    className="absolute w-3.5 h-3.5 bg-white border-2 rounded-full"
                                     style={{
                                         top:  handle.includes('t') ? singleSelectionScreenRect.top  - 8 : singleSelectionScreenRect.top  + singleSelectionScreenRect.height - 8,
                                         left: handle.includes('l') ? singleSelectionScreenRect.left - 8 : singleSelectionScreenRect.left + singleSelectionScreenRect.width  - 8,
                                         cursor: (handle === 'tl' || handle === 'br') ? 'nwse-resize' : 'nesw-resize',
+                                        borderColor: '#3b82f6',
                                         pointerEvents: 'auto', zIndex: 20,
                                     }}
                                     onMouseDown={e => handleResizeStart(e, selectedRectangle!.id, handle)}
                                 />
                             ))}
                         </>
-                    )}
+                        );
+                    })()}
 
                     {/* ── Selection floating menu (rect) ─────────────────────── */}
                     {singleSelectionScreenRect && !selectedRectangle?.locked && (

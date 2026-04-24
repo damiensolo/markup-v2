@@ -1389,13 +1389,13 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                                             />
                                         )}
                                         {/* Point handles for non-freehand strokes (line, arrow, freeline) */}
-                                        {!isFreehandTool && line.points.map((point, index) => {
+                                        {!isFreehandTool && isSelectedLine && line.points.map((point, index) => {
                                             const localPoint = getLocalPoint(point.x, point.y);
                                             if (!localPoint) return null;
                                             const isSelectedPoint = isSelectedLine && selectedLinePointIndex === index;
                                             return (
                                                 <g key={`${line.id}-${index}`} className="pointer-events-none" style={{ cursor: line.locked ? 'default' : 'grab' }}>
-                                                    <circle cx={localPoint.left} cy={localPoint.top} r={(isSelectedPoint ? 6 : 4) / s} fill="#ffffff" stroke={strokeColor} strokeWidth={2 / s} />
+                                                    <circle cx={localPoint.left} cy={localPoint.top} r={(isSelectedPoint ? 6 : 4) / s} fill="#ffffff" stroke={isSelectedLine ? '#3b82f6' : strokeColor} strokeWidth={2 / s} />
                                                 </g>
                                             );
                                         })}
@@ -1658,16 +1658,20 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                       );
                     })}
 
-                    {singleSelectionScreenRect && !selectedRectangle?.locked && (
+                    {singleSelectionScreenRect && !selectedRectangle?.locked && (() => {
+                      const strokeColor = resolveRectStrokeColor(selectedRectangle!, true);
+                      return (
                       <>
                         {(['tl', 'tr', 'bl', 'br'] as ResizeHandle[]).map(handle => (
                           <div
                             key={handle}
-                            className="absolute w-3.5 h-3.5 bg-red-400 border-2 border-white dark:border-gray-900 rounded-full"
+                            data-interactive-ui="true"
+                            className="absolute w-3.5 h-3.5 bg-white border-2 rounded-full"
                             style={{
                               top: handle.includes('t') ? singleSelectionScreenRect.top - 8 : singleSelectionScreenRect.top + singleSelectionScreenRect.height - 8,
                               left: handle.includes('l') ? singleSelectionScreenRect.left - 8 : singleSelectionScreenRect.left + singleSelectionScreenRect.width - 8,
                               cursor: (handle === 'tl' || handle === 'br') ? 'nwse-resize' : 'nesw-resize',
+                              borderColor: '#3b82f6',
                               pointerEvents: 'auto', zIndex: 20
                             }}
                             onMouseDown={(e) => selectedRectangle && handleResizeStart(e, selectedRectangle.id, handle)}
@@ -1719,7 +1723,8 @@ const CanvasView: React.FC<CanvasViewProps> = (props) => {
                             </div>
                         </div>
                       </>
-                    )}
+                      );
+                    })()}
 
                     {selectedLine && selectedLineScreenRect && !selectedLine.locked && (
                         <div data-interactive-ui="true" className={`absolute flex transition-opacity transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isMenuVisible ? 'opacity-100' : 'opacity-0'}`} style={{ left: `${selectedLineScreenRect.left + selectedLineScreenRect.width / 2}px`, top: `${selectedLineScreenRect.top}px`, transform: `translate(-50%, -100%) translateY(-10px) scale(${isMenuVisible ? 1 : 0.9})`, transformOrigin: 'bottom center', pointerEvents: isMenuVisible ? 'auto' : 'none', zIndex: 30 }}>

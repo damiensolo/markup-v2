@@ -199,6 +199,9 @@ export const useCanvasInteraction = ({
 
     if (activeTool === 'line' || activeTool === 'arrow' || activeTool === 'freeline') {
       setSelectedRectIds([]);
+      setSelectedLineId(null);
+      setSelectedLineIds([]);
+      setSelectedLinePointIndex(null);
       if (activeTool === 'freeline' && previouslySelectedLineId) {
         const selected = lineMarkups.find((line: LineMarkup) => line.id === previouslySelectedLineId && line.type === 'freeline');
         if (selected && !selected.closed && selected.points.length >= 3) {
@@ -730,9 +733,5 @@ export const useCanvasInteraction = ({
     }
   }, [interaction.type, draggingPinId, handleMouseUp]);
 
-  useCanvasInteraction.setState = setInteraction;
-
-  return { interaction, currentRect, marqueeRect, currentLineMarkup, hoveredLineId, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave };
+  return { interaction, setInteraction, currentRect, marqueeRect, currentLineMarkup, hoveredLineId, handleMouseDown, handleMouseMove, handleMouseUp, handleMouseLeave };
 };
-
-useCanvasInteraction.setState = (state: InteractionState) => {};
